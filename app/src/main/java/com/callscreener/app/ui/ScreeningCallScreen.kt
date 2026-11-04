@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -87,6 +88,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.core.keyframes
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
@@ -1816,9 +1819,9 @@ fun OemIncomingCallScreen(
     // Answer button idle heartbeat & expanding radar shockwave
     val answerPulse by infiniteTransition.animateFloat(
         initialValue = 1.0f,
-        targetValue = 1.07f,
+        targetValue = 1.06f,
         animationSpec = infiniteRepeatable(
-            animation = tween(850, easing = FastOutSlowInEasing),
+            animation = tween(900, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "answerPulse"
@@ -1826,18 +1829,18 @@ fun OemIncomingCallScreen(
 
     val answerRadarScale by infiniteTransition.animateFloat(
         initialValue = 1.0f,
-        targetValue = 1.62f,
+        targetValue = 1.68f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1400, easing = FastOutSlowInEasing),
+            animation = tween(1500, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "answerRadarScale"
     )
     val answerRadarAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.55f,
+        initialValue = 0.50f,
         targetValue = 0.0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1400, easing = FastOutSlowInEasing),
+            animation = tween(1500, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "answerRadarAlpha"
@@ -1845,31 +1848,73 @@ fun OemIncomingCallScreen(
 
     val answerRadarScale2 by infiniteTransition.animateFloat(
         initialValue = 1.0f,
-        targetValue = 1.95f,
+        targetValue = 2.05f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1400, delayMillis = 400, easing = FastOutSlowInEasing),
+            animation = tween(1500, delayMillis = 450, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "answerRadarScale2"
     )
     val answerRadarAlpha2 by infiniteTransition.animateFloat(
-        initialValue = 0.35f,
+        initialValue = 0.32f,
         targetValue = 0.0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1400, delayMillis = 400, easing = FastOutSlowInEasing),
+            animation = tween(1500, delayMillis = 450, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "answerRadarAlpha2"
     )
 
     val declineGlowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.20f,
-        targetValue = 0.45f,
+        initialValue = 0.22f,
+        targetValue = 0.52f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
+            animation = tween(1100, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "declineGlowAlpha"
+    )
+
+    val declineGlowScale by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1100, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "declineGlowScale"
+    )
+
+    // Periodic incoming call ringing handset vibration wiggle (every 2.4s)
+    val phoneWiggleAngle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 2400
+                0f at 0
+                -15f at 160 with FastOutSlowInEasing
+                15f at 320 with FastOutSlowInEasing
+                -11f at 480 with FastOutSlowInEasing
+                11f at 640 with FastOutSlowInEasing
+                -5f at 800 with FastOutSlowInEasing
+                0f at 960 with FastOutSlowInEasing
+                0f at 2400
+            },
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "phoneWiggleAngle"
+    )
+
+    // Continuous sweeping specular glint across glass orbs
+    val glassGlintOffset by infiniteTransition.animateFloat(
+        initialValue = -1.2f,
+        targetValue = 2.2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2800, delayMillis = 600, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "glassGlintOffset"
     )
 
     // AI Screen Pill shimmer sweep
@@ -2138,27 +2183,28 @@ fun OemIncomingCallScreen(
                 }
             }
 
-            // Bottom Decline (Left) and Answer (Right) - Modern VisionOS / iOS 18 Action Pods
+            // Bottom Decline (Left) and Answer (Right) - Full Premium Animated Liquid Glass Pods
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 34.dp),
+                    .padding(horizontal = 32.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Modern VisionOS / iOS 18 Liquid Glass Decline Action Pod (Left)
+                // Liquid Glass Decline Action Pod (Left)
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Box(
                         contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(86.dp)
+                        modifier = Modifier.size(96.dp)
                     ) {
-                        // Ambient Carmine Back-Radiance
+                        // Ambient Breathing Carmine Halo
                         Box(
                             modifier = Modifier
-                                .size(86.dp)
+                                .size(96.dp)
+                                .scale(declineGlowScale)
                                 .clip(CircleShape)
                                 .background(
                                     Brush.radialGradient(
@@ -2170,34 +2216,31 @@ fun OemIncomingCallScreen(
                                 )
                         )
 
-                        // Main Tactile Liquid Crimson Button
+                        // Main Tactile Liquid Crimson Glass Orb
                         Box(
                             modifier = Modifier
-                                .size(74.dp)
+                                .size(78.dp)
                                 .scale(declineScale)
-                                .shadow(
-                                    elevation = 22.dp,
-                                    shape = CircleShape,
-                                    spotColor = Color(0xDDFF3B30),
-                                    ambientColor = Color(0x50FF3B30)
-                                )
                                 .clip(CircleShape)
                                 .background(
-                                    Brush.verticalGradient(
+                                    Brush.radialGradient(
                                         listOf(
-                                            Color(0xFFFF453A), // Vivid carmine highlight
-                                            Color(0xFFD70015), // Pure crimson
-                                            Color(0xFF9E0B07)  // Deep rich obsidian crimson
-                                        )
+                                            Color(0x99FF453A), // Radiant apple carmine highlight
+                                            Color(0x75D70015), // Translucent liquid crimson
+                                            Color(0x452E070B)  // Deep obsidian wine glass base
+                                        ),
+                                        radius = 120f
                                     )
                                 )
                                 .border(
-                                    1.6.dp,
-                                    Brush.verticalGradient(
+                                    1.8.dp,
+                                    Brush.sweepGradient(
                                         listOf(
-                                            Color(0xAAFFFFFF), // Specular top light rim
-                                            Color(0x30FFFFFF),
-                                            Color(0x50FF453A)
+                                            Color(0xEEFFFFFF), // Crisp diamond top light reflection
+                                            Color(0x60FF453A),
+                                            Color(0x25FFFFFF),
+                                            Color(0x95FF3B30),
+                                            Color(0xEEFFFFFF)
                                         )
                                     ),
                                     CircleShape
@@ -2211,16 +2254,51 @@ fun OemIncomingCallScreen(
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            // Specular Top Sheen
+                            // Specular Top Curved Glass Sheen
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(37.dp)
+                                    .fillMaxHeight(0.52f)
                                     .align(Alignment.TopCenter)
                                     .background(
                                         Brush.verticalGradient(
                                             listOf(
-                                                Color(0x40FFFFFF),
+                                                Color(0x65FFFFFF),
+                                                Color(0x18FFFFFF),
+                                                Color.Transparent
+                                            )
+                                        )
+                                    )
+                            )
+
+                            // Sweeping Diagonal Glass Glint Reflection
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                val glintX = size.width * glassGlintOffset
+                                drawLine(
+                                    brush = Brush.linearGradient(
+                                        listOf(
+                                            Color.Transparent,
+                                            Color(0x60FFFFFF),
+                                            Color.Transparent
+                                        ),
+                                        start = Offset(glintX - 25f, 0f),
+                                        end = Offset(glintX + 25f, size.height)
+                                    ),
+                                    start = Offset(glintX - 25f, 0f),
+                                    end = Offset(glintX + 25f, size.height),
+                                    strokeWidth = 22f
+                                )
+                            }
+
+                            // Inner Luminous Core
+                            Box(
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.radialGradient(
+                                            listOf(
+                                                Color(0x30FFFFFF),
                                                 Color.Transparent
                                             )
                                         )
@@ -2231,7 +2309,7 @@ fun OemIncomingCallScreen(
                                 imageVector = Icons.Filled.CallEnd,
                                 contentDescription = "Decline",
                                 tint = Color.White,
-                                modifier = Modifier.size(32.dp)
+                                modifier = Modifier.size(34.dp)
                             )
                         }
                     }
@@ -2239,93 +2317,90 @@ fun OemIncomingCallScreen(
                     // Modern Frosted Micro-Pill Tag
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0x22FF453A))
-                            .border(0.8.dp, Color(0x40FF453A), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 11.dp, vertical = 3.5.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color(0x28FF3B30))
+                            .border(0.9.dp, Color(0x60FF453A), RoundedCornerShape(14.dp))
+                            .padding(horizontal = 14.dp, vertical = 4.dp)
                     ) {
                         Text(
                             text = "Decline",
-                            color = Color(0xFFFF6961),
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFFFF7B7B),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.SansSerif,
-                            letterSpacing = 0.4.sp
+                            letterSpacing = 0.5.sp
                         )
                     }
                 }
 
-                // Modern VisionOS / iOS 18 Liquid Glass Answer Action Pod (Right)
+                // Liquid Glass Answer Action Pod (Right)
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Box(
                         contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(86.dp)
+                        modifier = Modifier.size(96.dp)
                     ) {
-                        // Expanding Radar Ring 2
+                        // Expanding Outer Radar Shockwave 2
                         Box(
                             modifier = Modifier
-                                .size(74.dp)
+                                .size(78.dp)
                                 .scale(answerRadarScale2)
                                 .clip(CircleShape)
-                                .border(1.2.dp, Color(0x6030D158).copy(alpha = answerRadarAlpha2), CircleShape)
+                                .border(1.4.dp, Color(0x6530D158).copy(alpha = answerRadarAlpha2), CircleShape)
                         )
 
-                        // Expanding Radar Ring 1
+                        // Expanding Inner Radar Shockwave 1
                         Box(
                             modifier = Modifier
-                                .size(74.dp)
+                                .size(78.dp)
                                 .scale(answerRadarScale)
                                 .clip(CircleShape)
-                                .background(Color(0x2830D158).copy(alpha = answerRadarAlpha))
-                                .border(1.6.dp, Color(0x8030D158).copy(alpha = answerRadarAlpha), CircleShape)
+                                .background(Color(0x2530D158).copy(alpha = answerRadarAlpha))
+                                .border(1.8.dp, Color(0x9534C759).copy(alpha = answerRadarAlpha), CircleShape)
                         )
 
                         // Ambient Emerald Back-Radiance
                         Box(
                             modifier = Modifier
-                                .size(86.dp)
+                                .size(96.dp)
                                 .clip(CircleShape)
                                 .background(
                                     Brush.radialGradient(
                                         listOf(
-                                            Color(0x4530D158),
+                                            Color(0x5530D158),
                                             Color.Transparent
                                         )
                                     )
                                 )
                         )
 
-                        // Main Tactile Liquid Emerald Button
+                        // Main Tactile Liquid Emerald Glass Orb
                         Box(
                             modifier = Modifier
-                                .size(74.dp)
+                                .size(78.dp)
                                 .scale(answerScale)
-                                .shadow(
-                                    elevation = 24.dp,
-                                    shape = CircleShape,
-                                    spotColor = Color(0xDD30D158),
-                                    ambientColor = Color(0x7030D158)
-                                )
                                 .clip(CircleShape)
                                 .background(
-                                    Brush.verticalGradient(
+                                    Brush.radialGradient(
                                         listOf(
-                                            Color(0xFF34C759), // Luminous Apple Mint Emerald
-                                            Color(0xFF28A745),
-                                            Color(0xFF167B2F)  // Deep forest emerald base
-                                        )
+                                            Color(0x9934C759), // Radiant mint emerald highlight
+                                            Color(0x7528A745), // Translucent lush green
+                                            Color(0x450D3818)  // Deep forest obsidian glass base
+                                        ),
+                                        radius = 120f
                                     )
                                 )
                                 .border(
-                                    1.6.dp,
-                                    Brush.verticalGradient(
+                                    1.8.dp,
+                                    Brush.sweepGradient(
                                         listOf(
-                                            Color(0xBBFFFFFF), // Crisp diamond top light reflection
-                                            Color(0x40FFFFFF),
-                                            Color(0x6034C759)
+                                            Color(0xEEFFFFFF), // Crisp diamond top light reflection
+                                            Color(0x6034C759),
+                                            Color(0x25FFFFFF),
+                                            Color(0x9530D158),
+                                            Color(0xEEFFFFFF)
                                         )
                                     ),
                                     CircleShape
@@ -2339,27 +2414,65 @@ fun OemIncomingCallScreen(
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            // Specular Top Sheen
+                            // Specular Top Curved Glass Sheen
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(37.dp)
+                                    .fillMaxHeight(0.52f)
                                     .align(Alignment.TopCenter)
                                     .background(
                                         Brush.verticalGradient(
                                             listOf(
-                                                Color(0x50FFFFFF),
+                                                Color(0x65FFFFFF),
+                                                Color(0x18FFFFFF),
                                                 Color.Transparent
                                             )
                                         )
                                     )
                             )
 
+                            // Sweeping Diagonal Glass Glint Reflection
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                val glintX = size.width * glassGlintOffset
+                                drawLine(
+                                    brush = Brush.linearGradient(
+                                        listOf(
+                                            Color.Transparent,
+                                            Color(0x60FFFFFF),
+                                            Color.Transparent
+                                        ),
+                                        start = Offset(glintX - 25f, 0f),
+                                        end = Offset(glintX + 25f, size.height)
+                                    ),
+                                    start = Offset(glintX - 25f, 0f),
+                                    end = Offset(glintX + 25f, size.height),
+                                    strokeWidth = 22f
+                                )
+                            }
+
+                            // Inner Luminous Core
+                            Box(
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.radialGradient(
+                                            listOf(
+                                                Color(0x30FFFFFF),
+                                                Color.Transparent
+                                            )
+                                        )
+                                    )
+                            )
+
+                            // Animated Ringing Handset Icon
                             Icon(
                                 imageVector = Icons.Filled.Call,
                                 contentDescription = "Answer",
-                                tint = Color.White, // Crisp white glyph
-                                modifier = Modifier.size(32.dp)
+                                tint = Color.White,
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .rotate(phoneWiggleAngle)
                             )
                         }
                     }
@@ -2367,18 +2480,18 @@ fun OemIncomingCallScreen(
                     // Modern Frosted Micro-Pill Tag
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0x2230D158))
-                            .border(0.8.dp, Color(0x4530D158), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 11.dp, vertical = 3.5.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color(0x2830D158))
+                            .border(0.9.dp, Color(0x6534C759), RoundedCornerShape(14.dp))
+                            .padding(horizontal = 14.dp, vertical = 4.dp)
                     ) {
                         Text(
                             text = "Answer",
-                            color = Color(0xFF34C759),
-                            fontSize = 11.5.sp,
+                            color = Color(0xFF4CD964),
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.SansSerif,
-                            letterSpacing = 0.4.sp
+                            letterSpacing = 0.5.sp
                         )
                     }
                 }
