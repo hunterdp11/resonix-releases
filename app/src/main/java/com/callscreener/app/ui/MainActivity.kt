@@ -675,45 +675,51 @@ fun LiquidGlassBottomBar(
             .shadow(
                 elevation = 20.dp,
                 shape = RoundedCornerShape(32.dp),
-                spotColor = Color(0x90000000),
-                ambientColor = Color(0x50000000)
+                spotColor = Color(0x60000000),
+                ambientColor = Color(0x30000000)
             )
             .hazeChild(
                 state = hazeState,
                 shape = RoundedCornerShape(32.dp),
                 style = HazeStyle(
-                    tint = Color(0xFF161A24).copy(alpha = 0.55f),
-                    blurRadius = 30.dp,
-                    noiseFactor = 0.12f
+                    tint = Color(0x28FFFFFF),
+                    blurRadius = 26.dp,
+                    noiseFactor = 0f
                 )
             )
             .clip(RoundedCornerShape(32.dp))
+            .background(LiquidGlassDockFill)
             .border(
                 1.2.dp,
-                Brush.verticalGradient(
-                    listOf(
-                        Color(0x85FFFFFF), // Crisp diamond specular top rim
-                        Color(0x30FFFFFF),
-                        Color(0x10FFFFFF)
-                    )
-                ),
+                LiquidGlassDockBorder,
                 RoundedCornerShape(32.dp)
             )
     ) {
-        // Specular Top Sheen (light reflecting across curved frosted glass)
+        // Apple Signature Specular Top Sheen (refraction crest reflecting across curved frosted glass)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(28.dp)
+                .height(26.dp)
                 .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            Color(0x28FFFFFF),
+                            Color(0x38FFFFFF),
+                            Color(0x0EFFFFFF),
                             Color.Transparent
                         )
                     )
                 )
+        )
+
+        // Bottom refraction return rim
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .align(Alignment.BottomCenter)
+                .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
+                .background(Color(0x25FFFFFF))
         )
 
         BoxWithConstraints(
@@ -3787,11 +3793,11 @@ fun GlassAudioPresetsCard(
                 }
             }
 
-            // Presets List with Tight Spacing & Inline Up/Down Controls
+            // Compact Quick Access Preview (Top 3 Presets)
+            val previewPresets = remember(presets) { presets.take(3) }
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                presets.forEachIndexed { index, preset ->
+                previewPresets.forEach { preset ->
                     val isPlaying = currentlyPlayingId == preset.id
-                    val isCustom = preset.id.startsWith("custom_")
 
                     Box(
                         modifier = Modifier
@@ -3803,63 +3809,15 @@ fun GlassAudioPresetsCard(
                                 if (isPlaying) SolidColor(AppleGreen.copy(alpha = 0.7f)) else LiquidGlassBorderSubtle,
                                 RoundedCornerShape(14.dp)
                             )
-                            .padding(horizontal = 8.dp, vertical = 5.dp)
+                            .padding(horizontal = 10.dp, vertical = 7.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Reorder Controls: Up / Down Arrows + Index
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center,
-                                modifier = Modifier.padding(end = 4.dp)
-                            ) {
-                                IconButton(
-                                    onClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        presetManager.movePresetUp(preset.id)
-                                    },
-                                    enabled = index > 0,
-                                    modifier = Modifier.size(18.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.KeyboardArrowUp,
-                                        contentDescription = "Move Up",
-                                        tint = if (index > 0) Color.White else Color(0x25FFFFFF),
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                }
-
-                                Text(
-                                    text = "#${index + 1}",
-                                    color = if (preset.isAudioFile) AppleAmber else TextSecondary,
-                                    fontSize = 8.5.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold
-                                )
-
-                                IconButton(
-                                    onClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        presetManager.movePresetDown(preset.id)
-                                    },
-                                    enabled = index < presets.size - 1,
-                                    modifier = Modifier.size(18.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.KeyboardArrowDown,
-                                        contentDescription = "Move Down",
-                                        tint = if (index < presets.size - 1) Color.White else Color(0x25FFFFFF),
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                }
-                            }
-
-                            // Preset Icon
                             Box(
                                 modifier = Modifier
-                                    .size(32.dp)
+                                    .size(30.dp)
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(Color(0x18FFFFFF))
                                     .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(8.dp)),
@@ -3869,13 +3827,12 @@ fun GlassAudioPresetsCard(
                                     imageVector = if (preset.isAudioFile) Icons.Rounded.GraphicEq else Icons.AutoMirrored.Rounded.VolumeUp,
                                     contentDescription = null,
                                     tint = if (preset.isAudioFile) AppleAmber else Color.White,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(15.dp)
                                 )
                             }
 
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
 
-                            // Title and detail
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = preset.title,
@@ -3886,7 +3843,7 @@ fun GlassAudioPresetsCard(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = if (preset.isAudioFile) "Custom WAV/MP3 Audio" else "\"${preset.textOrPath}\"",
+                                    text = if (preset.isAudioFile) "Custom Audio File • Hardware Uplink" else "\"${preset.textOrPath}\"",
                                     color = TextSecondary,
                                     fontSize = 10.5.sp,
                                     maxLines = 1,
@@ -3894,9 +3851,8 @@ fun GlassAudioPresetsCard(
                                 )
                             }
 
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
 
-                            // Play / Stop Preview button
                             Box(
                                 modifier = Modifier
                                     .size(30.dp)
@@ -3919,55 +3875,74 @@ fun GlassAudioPresetsCard(
                                     modifier = Modifier.size(15.dp)
                                 )
                             }
-
-                            // Edit / Rename button for custom presets
-                            if (isCustom) {
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .size(28.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0x18FFFFFF))
-                                        .border(0.8.dp, Color(0x30FFFFFF), CircleShape)
-                                        .clickable {
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            presetToRenameId = preset.id
-                                            renamePresetTitle = preset.title
-                                            showRenameDialog = true
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Edit,
-                                        contentDescription = "Rename",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .size(28.dp)
-                                        .clip(CircleShape)
-                                        .background(AppleRed.copy(alpha = 0.2f))
-                                        .clickable {
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            presetManager.deletePreset(preset.id)
-                                            Toast.makeText(context, "Deleted ${preset.title}", Toast.LENGTH_SHORT).show()
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Delete,
-                                        contentDescription = "Delete",
-                                        tint = AppleRed,
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                }
-                            }
                         }
                     }
+                }
+            }
+
+            // Primary Hub Banner Button: Opens the dedicated Preset Management Screen
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                AppleAmber.copy(alpha = 0.20f),
+                                Color(0x18FFFFFF)
+                            )
+                        )
+                    )
+                    .border(1.dp, AppleAmber.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onOpenManager()
+                    }
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(AppleAmber.copy(alpha = 0.25f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Tune,
+                                contentDescription = null,
+                                tint = AppleAmber,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "Manage Soundboard (${presets.size} presets)",
+                                color = TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Reorder, delete, edit & organize soundboard",
+                                color = TextSecondary,
+                                fontSize = 10.5.sp
+                            )
+                        }
+                    }
+                    Icon(
+                        imageVector = Icons.Rounded.ChevronRight,
+                        contentDescription = "Open",
+                        tint = AppleAmber,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
 

@@ -75,11 +75,11 @@ val LiquidGlassFillSubtle = Brush.linearGradient(
     )
 )
 
-val LiquidGlassDockFill = Brush.verticalGradient(
+val LiquidGlassDockFill = Brush.linearGradient(
     listOf(
-        Color(0xF21C263C), // 95% dense frosted liquid glass top
-        Color(0xEA141D2E), // 92% dense glass body
-        Color(0xF50D1422)  // 96% deep OLED bottom base
+        Color(0x35FFFFFF), // Signature iOS specular dispersion top-left
+        Color(0x1E142032), // Translucent liquid crystal body
+        Color(0x160C1420)  // Deep OLED translucent base
     )
 )
 
@@ -101,9 +101,10 @@ val LiquidGlassBorderSubtle = Brush.verticalGradient(
 
 val LiquidGlassDockBorder = Brush.verticalGradient(
     listOf(
-        Color(0xCCFFFFFF), // Brilliant 80% specular refraction on top dock rim
-        Color(0x38FFFFFF),
-        Color(0x12FFFFFF)
+        Color(0x99FFFFFF), // Signature Apple edge-lighting: brilliant specular top rim
+        Color(0x38FFFFFF), // Prismatic light refraction on curved sides
+        Color(0x12FFFFFF), // Ambient subtle mid transition
+        Color(0x28FFFFFF)  // Bottom refraction return
     )
 )
 
