@@ -286,24 +286,7 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
             return
         }
 
-        if (useDirectRootInjection && !localSim) {
-            _isSpeaking.value = true
-            scope.launch {
-                // Pre-apply persona voice and pitch before synthesizing to audio track
-                applyVoiceForPersona(_activePersona.value)
-                injector.injectSpeech(processedText, textToSpeech) { success ->
-                    if (!success) {
-                        Log.w(TAG, "Direct injection failed, falling back to internal speak")
-                        speakInternal(processedText, false)
-                    } else {
-                        _isSpeaking.value = false
-                        onSpeechFinished?.invoke()
-                    }
-                }
-            }
-        } else {
-            speakInternal(processedText, localSim)
-        }
+        speakInternal(processedText, localSim)
     }
 
     /**

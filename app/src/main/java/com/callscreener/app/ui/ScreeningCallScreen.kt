@@ -161,9 +161,7 @@ fun ScreeningCallScreen(
     onToggleMute: () -> Unit,
     onToggleSpeaker: () -> Unit,
     onSelectPersona: (VoicePersona) -> Unit = {},
-    onToggleVoiceChanger: () -> Unit = {},
     onSwitchToAiTypeMode: () -> Unit = {},
-    onSwitchToVoiceChangerMode: () -> Unit = {},
     onSwitchToDirectMicMode: () -> Unit = {},
     onSimulateCallerReply: (String) -> Unit = {},
     onToggleAiVoiceListening: () -> Unit = {},
@@ -396,9 +394,7 @@ fun ScreeningCallScreen(
                     isMuted = state.isMuted,
                     isSpeakerOn = state.isSpeakerOn,
                     onSwitchToAiType = onSwitchToAiTypeMode,
-                    onSwitchToVoiceChanger = onSwitchToVoiceChangerMode,
                     onSwitchToDirectMic = onSwitchToDirectMicMode,
-                    onToggleVoiceChanger = onToggleVoiceChanger,
                     onTakeOver = onTakeOver,
                     onHangUp = onHangUp,
                     onToggleMute = onToggleMute,
@@ -978,9 +974,7 @@ fun UnifiedLiquidCommandIsland(
     isMuted: Boolean,
     isSpeakerOn: Boolean,
     onSwitchToAiType: () -> Unit,
-    onSwitchToVoiceChanger: () -> Unit,
     onSwitchToDirectMic: () -> Unit,
-    onToggleVoiceChanger: () -> Unit,
     onTakeOver: () -> Unit,
     onHangUp: () -> Unit,
     onToggleMute: () -> Unit,
@@ -1063,30 +1057,6 @@ fun UnifiedLiquidCommandIsland(
                     )
                 }
             }
-        } else if (audioMode == AudioCallMode.VOICE_CHANGER) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0x20FF9F0A))
-                    .border(0.8.dp, Color(0x50FF9F0A), RoundedCornerShape(12.dp))
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(7.dp)
-                        .clip(CircleShape)
-                        .background(AppleAmber)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Live Voice Changer: ${state.currentPersona.name} • Natural mic muted from caller",
-                    color = AppleAmber,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
         }
 
         // Type-to-Speak Input Bar (Minimalist Frosted Titanium)
@@ -1101,8 +1071,7 @@ fun UnifiedLiquidCommandIsland(
                     Text(
                         text = when (audioMode) {
                             AudioCallMode.AI_TYPE_SPEAK -> if (state.isListeningToUserSpeech) "Listening... speak into mic or type" else "Type a message to speak in AI Voice..."
-                            AudioCallMode.VOICE_CHANGER -> "Voice changer active... speak into mic"
-                            AudioCallMode.DIRECT_MIC -> "Direct microphone active..."
+                            else -> "Direct microphone active..."
                         },
                         color = TextTertiary,
                         fontSize = 13.sp
@@ -1213,10 +1182,10 @@ fun UnifiedLiquidCommandIsland(
                 )
             }
 
-            // Row 2: AI Voice | Voice Changer | Direct Mic
+            // Row 2: AI Voice Relay | Direct Mic
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceAround,
+                horizontalArrangement = Arrangement.spacedBy(48.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Button 4: AI Voice Relay Mode
@@ -1230,18 +1199,7 @@ fun UnifiedLiquidCommandIsland(
                     onClick = onSwitchToAiType
                 )
 
-                // Button 5: Voice Changer Mode
-                val isChanger = audioMode == AudioCallMode.VOICE_CHANGER
-                OemInCallControlButton(
-                    icon = Icons.Rounded.GraphicEq,
-                    label = "Changer",
-                    isActive = isChanger,
-                    activeColor = AppleAmber,
-                    activeContentColor = Color.Black,
-                    onClick = onSwitchToVoiceChanger
-                )
-
-                // Button 6: Direct Mic Mode
+                // Button 5: Direct Mic Mode
                 val isDirect = audioMode == AudioCallMode.DIRECT_MIC
                 OemInCallControlButton(
                     icon = Icons.Filled.Call,

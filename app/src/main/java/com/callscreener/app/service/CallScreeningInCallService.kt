@@ -117,19 +117,6 @@ class CallScreeningInCallService : InCallService() {
     override fun onCallAudioStateChanged(audioState: CallAudioState?) {
         super.onCallAudioStateChanged(audioState)
         Log.d(TAG, "Telecom onCallAudioStateChanged: route = ${audioState?.route}, isMuted = ${audioState?.isMuted}")
-
-        // If Telecom or system dialer automatically un-mutes the call while we are in
-        // AI Type-to-Speak or Voice Changer mode, immediately re-enforce mute to prevent natural voice leak!
-        try {
-            val sessionManager = CallSessionManager.getInstance(applicationContext)
-            val currentMode = sessionManager.sessionState.value.audioCallMode
-            if (currentMode != com.callscreener.app.model.AudioCallMode.DIRECT_MIC && audioState?.isMuted == false) {
-                Log.i(TAG, "Re-enforcing Telecom mute to prevent physical mic leakage during $currentMode")
-                setMuted(true)
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Error in onCallAudioStateChanged mute guard", e)
-        }
     }
 
     fun setSpeakerRoute(on: Boolean) {

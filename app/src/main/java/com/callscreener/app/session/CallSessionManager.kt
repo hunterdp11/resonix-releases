@@ -11,7 +11,6 @@ import com.callscreener.app.engine.AiVoiceRelayManager
 import com.callscreener.app.engine.AudioPresetManager
 import com.callscreener.app.engine.QuickReplyManager
 import com.callscreener.app.engine.CallSpeechManager
-import com.callscreener.app.engine.RealtimeVoiceChangerEngine
 import com.callscreener.app.model.AudioCallMode
 import com.callscreener.app.model.AudioPreset
 import com.callscreener.app.model.CallSessionState
@@ -44,7 +43,6 @@ class CallSessionManager private constructor(private val appContext: Context) {
 
     private val speechManager = CallSpeechManager(appContext)
     val aiVoiceRelayManager = AiVoiceRelayManager(appContext)
-    val voiceChangerEngine = RealtimeVoiceChangerEngine()
     val recordingEngine = CallRecordingEngine(appContext)
     val presetManager = AudioPresetManager(appContext)
     val quickReplyManager = QuickReplyManager(appContext)
@@ -53,10 +51,6 @@ class CallSessionManager private constructor(private val appContext: Context) {
 
     private val _sessionState = MutableStateFlow(CallSessionState())
     val sessionState: StateFlow<CallSessionState> = _sessionState.asStateFlow()
-
-    private val _isLiveMicTestRunning = MutableStateFlow(false)
-    val isLiveMicTestRunning: StateFlow<Boolean> = _isLiveMicTestRunning.asStateFlow()
-    val liveMicLevel: StateFlow<Float> = voiceChangerEngine.liveAudioLevel
 
     init {
         // Observe customized quick replies
@@ -136,13 +130,6 @@ class CallSessionManager private constructor(private val appContext: Context) {
                 _sessionState.update { it.copy(isListeningToUserSpeech = listening) }
             }
         }
-
-        // Observe Realtime Voice Changer state
-        scope.launch {
-            voiceChangerEngine.isVoiceChangerActive.collect { active ->
-                _sessionState.update { it.copy(isRealtimeVoiceChangerActive = active) }
-            }
-        }
     }
 
     /**
@@ -194,10 +181,10 @@ class CallSessionManager private constructor(private val appContext: Context) {
         val isPrivileged = (RootPrivilegeManager.isPrivilegedApp(appContext) || RootPrivilegeManager.isRootAvailable()) && !isSim
         speechManager.useDirectRootInjection = isPrivileged
 
-        // Start with Telecom raw mic MUTED — AI mode uses TTS AudioTrack as the uplink.
-        // This prevents any ambient mic audio from leaking to caller during AI screening.
-        CallScreeningInCallService.setCallMute(true)
-        audioManager.isMicrophoneMute = false // keep false so local SpeechRecognizer can hear user speech
+        // Ensure microphone is unmuted for speech recognition and AI Voice Relay.
+        // In root mode, ALSA unroutes raw mic from telephony TX so natural voice never leaks.
+        CallScreeningInCallService.setCallMute(false)
+        audioManager.isMicrophoneMute = false
 
         _sessionState.update {
             it.copy(
@@ -458,7 +445,6 @@ class CallSessionManager private constructor(private val appContext: Context) {
      * Physical mic is unrouted from carrier uplink via ALSA so speech to AI doesn't leak to caller.
      */
     fun switchToAiTypeMode() {
-        voiceChangerEngine.stop()
         speechManager.stop()
 
         val isSim = _sessionState.value.isSimulated
@@ -488,7 +474,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
         }
 
         audioManager.isMicrophoneMute = false
-        CallScreeningInCallService.currentInstance?.setMuted(false) // Keep local speech capture alive
+        CallScreeningInCallService.setCallMute(false) // Keep local speech capture alive
 
         _sessionState.update {
             it.copy(
@@ -507,77 +493,10 @@ class CallSessionManager private constructor(private val appContext: Context) {
     }
 
     /**
-     * MODE 2: Switch to Real-Time Live Mic Voice Changer.
-     * Your live voice into the microphone is transformed (e.g. Female Voice) and streamed live to caller.
-     *
-     * How we completely isolate and eliminate your real natural voice:
-     * 1. Unroute physical mic from Voice_Tx (TX_Voice -> 0) via ALSA tinymix so raw voice never reaches caller.
-     * 2. Route MultiMedia1 to Voice_Tx so caller receives only pitch-shifted voice.
-     * 3. Speakerphone is turned OFF to prevent physical acoustic feedback into the microphone.
-     * 4. AudioRecord captures clean mic, applies smooth Hann dual-grain pitch shift, and injects into call.
-     */
-    fun switchToVoiceChangerMode() {
-        stopLiveMicTest()
-        aiVoiceRelayManager.stopListening()
-        speechManager.stop()
-
-        val isSim = _sessionState.value.isSimulated
-        val stream = if (isSim) AudioManager.STREAM_MUSIC else AudioManager.STREAM_VOICE_CALL
-
-        if (isSim) {
-            audioManager.mode = AudioManager.MODE_NORMAL
-        } else {
-            audioManager.mode = AudioManager.MODE_IN_CALL
-            // Turn off speakerphone: prevents speaker sound from feeding back into microphone causing echo!
-            setSpeakerphone(false)
-        }
-
-        // Keep local AudioRecord unmuted while cutting raw mic from modem TX
-        audioManager.isMicrophoneMute = false
-        CallScreeningInCallService.currentInstance?.setMuted(false)
-
-        // Route ALSA mixers via root: cut raw mic from modem TX, route MultiMedia to modem TX
-        scope.launch {
-            try {
-                val script = """
-                    tinymix 'Voice_Tx Mixer MultiMedia1' 1 2>/dev/null || true
-                    tinymix 'Incall_Music Audio Mixer MultiMedia1' 1 2>/dev/null || true
-                    tinymix 'Incall_Music Audio Mixer MultiMedia2' 1 2>/dev/null || true
-                    tinymix 'Voice_Tx Mixer TX_Voice' 0 2>/dev/null || true
-                    tinymix 'Voice_Tx Mixer SLIM_0_TX_Voice' 0 2>/dev/null || true
-                    tinymix 'Voice_Tx Mixer PRI_TX_Voice' 0 2>/dev/null || true
-                    tinymix 'Voice_Tx Mixer TERT_MI2S_TX_Voice' 0 2>/dev/null || true
-                    tinymix 'Voice_Tx Mixer TX_CDC_DMA_TX_3' 0 2>/dev/null || true
-                    tinymix 'Voice_Tx Mixer SLIM_0_TX' 0 2>/dev/null || true
-                    tinymix 'Voice_Tx Mixer AFE_PCM_TX' 0 2>/dev/null || true
-                """.trimIndent()
-                RootPrivilegeManager.executeSuCommand(script)
-            } catch (_: Exception) {}
-        }
-
-        // Start live DSP engine
-        voiceChangerEngine.setPersona(_sessionState.value.currentPersona)
-        voiceChangerEngine.start(stream, appContext, isTestMode = isSim)
-
-        val persona = _sessionState.value.currentPersona
-        _sessionState.update {
-            it.copy(
-                audioCallMode = AudioCallMode.VOICE_CHANGER,
-                isRealtimeVoiceChangerActive = true,
-                status = CallStatus.SCREENING_ACTIVE,
-                isMuted = false,
-                isSpeakerOn = false
-            )
-        }
-        addMessage(MessageSender.SYSTEM, "Voice Changer Active (${persona.name} Female Voice). Speak into your phone — live DSP pitch shift active!")
-    }
-
-    /**
-     * MODE 3: Switch to Direct Real Mic Mode.
+     * MODE 2: Switch to Direct Real Mic Mode.
      * Raw mic → Telecom uplink → caller (no processing).
      */
     fun switchToDirectMicMode() {
-        voiceChangerEngine.stop()
         speechManager.stop()
         aiVoiceRelayManager.release()
 
@@ -629,61 +548,9 @@ class CallSessionManager private constructor(private val appContext: Context) {
      */
     fun setVoicePersona(persona: VoicePersona) {
         speechManager.setVoicePersona(persona)
-        voiceChangerEngine.setPersona(persona)
         aiVoiceRelayManager.targetLanguageTag = persona.localeTag
         _sessionState.update { it.copy(currentPersona = persona) }
         addMessage(MessageSender.SYSTEM, "Voice profile updated: ${persona.name} (${persona.tag})")
-    }
-
-    /**
-     * Single-Device Live Mic Test Studio:
-     * Allows the user to speak into their phone microphone and hear their
-     * pitch-shifted voice immediately in real time through headphones/earbuds or speaker,
-     * without needing a second phone or active call.
-     */
-    fun startLiveMicTest(persona: VoicePersona? = null) {
-        if (_isLiveMicTestRunning.value) return
-        persona?.let { setVoicePersona(it) }
-        voiceChangerEngine.setPersona(_sessionState.value.currentPersona)
-        voiceChangerEngine.start(
-            streamType = AudioManager.STREAM_MUSIC,
-            context = appContext,
-            isTestMode = true
-        )
-        _isLiveMicTestRunning.value = true
-        Log.i(TAG, "Single-Device Live Mic Test started with persona: ${_sessionState.value.currentPersona.name}")
-    }
-
-    fun stopLiveMicTest() {
-        if (!_isLiveMicTestRunning.value) return
-        voiceChangerEngine.stop()
-        _isLiveMicTestRunning.value = false
-        Log.i(TAG, "Single-Device Live Mic Test stopped")
-    }
-
-    fun toggleLiveMicTest(persona: VoicePersona? = null) {
-        if (_isLiveMicTestRunning.value) {
-            stopLiveMicTest()
-        } else {
-            startLiveMicTest(persona)
-        }
-    }
-
-    /**
-     * Toggle Real-time Voice Changer for live microphone speech.
-     */
-    fun toggleRealtimeVoiceChanger() {
-        val currentCall = activeTelecomCall
-        if (currentCall == null && !_sessionState.value.isSimulated) {
-            // Not in a call: toggle the Single-Device Live Mic Test Studio directly!
-            toggleLiveMicTest()
-            return
-        }
-        if (_sessionState.value.audioCallMode == AudioCallMode.VOICE_CHANGER) {
-            switchToAiTypeMode()
-        } else {
-            switchToVoiceChangerMode()
-        }
     }
 
     /**
@@ -797,7 +664,6 @@ class CallSessionManager private constructor(private val appContext: Context) {
         speechManager.stop()
         speechManager.isSimulatorMode = false
         aiVoiceRelayManager.release()
-        voiceChangerEngine.stop()
         durationJob?.cancel()
 
         try {
@@ -825,7 +691,6 @@ class CallSessionManager private constructor(private val appContext: Context) {
         speechManager.stop()
         speechManager.isSimulatorMode = false
         aiVoiceRelayManager.release()
-        voiceChangerEngine.stop()
         durationJob?.cancel()
         activeTelecomCall = null
         _sessionState.update { it.copy(status = CallStatus.ENDED) }
@@ -834,36 +699,11 @@ class CallSessionManager private constructor(private val appContext: Context) {
 
     /**
      * Toggle Mute.
-     * In VOICE_CHANGER and AI_TYPE_SPEAK modes the Telecom raw uplink is kept muted at all times
-     * — only the engine's AudioTrack reaches the caller. So "muting" in those modes means
-     * stopping the voice changer engine (or doing nothing for AI, since TTS is already push-only).
-     * In DIRECT_MIC mode, muting toggles the raw telecom uplink normally.
      */
     fun toggleMute() {
         val newMute = !_sessionState.value.isMuted
-        when (_sessionState.value.audioCallMode) {
-            AudioCallMode.VOICE_CHANGER -> {
-                // Mute = stop the DSP engine (no audio reaches caller); unmute = restart it
-                if (newMute) {
-                    voiceChangerEngine.stop()
-                    audioManager.isMicrophoneMute = true
-                } else {
-                    audioManager.isMicrophoneMute = false
-                    val isSim = _sessionState.value.isSimulated
-                    val stream = if (isSim) AudioManager.STREAM_MUSIC else AudioManager.STREAM_VOICE_CALL
-                    voiceChangerEngine.start(stream, appContext, isTestMode = isSim)
-                }
-            }
-            AudioCallMode.DIRECT_MIC -> {
-                // Raw telecom uplink — toggle normally
-                audioManager.isMicrophoneMute = newMute
-                CallScreeningInCallService.setCallMute(newMute)
-            }
-            AudioCallMode.AI_TYPE_SPEAK -> {
-                // TTS push-only; nothing to toggle on the raw path
-                audioManager.isMicrophoneMute = newMute
-            }
-        }
+        audioManager.isMicrophoneMute = newMute
+        CallScreeningInCallService.setCallMute(newMute)
         _sessionState.update { it.copy(isMuted = newMute) }
     }
 

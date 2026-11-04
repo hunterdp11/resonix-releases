@@ -546,11 +546,6 @@ fun MainDashboard(
                     )
                     context.startActivity(Intent(context, ScreeningCallActivity::class.java))
                     selectedContactForDetails = null
-                },
-                onVoiceChangerTest = { persona ->
-                    sessionManager.setVoicePersona(persona)
-                    sessionManager.startLiveMicTest(persona)
-                    Toast.makeText(context, "Voice Changer live test: ${persona.name}. Speak into phone mic!", Toast.LENGTH_SHORT).show()
                 }
             )
         }
@@ -1105,8 +1100,7 @@ fun Ios26LiquidContactDetailsSheet(
     onPlayPreset: (AudioPreset) -> Unit = {},
     onDismiss: () -> Unit,
     onCall: (String) -> Unit,
-    onScreen: (String, String) -> Unit,
-    onVoiceChangerTest: (VoicePersona) -> Unit
+    onScreen: (String, String) -> Unit
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -1605,8 +1599,7 @@ fun CallLogDetailsDialog(
         onPlayPreset = onPlayPreset,
         onDismiss = onDismiss,
         onCall = onCall,
-        onScreen = { _, _ -> onScreen(log) },
-        onVoiceChangerTest = {}
+        onScreen = { _, _ -> onScreen(log) }
     )
 }
 
@@ -3248,13 +3241,11 @@ fun GlassSimulatorCard(onStartSimulation: () -> Unit) {
 fun GlassVoiceStudioCard(
     selectedPersona: VoicePersona,
     onSelectPersona: (VoicePersona) -> Unit,
-    isLiveMicActive: Boolean,
-    onToggleLiveMic: () -> Unit
+    isLiveMicActive: Boolean = false,
+    onToggleLiveMic: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val sessionManager = remember { CallSessionManager.getInstance(context) }
-    val isMicTestRunning by sessionManager.isLiveMicTestRunning.collectAsState()
-    val liveLevel by sessionManager.liveMicLevel.collectAsState()
     val sessionState by sessionManager.sessionState.collectAsState()
 
     Box(
@@ -3265,7 +3256,7 @@ fun GlassVoiceStudioCard(
             .background(LiquidGlassFill)
             .border(
                 1.2.dp,
-                if (isMicTestRunning) Brush.verticalGradient(listOf(AppleGreen, AppleGreen.copy(alpha = 0.4f))) else LiquidGlassBorder,
+                LiquidGlassBorder,
                 RoundedCornerShape(26.dp)
             )
             .padding(18.dp)
@@ -3281,21 +3272,18 @@ fun GlassVoiceStudioCard(
                         modifier = Modifier
                             .size(38.dp)
                             .clip(CircleShape)
-                            .background(
-                                if (isMicTestRunning) AppleGreen.copy(alpha = 0.25f)
-                                else Color(0x18FFFFFF)
-                            )
+                            .background(Color(0x18FFFFFF))
                             .border(
                                 0.8.dp,
-                                if (isMicTestRunning) AppleGreen.copy(alpha = 0.4f) else Color(0x30FFFFFF),
+                                Color(0x30FFFFFF),
                                 CircleShape
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.GraphicEq,
+                            imageVector = Icons.Rounded.RecordVoiceOver,
                             contentDescription = null,
-                            tint = if (isMicTestRunning) AppleGreen else Color.White,
+                            tint = AppleGreen,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -3304,34 +3292,16 @@ fun GlassVoiceStudioCard(
 
                     Column {
                         Text(
-                            text = "Real-Time Voice Studio",
+                            text = "AI Voice Studio",
                             color = TextPrimary,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = (-0.3).sp
                         )
                         Text(
-                            text = if (isMicTestRunning) "Live Single-Device Mic Test Active" else "Single-device live mic test and voice personas",
-                            color = if (isMicTestRunning) AppleGreen else TextSecondary,
+                            text = "Studio neural voice personas & AI Voice Relay",
+                            color = TextSecondary,
                             fontSize = 12.sp
-                        )
-                    }
-                }
-
-                if (isMicTestRunning) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(AppleGreen.copy(alpha = 0.2f))
-                            .border(0.8.dp, AppleGreen.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 8.dp, vertical = 3.dp)
-                    ) {
-                        Text(
-                            text = "LIVE",
-                            color = AppleGreen,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
                         )
                     }
                 }
@@ -3518,67 +3488,6 @@ fun GlassVoiceStudioCard(
                 )
             }
 
-            // Live Audio Level & Waveform Monitor (shown when mic test is active)
-            if (isMicTestRunning) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0x22000000))
-                        .border(1.dp, AppleGreen.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
-                        .padding(12.dp)
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Mic Input Level (Speak now to test)",
-                                color = AppleGreen,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = "${(liveLevel * 100).toInt()}%",
-                                color = AppleTeal,
-                                fontSize = 11.sp,
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
-
-                        // Audio Level Bar
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(8.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(Color(0x33FFFFFF))
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(fraction = liveLevel.coerceIn(0.05f, 1.0f))
-                                    .height(8.dp)
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            listOf(AppleTeal, AppleGreen, AppleAmber)
-                                        )
-                                    )
-                            )
-                        }
-
-                        Text(
-                            text = "Transformed audio is playing out of speaker/headphones in real-time. Wear earbuds to avoid acoustic feedback.",
-                            color = TextTertiary,
-                            fontSize = 11.sp,
-                            lineHeight = 14.sp
-                        )
-                    }
-                }
-            }
-
             // Live AI Voice Relay Transcript Banner
             AnimatedVisibility(visible = sessionState.isListeningToUserSpeech || sessionState.userLiveTranscript.isNotBlank()) {
                 Box(
@@ -3632,61 +3541,31 @@ fun GlassVoiceStudioCard(
                 )
             }
 
-            // Secondary Row: Sample TTS and DSP Pitch Test
-            Row(
+            // Secondary Button: Sample Neural Voice Persona
+            OutlinedButton(
+                onClick = {
+                    val sampleText = when (selectedPersona.id) {
+                        "hindi_pooja" -> "नमस्ते! मैं पूजा बोल रही हूँ। बताइए, क्या काम था? यह आवाज़ बिल्कुल असली लगती है।"
+                        "hindi_ananya" -> "नमस्ते जी, मैं अनन्या हूँ। आपकी कॉल स्क्रीन की जा रही है, आप अपना संदेश बताइए।"
+                        "hindi_kavya" -> "Hello! मैं काव्या बोल रही हूँ, how can I help you? सब कुछ एकदम natural sound कर रहा है।"
+                        "hindi_aarav" -> "नमस्ते, मैं आरव बोल रहा हूँ। कृपया बताइए आपने किस सिलसिले में कॉल किया है?"
+                        "hindi_vikram" -> "नमस्ते। विक्रम बात कर रहा हूँ। इस नंबर पर फालतू कॉल करना तुरंत बंद कर दें।"
+                        "girl_chloe" -> "Hey! How is it going? I am Chloe. Ready to prank your friends?"
+                        "girl_zoe" -> "Hi there! Zoe here, everything sounds completely natural and real."
+                        "girl_mia" -> "Hey, what is up? It is Mia. I am all set for your call."
+                        else -> "Hello, this is ${selectedPersona.name}. How can I assist you today?"
+                    }
+                    Toast.makeText(context, "Playing ${selectedPersona.name} sample...", Toast.LENGTH_SHORT).show()
+                    sessionManager.testSpeech(sampleText)
+                },
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
+                border = androidx.compose.foundation.BorderStroke(1.2.dp, LiquidGlassBorder)
             ) {
-                OutlinedButton(
-                    onClick = {
-                        val sampleText = when (selectedPersona.id) {
-                            "hindi_pooja" -> "नमस्ते! मैं पूजा बोल रही हूँ। बताइए, क्या काम था? यह आवाज़ बिल्कुल असली लगती है।"
-                            "hindi_ananya" -> "नमस्ते जी, मैं अनन्या हूँ। आपकी कॉल स्क्रीन की जा रही है, आप अपना संदेश बताइए।"
-                            "hindi_kavya" -> "Hello! मैं काव्या बोल रही हूँ, how can I help you? सब कुछ एकदम natural sound कर रहा है।"
-                            "hindi_aarav" -> "नमस्ते, मैं आरव बोल रहा हूँ। कृपया बताइए आपने किस सिलसिले में कॉल किया है?"
-                            "hindi_vikram" -> "नमस्ते। विक्रम बात कर रहा हूँ। इस नंबर पर फालतू कॉल करना तुरंत बंद कर दें।"
-                            "girl_chloe" -> "Hey! How is it going? I am Chloe. Ready to prank your friends?"
-                            "girl_zoe" -> "Hi there! Zoe here, everything sounds completely natural and real."
-                            "girl_mia" -> "Hey, what is up? It is Mia. I am all set for your call."
-                            else -> "Hello, this is ${selectedPersona.name}. How can I assist you today?"
-                        }
-                        Toast.makeText(context, "Playing ${selectedPersona.name} sample...", Toast.LENGTH_SHORT).show()
-                        sessionManager.testSpeech(sampleText)
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
-                    border = androidx.compose.foundation.BorderStroke(1.2.dp, LiquidGlassBorder)
-                ) {
-                    Icon(Icons.Rounded.GraphicEq, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Sample Voice", fontSize = 12.sp)
-                }
-
-                Button(
-                    onClick = {
-                        onToggleLiveMic()
-                        sessionManager.toggleLiveMicTest(selectedPersona)
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isMicTestRunning) AppleRed else Color(0x30FFFFFF)
-                    ),
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(16.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.2.dp, LiquidGlassBorder)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.GraphicEq,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        if (isMicTestRunning) "Stop DSP" else "DSP Pitch Test",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                Icon(Icons.AutoMirrored.Rounded.VolumeUp, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Sample Voice Persona", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
