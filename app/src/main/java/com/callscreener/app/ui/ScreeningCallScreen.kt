@@ -1816,10 +1816,10 @@ fun OemIncomingCallScreen(
         label = "dotAlpha"
     )
 
-    // Answer button idle heartbeat & expanding radar shockwave
+    // Answer button gentle organic pulse
     val answerPulse by infiniteTransition.animateFloat(
         initialValue = 1.0f,
-        targetValue = 1.06f,
+        targetValue = 1.05f,
         animationSpec = infiniteRepeatable(
             animation = tween(900, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -1827,47 +1827,20 @@ fun OemIncomingCallScreen(
         label = "answerPulse"
     )
 
-    val answerRadarScale by infiniteTransition.animateFloat(
+    // Answer ambient aura scale
+    val answerAuraScale by infiniteTransition.animateFloat(
         initialValue = 1.0f,
-        targetValue = 1.68f,
+        targetValue = 1.16f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
+            animation = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
         ),
-        label = "answerRadarScale"
-    )
-    val answerRadarAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.50f,
-        targetValue = 0.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "answerRadarAlpha"
-    )
-
-    val answerRadarScale2 by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 2.05f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, delayMillis = 450, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "answerRadarScale2"
-    )
-    val answerRadarAlpha2 by infiniteTransition.animateFloat(
-        initialValue = 0.32f,
-        targetValue = 0.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, delayMillis = 450, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "answerRadarAlpha2"
+        label = "answerAuraScale"
     )
 
     val declineGlowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.22f,
-        targetValue = 0.52f,
+        initialValue = 0.25f,
+        targetValue = 0.60f,
         animationSpec = infiniteRepeatable(
             animation = tween(1100, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -1877,7 +1850,7 @@ fun OemIncomingCallScreen(
 
     val declineGlowScale by infiniteTransition.animateFloat(
         initialValue = 1.0f,
-        targetValue = 1.15f,
+        targetValue = 1.14f,
         animationSpec = infiniteRepeatable(
             animation = tween(1100, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -1885,7 +1858,7 @@ fun OemIncomingCallScreen(
         label = "declineGlowScale"
     )
 
-    // Periodic incoming call ringing handset vibration wiggle (every 2.4s)
+    // Subtle incoming call ringing handset vibration wiggle (every 2.4s)
     val phoneWiggleAngle by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 0f,
@@ -1893,28 +1866,17 @@ fun OemIncomingCallScreen(
             animation = keyframes {
                 durationMillis = 2400
                 0f at 0
-                -15f at 160 with FastOutSlowInEasing
-                15f at 320 with FastOutSlowInEasing
-                -11f at 480 with FastOutSlowInEasing
-                11f at 640 with FastOutSlowInEasing
-                -5f at 800 with FastOutSlowInEasing
-                0f at 960 with FastOutSlowInEasing
+                -12f at 160 using FastOutSlowInEasing
+                12f at 320 using FastOutSlowInEasing
+                -8f at 480 using FastOutSlowInEasing
+                8f at 640 using FastOutSlowInEasing
+                -4f at 800 using FastOutSlowInEasing
+                0f at 960 using FastOutSlowInEasing
                 0f at 2400
             },
             repeatMode = RepeatMode.Restart
         ),
         label = "phoneWiggleAngle"
-    )
-
-    // Continuous sweeping specular glint across glass orbs
-    val glassGlintOffset by infiniteTransition.animateFloat(
-        initialValue = -1.2f,
-        targetValue = 2.2f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2800, delayMillis = 600, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "glassGlintOffset"
     )
 
     // AI Screen Pill shimmer sweep
@@ -2183,315 +2145,174 @@ fun OemIncomingCallScreen(
                 }
             }
 
-            // Bottom Decline (Left) and Answer (Right) - Full Premium Animated Liquid Glass Pods
+            // Bottom Decline (Left) and Answer (Right) - Modern Minimalist Frosted Glass Discs
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 32.dp),
+                    .padding(horizontal = 42.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Liquid Glass Decline Action Pod (Left)
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                // Modern Minimalist Ruby Glass Decline Button (Left)
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(84.dp)
                 ) {
+                    // Soft Ambient Ruby Aura
                     Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(96.dp)
+                        modifier = Modifier
+                            .size(80.dp)
+                            .scale(declineGlowScale)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    listOf(
+                                        Color(0xFFFF3B30).copy(alpha = declineGlowAlpha * 0.7f),
+                                        Color.Transparent
+                                    )
+                                )
+                            )
+                    )
+
+                    // Frosted Liquid Glass Button
+                    Box(
+                        modifier = Modifier
+                            .size(74.dp)
+                            .scale(declineScale)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color(0x40FF453A),
+                                        Color(0x22D70015),
+                                        Color(0x28180608)
+                                    )
+                                )
+                            )
+                            .border(
+                                1.4.dp,
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color(0x80FFFFFF),
+                                        Color(0x30FF453A),
+                                        Color(0x18FFFFFF)
+                                    )
+                                ),
+                                CircleShape
+                            )
+                            .clickable(
+                                interactionSource = declineSource,
+                                indication = null
+                            ) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onDecline()
+                            },
+                        contentAlignment = Alignment.Center
                     ) {
-                        // Ambient Breathing Carmine Halo
+                        // Subtle specular top glass sheen
                         Box(
                             modifier = Modifier
-                                .size(96.dp)
-                                .scale(declineGlowScale)
-                                .clip(CircleShape)
+                                .fillMaxWidth()
+                                .height(37.dp)
+                                .align(Alignment.TopCenter)
                                 .background(
-                                    Brush.radialGradient(
+                                    Brush.verticalGradient(
                                         listOf(
-                                            Color(0xFFFF3B30).copy(alpha = declineGlowAlpha),
+                                            Color(0x35FFFFFF),
                                             Color.Transparent
                                         )
                                     )
                                 )
                         )
 
-                        // Main Tactile Liquid Crimson Glass Orb
-                        Box(
-                            modifier = Modifier
-                                .size(78.dp)
-                                .scale(declineScale)
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.radialGradient(
-                                        listOf(
-                                            Color(0x99FF453A), // Radiant apple carmine highlight
-                                            Color(0x75D70015), // Translucent liquid crimson
-                                            Color(0x452E070B)  // Deep obsidian wine glass base
-                                        ),
-                                        radius = 120f
-                                    )
-                                )
-                                .border(
-                                    1.8.dp,
-                                    Brush.sweepGradient(
-                                        listOf(
-                                            Color(0xEEFFFFFF), // Crisp diamond top light reflection
-                                            Color(0x60FF453A),
-                                            Color(0x25FFFFFF),
-                                            Color(0x95FF3B30),
-                                            Color(0xEEFFFFFF)
-                                        )
-                                    ),
-                                    CircleShape
-                                )
-                                .clickable(
-                                    interactionSource = declineSource,
-                                    indication = null
-                                ) {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    onDecline()
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            // Specular Top Curved Glass Sheen
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .fillMaxHeight(0.52f)
-                                    .align(Alignment.TopCenter)
-                                    .background(
-                                        Brush.verticalGradient(
-                                            listOf(
-                                                Color(0x65FFFFFF),
-                                                Color(0x18FFFFFF),
-                                                Color.Transparent
-                                            )
-                                        )
-                                    )
-                            )
-
-                            // Sweeping Diagonal Glass Glint Reflection
-                            Canvas(modifier = Modifier.fillMaxSize()) {
-                                val glintX = size.width * glassGlintOffset
-                                drawLine(
-                                    brush = Brush.linearGradient(
-                                        listOf(
-                                            Color.Transparent,
-                                            Color(0x60FFFFFF),
-                                            Color.Transparent
-                                        ),
-                                        start = Offset(glintX - 25f, 0f),
-                                        end = Offset(glintX + 25f, size.height)
-                                    ),
-                                    start = Offset(glintX - 25f, 0f),
-                                    end = Offset(glintX + 25f, size.height),
-                                    strokeWidth = 22f
-                                )
-                            }
-
-                            // Inner Luminous Core
-                            Box(
-                                modifier = Modifier
-                                    .size(46.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        Brush.radialGradient(
-                                            listOf(
-                                                Color(0x30FFFFFF),
-                                                Color.Transparent
-                                            )
-                                        )
-                                    )
-                            )
-
-                            Icon(
-                                imageVector = Icons.Filled.CallEnd,
-                                contentDescription = "Decline",
-                                tint = Color.White,
-                                modifier = Modifier.size(34.dp)
-                            )
-                        }
-                    }
-
-                    // Modern Frosted Micro-Pill Tag
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color(0x28FF3B30))
-                            .border(0.9.dp, Color(0x60FF453A), RoundedCornerShape(14.dp))
-                            .padding(horizontal = 14.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = "Decline",
-                            color = Color(0xFFFF7B7B),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.SansSerif,
-                            letterSpacing = 0.5.sp
+                        Icon(
+                            imageVector = Icons.Filled.CallEnd,
+                            contentDescription = "Decline",
+                            tint = Color.White,
+                            modifier = Modifier.size(32.dp)
                         )
                     }
                 }
 
-                // Liquid Glass Answer Action Pod (Right)
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                // Modern Minimalist Emerald Glass Answer Button (Right)
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(84.dp)
                 ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(96.dp)
-                    ) {
-                        // Expanding Outer Radar Shockwave 2
-                        Box(
-                            modifier = Modifier
-                                .size(78.dp)
-                                .scale(answerRadarScale2)
-                                .clip(CircleShape)
-                                .border(1.4.dp, Color(0x6530D158).copy(alpha = answerRadarAlpha2), CircleShape)
-                        )
-
-                        // Expanding Inner Radar Shockwave 1
-                        Box(
-                            modifier = Modifier
-                                .size(78.dp)
-                                .scale(answerRadarScale)
-                                .clip(CircleShape)
-                                .background(Color(0x2530D158).copy(alpha = answerRadarAlpha))
-                                .border(1.8.dp, Color(0x9534C759).copy(alpha = answerRadarAlpha), CircleShape)
-                        )
-
-                        // Ambient Emerald Back-Radiance
-                        Box(
-                            modifier = Modifier
-                                .size(96.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.radialGradient(
-                                        listOf(
-                                            Color(0x5530D158),
-                                            Color.Transparent
-                                        )
-                                    )
-                                )
-                        )
-
-                        // Main Tactile Liquid Emerald Glass Orb
-                        Box(
-                            modifier = Modifier
-                                .size(78.dp)
-                                .scale(answerScale)
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.radialGradient(
-                                        listOf(
-                                            Color(0x9934C759), // Radiant mint emerald highlight
-                                            Color(0x7528A745), // Translucent lush green
-                                            Color(0x450D3818)  // Deep forest obsidian glass base
-                                        ),
-                                        radius = 120f
-                                    )
-                                )
-                                .border(
-                                    1.8.dp,
-                                    Brush.sweepGradient(
-                                        listOf(
-                                            Color(0xEEFFFFFF), // Crisp diamond top light reflection
-                                            Color(0x6034C759),
-                                            Color(0x25FFFFFF),
-                                            Color(0x9530D158),
-                                            Color(0xEEFFFFFF)
-                                        )
-                                    ),
-                                    CircleShape
-                                )
-                                .clickable(
-                                    interactionSource = answerSource,
-                                    indication = null
-                                ) {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    onAnswer()
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            // Specular Top Curved Glass Sheen
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .fillMaxHeight(0.52f)
-                                    .align(Alignment.TopCenter)
-                                    .background(
-                                        Brush.verticalGradient(
-                                            listOf(
-                                                Color(0x65FFFFFF),
-                                                Color(0x18FFFFFF),
-                                                Color.Transparent
-                                            )
-                                        )
-                                    )
-                            )
-
-                            // Sweeping Diagonal Glass Glint Reflection
-                            Canvas(modifier = Modifier.fillMaxSize()) {
-                                val glintX = size.width * glassGlintOffset
-                                drawLine(
-                                    brush = Brush.linearGradient(
-                                        listOf(
-                                            Color.Transparent,
-                                            Color(0x60FFFFFF),
-                                            Color.Transparent
-                                        ),
-                                        start = Offset(glintX - 25f, 0f),
-                                        end = Offset(glintX + 25f, size.height)
-                                    ),
-                                    start = Offset(glintX - 25f, 0f),
-                                    end = Offset(glintX + 25f, size.height),
-                                    strokeWidth = 22f
-                                )
-                            }
-
-                            // Inner Luminous Core
-                            Box(
-                                modifier = Modifier
-                                    .size(46.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        Brush.radialGradient(
-                                            listOf(
-                                                Color(0x30FFFFFF),
-                                                Color.Transparent
-                                            )
-                                        )
-                                    )
-                            )
-
-                            // Animated Ringing Handset Icon
-                            Icon(
-                                imageVector = Icons.Filled.Call,
-                                contentDescription = "Answer",
-                                tint = Color.White,
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .rotate(phoneWiggleAngle)
-                            )
-                        }
-                    }
-
-                    // Modern Frosted Micro-Pill Tag
+                    // Soft Ambient Emerald Aura
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color(0x2830D158))
-                            .border(0.9.dp, Color(0x6534C759), RoundedCornerShape(14.dp))
-                            .padding(horizontal = 14.dp, vertical = 4.dp)
+                            .size(84.dp)
+                            .scale(answerAuraScale)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    listOf(
+                                        Color(0x5030D158),
+                                        Color.Transparent
+                                    )
+                                )
+                            )
+                    )
+
+                    // Frosted Liquid Glass Button
+                    Box(
+                        modifier = Modifier
+                            .size(74.dp)
+                            .scale(answerScale)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color(0x4834C759),
+                                        Color(0x2828A745),
+                                        Color(0x280B2B15)
+                                    )
+                                )
+                            )
+                            .border(
+                                1.4.dp,
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color(0x95FFFFFF),
+                                        Color(0x4034C759),
+                                        Color(0x20FFFFFF)
+                                    )
+                                ),
+                                CircleShape
+                            )
+                            .clickable(
+                                interactionSource = answerSource,
+                                indication = null
+                            ) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onAnswer()
+                            },
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "Answer",
-                            color = Color(0xFF4CD964),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.SansSerif,
-                            letterSpacing = 0.5.sp
+                        // Subtle specular top glass sheen
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(37.dp)
+                                .align(Alignment.TopCenter)
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            Color(0x40FFFFFF),
+                                            Color.Transparent
+                                        )
+                                    )
+                                )
+                        )
+
+                        Icon(
+                            imageVector = Icons.Filled.Call,
+                            contentDescription = "Answer",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .rotate(phoneWiggleAngle)
                         )
                     }
                 }
