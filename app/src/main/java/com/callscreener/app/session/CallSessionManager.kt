@@ -1,8 +1,10 @@
 package com.callscreener.app.session
 
 import android.content.Context
+import android.media.AudioAttributes
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
+import android.media.MediaPlayer
 import android.os.Build
 import android.telecom.Call
 import android.telecom.VideoProfile
@@ -581,6 +583,49 @@ class CallSessionManager private constructor(private val appContext: Context) {
         }
     }
 
+    private var localMonitorPlayer: MediaPlayer? = null
+
+    /**
+     * Plays a gentle, comfortable sidetone preview of custom audio on the local device
+     * (earpiece/headset/speaker at ~20% volume) so the user knows exactly what is playing
+     * to the caller, without causing acoustic feedback.
+     */
+    fun playLocalAudioMonitor(audioFile: File, volume: Float = 0.20f) {
+        stopLocalAudioMonitor()
+        try {
+            localMonitorPlayer = MediaPlayer().apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+                setDataSource(audioFile.absolutePath)
+                setVolume(volume, volume)
+                setOnCompletionListener {
+                    stopLocalAudioMonitor()
+                }
+                setOnErrorListener { _, _, _ ->
+                    stopLocalAudioMonitor()
+                    true
+                }
+                prepare()
+                start()
+            }
+            Log.d(TAG, "Started local audio monitor for ${audioFile.name} at volume $volume")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to start local audio monitor", e)
+        }
+    }
+
+    fun stopLocalAudioMonitor() {
+        try {
+            localMonitorPlayer?.stop()
+            localMonitorPlayer?.release()
+        } catch (_: Exception) {}
+        localMonitorPlayer = null
+    }
+
     /**
      * Injects an Audio Preset directly into active call or simulator.
      * Uses Root Call Audio Injector for 100% digital playback with ZERO physical mic noise!
@@ -597,7 +642,11 @@ class CallSessionManager private constructor(private val appContext: Context) {
                     if (isSim) {
                         presetManager.previewPreset(preset)
                     } else {
+                        // Play gentle local sidetone monitor so user can hear what is playing at ~20% volume
+                        playLocalAudioMonitor(audioFile, volume = 0.20f)
+
                         speechManager.injector.injectAudioFile(audioFile) { success ->
+                            stopLocalAudioMonitor()
                             Log.i(TAG, "Audio preset injected into call: $success")
                             if (_sessionState.value.status == CallStatus.SCREENING_ACTIVE &&
                                 _sessionState.value.audioCallMode == AudioCallMode.AI_TYPE_SPEAK &&
@@ -664,6 +713,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
         speechManager.stop()
         speechManager.isSimulatorMode = false
         aiVoiceRelayManager.release()
+        stopLocalAudioMonitor()
         durationJob?.cancel()
 
         try {
@@ -691,6 +741,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
         speechManager.stop()
         speechManager.isSimulatorMode = false
         aiVoiceRelayManager.release()
+        stopLocalAudioMonitor()
         durationJob?.cancel()
         activeTelecomCall = null
         _sessionState.update { it.copy(status = CallStatus.ENDED) }

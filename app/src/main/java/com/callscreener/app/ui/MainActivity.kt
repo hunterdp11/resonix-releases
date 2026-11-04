@@ -3362,7 +3362,62 @@ fun GlassVoiceStudioCard(
                 }
             }
 
-            // Section 2: Pure Girl Voices (English • Real-Life Neural)
+            // Section 2: Assamese Neural Voices (অসমীয়া মডেল • Regional Native Voice)
+            Text(
+                text = "Assamese Neural Voices (অসমীয়া মডেল)",
+                color = AppleAmber,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.2).sp
+            )
+
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(VoicePersona.ASSAMESE_PERSONAS, key = { it.id }) { persona ->
+                    val isSelected = persona.id == selectedPersona.id
+                    Box(
+                        modifier = Modifier
+                            .shadow(elevation = if (isSelected) 8.dp else 2.dp, shape = RoundedCornerShape(16.dp), spotColor = Color(0x40000000))
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (isSelected) LiquidGlassFillElevated else LiquidGlassFillSubtle)
+                            .border(
+                                1.2.dp,
+                                if (isSelected) SolidColor(AppleAmber) else LiquidGlassBorderSubtle,
+                                RoundedCornerShape(16.dp)
+                            )
+                            .clickable {
+                                onSelectPersona(persona)
+                                sessionManager.setVoicePersona(persona)
+                            }
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (isSelected) AppleAmber.copy(alpha = 0.35f) else Color(0x18FFFFFF))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = persona.code,
+                                    color = if (isSelected) AppleAmber else TextTertiary,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = persona.name,
+                                color = TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Section 3: Pure Girl Voices (English • Real-Life Neural)
             Text(
                 text = "Pure Girl Voices (English • Real-Life Neural)",
                 color = TextSecondary,
@@ -3550,6 +3605,10 @@ fun GlassVoiceStudioCard(
                         "hindi_kavya" -> "Hello! मैं काव्या बोल रही हूँ, how can I help you? सब कुछ एकदम natural sound कर रहा है।"
                         "hindi_aarav" -> "नमस्ते, मैं आरव बोल रहा हूँ। कृपया बताइए आपने किस सिलसिले में कॉल किया है?"
                         "hindi_vikram" -> "नमस्ते। विक्रम बात कर रहा हूँ। इस नंबर पर फालतू कॉल करना तुरंत बंद कर दें।"
+                        "as_juri" -> "নমস্কাৰ! মই জুৰি কৈছোঁ। কওকচোন, কি কথাত ফোন কৰিছিল? এইটো সম্পূৰ্ণ প্ৰাকৃতিক মাত।"
+                        "as_priyanka" -> "নমস্কাৰ, মই প্ৰিয়ংকা। আপোনাৰ ফোনটো স্ক্ৰীণ কৰা হৈছে, আপোনাৰ বার্তা কওক।"
+                        "as_ratul" -> "নমস্কাৰ, মই ৰাতুল কৈছোঁ। অনুগ্ৰহ কৰি কওক কি সম্পৰ্কে ফোন কৰিছে?"
+                        "as_bhaskar" -> "নমস্কাৰ, ভাস্কৰ কৈছোঁ। এই নম্বৰত অনাহকত ফোন নকৰিব।"
                         "girl_chloe" -> "Hey! How is it going? I am Chloe. Ready to prank your friends?"
                         "girl_zoe" -> "Hi there! Zoe here, everything sounds completely natural and real."
                         "girl_mia" -> "Hey, what is up? It is Mia. I am all set for your call."

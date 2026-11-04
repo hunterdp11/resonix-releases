@@ -83,6 +83,11 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
                 Log.w(TAG, "Locale $targetLocale not fully supported, trying fallback")
                 if (persona.isHindi) {
                     tts.setLanguage(Locale("hi", "IN"))
+                } else if (persona.isAssamese) {
+                    val asResult = tts.setLanguage(Locale("as", "IN"))
+                    if (asResult == TextToSpeech.LANG_MISSING_DATA || asResult == TextToSpeech.LANG_NOT_SUPPORTED) {
+                        tts.setLanguage(Locale("en", "IN"))
+                    }
                 } else {
                     tts.setLanguage(Locale.US)
                 }
@@ -90,16 +95,16 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
 
             val availableVoices = tts.voices
             if (!availableVoices.isNullOrEmpty()) {
-                val targetLangCode = persona.languageCode // "hi" or "en"
+                val targetLangCode = persona.languageCode // "hi", "as", or "en"
 
-                // 1. Filter voices for target language (e.g. "hi")
+                // 1. Filter voices for target language (e.g. "hi" or "as")
                 val langVoices = availableVoices.filter { voice ->
                     voice.locale.language.equals(targetLangCode, ignoreCase = true)
                 }
                 val candidateVoices = if (langVoices.isNotEmpty()) {
                     langVoices
-                } else if (persona.isHindi) {
-                    // Fallback to Indian English (en-IN) if pure Hindi voice is not downloaded
+                } else if (persona.isHindi || persona.isAssamese) {
+                    // Fallback to Indian English (en-IN) if pure Hindi/Assamese voice pack is not downloaded
                     val indianVoices = availableVoices.filter {
                         it.locale.country.equals("IN", ignoreCase = true)
                     }
@@ -294,6 +299,38 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
      * neural TTS engine pronounces every word with native Indian phonetics instead of awkward English phonetics.
      */
     private fun normalizeHinglishForTts(input: String, persona: VoicePersona): String {
+        if (persona.isAssamese) {
+            val bengaliAssameseCount = input.count { it in '\u0980'..'\u09FF' }
+            if (bengaliAssameseCount > input.length / 3) return input
+            var text = input
+            val asReplacements = listOf(
+                Regex("(?i)\\bnamaskar\\b|\\bnomoskar\\b") to "নমস্কাৰ",
+                Regex("(?i)\\bki\\s*khobor\\b") to "কি খবৰ",
+                Regex("(?i)\\bbhal\\b") to "ভাল",
+                Regex("(?i)\\bapuni\\b") to "আপুনি",
+                Regex("(?i)\\bkone\\b") to "কোনে",
+                Regex("(?i)\\bkoidise\\b|\\bkoise\\b|\\bkoisey\\b") to "কৈছে",
+                Regex("(?i)\\bkiba\\b") to "কিবা",
+                Regex("(?i)\\bkaam\\b") to "কাম",
+                Regex("(?i)\\beitiya\\b|\\betiya\\b") to "এতিয়া",
+                Regex("(?i)\\bpisot\\b|\\bpasot\\b") to "পাছত",
+                Regex("(?i)\\bphone\\b|\\bphon\\b") to "ফোন",
+                Regex("(?i)\\bkarok\\b|\\bkoro\\b|\\bkorim\\b") to "কৰক",
+                Regex("(?i)\\bdhanyabad\\b|\\bdhonyobad\\b") to "ধন্যবাদ",
+                Regex("(?i)\\broba\\b|\\brobo\\b") to "ৰ'ব",
+                Regex("(?i)\\bduwarmukhot\\b|\\bduwar\\b") to "দুৱাৰমুখত",
+                Regex("(?i)\\bthoidiyok\\b|\\bthoy\\b|\\bthowk\\b") to "থৈ দিয়ক",
+                Regex("(?i)\\bbhul\\b") to "ভুল",
+                Regex("(?i)\\bnombor\\b|\\bnumber\\b") to "নম্বৰ",
+                Regex("(?i)\\bproyojon\\b") to "প্ৰয়োজন",
+                Regex("(?i)\\bnai\\b") to "নাই"
+            )
+            for ((pattern, script) in asReplacements) {
+                text = pattern.replace(text, script)
+            }
+            return text
+        }
+
         if (!persona.isHindi) return input
         val devanagariCount = input.count { it in '\u0900'..'\u097F' }
         if (devanagariCount > input.length / 3) return input

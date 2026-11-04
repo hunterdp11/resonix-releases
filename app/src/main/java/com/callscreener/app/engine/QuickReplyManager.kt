@@ -38,6 +38,12 @@ class QuickReplyManager(private val context: Context) {
                     )
                 }
                 if (list.isNotEmpty()) {
+                    val existingIds = list.map { it.id }.toSet()
+                    val newDefaults = QuickReply.DEFAULT_REPLIES.filter { it.id !in existingIds }
+                    if (newDefaults.isNotEmpty()) {
+                        list.addAll(newDefaults)
+                        saveQuickReplies(list)
+                    }
                     _quickReplies.value = list
                     return
                 }

@@ -53,6 +53,12 @@ class AudioPresetManager(private val context: Context) {
                     )
                 }
                 if (list.isNotEmpty()) {
+                    val existingIds = list.map { it.id }.toSet()
+                    val newDefaults = AudioPreset.DEFAULT_PRESETS.filter { it.id !in existingIds }
+                    if (newDefaults.isNotEmpty()) {
+                        list.addAll(newDefaults)
+                        saveAllPresets(list)
+                    }
                     _presets.value = list
                     return
                 }

@@ -107,7 +107,7 @@ class AiVoiceRelayManager(private val context: Context) : RecognitionListener {
                     putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, lang)
-                    putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf("en-US", "en-IN", "hi-IN"))
+                    putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf("en-US", "en-IN", "hi-IN", "as-IN"))
                 }
 
                 speechRecognizer?.startListening(intent)
