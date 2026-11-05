@@ -177,8 +177,7 @@ class CallScreeningInCallService : InCallService() {
                     """
                         cmd telecom set-call-muted true 2>/dev/null || true
                         tinymix 'Voice Tx Mute' 1 2>/dev/null || true
-                        tinymix 'Voice Tx Device Mute' 1 2>/dev/null || true
-                        tinymix 'Voip Tx Mute' 1 2>/dev/null || true
+                        tinymix 'Voice Tx Device Mute' 0 2>/dev/null || true
                         tinymix 'Voice_Tx Mixer MultiMedia1' 1 2>/dev/null || true
                         tinymix 'Incall_Music Audio Mixer MultiMedia1' 1 2>/dev/null || true
                         tinymix 'Voice_Tx Mixer TX_Voice' 0 2>/dev/null || true

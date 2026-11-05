@@ -49,7 +49,7 @@ class AiVoiceRelayManager(private val context: Context) : RecognitionListener {
     val speechEvents: SharedFlow<String> = _speechEvents.asSharedFlow()
 
     @Volatile
-    var isAutoRelayActive: Boolean = true
+    var isAutoRelayActive: Boolean = false
 
     @Volatile
     var isTtsCurrentlySpeaking: Boolean = false
@@ -82,19 +82,15 @@ class AiVoiceRelayManager(private val context: Context) : RecognitionListener {
                     return@post
                 }
 
+                // If recognizer is active or already exists, cancel previous session cleanly
+                try {
+                    speechRecognizer?.cancel()
+                } catch (_: Exception) {}
+
                 if (speechRecognizer == null) {
-                    speechRecognizer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) {
-                        try {
-                            Log.i(TAG, "Creating on-device SpeechRecognizer for ultra-low latency")
-                            SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
-                        } catch (e: Exception) {
-                            Log.w(TAG, "On-device recognizer creation failed, falling back to default", e)
-                            SpeechRecognizer.createSpeechRecognizer(context)
-                        }
-                    } else {
-                        SpeechRecognizer.createSpeechRecognizer(context)
+                    speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
+                        setRecognitionListener(this@AiVoiceRelayManager)
                     }
-                    speechRecognizer?.setRecognitionListener(this@AiVoiceRelayManager)
                 }
 
                 val defaultLang = Locale.getDefault().toLanguageTag()
@@ -116,7 +112,9 @@ class AiVoiceRelayManager(private val context: Context) : RecognitionListener {
             } catch (e: Exception) {
                 Log.e(TAG, "Error in startListening()", e)
                 _isListening.value = false
-                recreateRecognizer(backoffMs = 1000L)
+                if (isAutoRelayActive) {
+                    recreateRecognizer(backoffMs = 1200L)
+                }
             }
         }
     }
@@ -125,6 +123,7 @@ class AiVoiceRelayManager(private val context: Context) : RecognitionListener {
         mainHandler.post {
             try {
                 speechRecognizer?.stopListening()
+                speechRecognizer?.cancel()
             } catch (e: Exception) {
                 Log.w(TAG, "Error stopping recognizer", e)
             }
@@ -173,7 +172,8 @@ class AiVoiceRelayManager(private val context: Context) : RecognitionListener {
     override fun onBufferReceived(buffer: ByteArray?) {}
 
     override fun onEndOfSpeech() {
-        Log.d(TAG, "SpeechRecognizer onEndOfSpeech")
+        _isListening.value = false
+        Log.d(TAG, "SpeechRecognizer onEndOfSpeech (processing speech)")
     }
 
     override fun onError(error: Int) {
@@ -190,25 +190,33 @@ class AiVoiceRelayManager(private val context: Context) : RecognitionListener {
             else -> "CODE_$error"
         }
         Log.d(TAG, "SpeechRecognizer status: $errorDesc ($error)")
+        _isListening.value = false
+        _livePartialTranscript.value = ""
 
-        // If error is simply NO_MATCH or SPEECH_TIMEOUT, user just paused or hasn't spoken yet.
-        // Don't destroy the recognizer! Simply restart listening if still in auto-relay.
+        // If auto-relay is OFF, do NOT loop or auto-restart! Simply remain idle until user taps mic.
+        if (!isAutoRelayActive || isTtsCurrentlySpeaking) {
+            return
+        }
+
+        // Auto-relay is active:
         if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
             consecutiveErrors = 0
-            if (isAutoRelayActive && !isTtsCurrentlySpeaking) {
-                mainHandler.postDelayed({
-                    if (isAutoRelayActive && !isTtsCurrentlySpeaking) {
-                        try {
-                            startListening()
-                        } catch (_: Exception) {}
-                    }
-                }, 250L)
-            }
+            mainHandler.postDelayed({
+                if (isAutoRelayActive && !isTtsCurrentlySpeaking && !_isListening.value) {
+                    try {
+                        startListening()
+                    } catch (_: Exception) {}
+                }
+            }, 700L)
             return
         }
 
         consecutiveErrors++
-        recreateRecognizer(backoffMs = (consecutiveErrors * 400L).coerceIn(500L, 2000L))
+        if (consecutiveErrors <= 3) {
+            recreateRecognizer(backoffMs = (consecutiveErrors * 600L).coerceIn(800L, 2500L))
+        } else {
+            Log.w(TAG, "Excessive SpeechRecognizer errors ($consecutiveErrors). Pausing auto-restart to prevent flapping.")
+        }
     }
 
     private fun recreateRecognizer(backoffMs: Long) {
@@ -222,7 +230,7 @@ class AiVoiceRelayManager(private val context: Context) : RecognitionListener {
 
             if (isAutoRelayActive && !isTtsCurrentlySpeaking) {
                 mainHandler.postDelayed({
-                    if (isAutoRelayActive && !isTtsCurrentlySpeaking) {
+                    if (isAutoRelayActive && !isTtsCurrentlySpeaking && !_isListening.value) {
                         startListening()
                     }
                 }, backoffMs)
@@ -232,22 +240,24 @@ class AiVoiceRelayManager(private val context: Context) : RecognitionListener {
 
     override fun onResults(results: Bundle?) {
         consecutiveErrors = 0
+        _isListening.value = false
+        _livePartialTranscript.value = ""
         val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
         val text = matches?.firstOrNull()?.trim()
-        _livePartialTranscript.value = ""
 
         if (!text.isNullOrBlank()) {
             Log.i(TAG, "Final user speech transcribed: '$text'")
             _speechEvents.tryEmit(text)
-        }
-
-        // Instantly restart listening so subsequent sentences are never dropped
-        if (isAutoRelayActive && !isTtsCurrentlySpeaking) {
+            // Once emitted, CallSessionManager will trigger TTS playback.
+            // When TTS completes, CallSessionManager.speechManager.onSpeechFinished
+            // will resume listening if isAutoRelayEnabled is true.
+        } else if (isAutoRelayActive && !isTtsCurrentlySpeaking) {
+            // No speech detected, restart listening after debounce
             mainHandler.postDelayed({
-                if (isAutoRelayActive && !isTtsCurrentlySpeaking) {
+                if (isAutoRelayActive && !isTtsCurrentlySpeaking && !_isListening.value) {
                     startListening()
                 }
-            }, 300L)
+            }, 600L)
         }
     }
 

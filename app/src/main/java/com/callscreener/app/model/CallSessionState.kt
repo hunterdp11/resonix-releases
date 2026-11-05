@@ -30,7 +30,7 @@ data class CallSessionState(
     val isRealtimeVoiceChangerActive: Boolean = false,
     val isListeningToUserSpeech: Boolean = false,
     val userLiveTranscript: String = "",
-    val isAutoRelayEnabled: Boolean = true,
+    val isAutoRelayEnabled: Boolean = false,
     val isGreetingEnabled: Boolean = false,
     val isHideNumberOnCallerId: Boolean = false,
     val isRecording: Boolean = false,

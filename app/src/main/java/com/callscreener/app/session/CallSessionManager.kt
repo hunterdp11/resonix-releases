@@ -416,8 +416,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
                             tinymix 'Voice_Tx Mixer SLIM_0_TX' 0 2>/dev/null || true
                             tinymix 'Voice_Tx Mixer AFE_PCM_TX' 0 2>/dev/null || true
                             tinymix 'Voice Tx Mute' 1 2>/dev/null || true
-                            tinymix 'Voice Tx Device Mute' 1 2>/dev/null || true
-                            tinymix 'Voip Tx Mute' 1 2>/dev/null || true
+                            tinymix 'Voice Tx Device Mute' 0 2>/dev/null || true
                         """.trimIndent()
                         RootPrivilegeManager.executeSuCommand(script)
                     }
