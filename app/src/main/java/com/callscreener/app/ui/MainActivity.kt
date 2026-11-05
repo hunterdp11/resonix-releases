@@ -971,7 +971,7 @@ fun RecentsScreen(
             // LazyColumn extends edge-to-edge; items scroll fluidly underneath the transparent status bar!
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = statusBarTop + 68.dp, bottom = 120.dp, start = 20.dp, end = 20.dp),
+                contentPadding = PaddingValues(top = statusBarTop + 78.dp, bottom = 120.dp, start = 20.dp, end = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 groupedLogs.forEach { (dateGroup, logsInGroup) ->
@@ -1123,7 +1123,18 @@ fun RecentsScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = statusBarTop + 6.dp, start = 20.dp, end = 20.dp, bottom = 8.dp),
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xFF000000),
+                            Color(0xFF000000),
+                            Color(0xF5000000),
+                            Color(0xD0000000),
+                            Color.Transparent
+                        )
+                    )
+                )
+                .padding(top = statusBarTop + 14.dp, start = 20.dp, end = 20.dp, bottom = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -1137,7 +1148,7 @@ fun RecentsScreen(
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // Minimalist Monochromatic Frosted Capsule: All | Missed
                 Box(
@@ -1155,12 +1166,12 @@ fun RecentsScreen(
                                     .clip(RoundedCornerShape(15.dp))
                                     .background(if (isSel) Color(0x35FFFFFF) else Color.Transparent)
                                     .clickable { selectedFilter = filter }
-                                    .padding(horizontal = 14.dp, vertical = 5.dp)
+                                    .padding(horizontal = 12.dp, vertical = 5.dp)
                             ) {
                                 Text(
                                     text = filter,
                                     color = if (isSel) Color.White else TextSecondary,
-                                    fontSize = 13.sp,
+                                    fontSize = 12.5.sp,
                                     fontWeight = if (isSel) FontWeight.SemiBold else FontWeight.Normal
                                 )
                             }
@@ -1168,7 +1179,7 @@ fun RecentsScreen(
                     }
                 }
 
-                // 3-Dot Options Menu
+                // 3-Dot Options Menu with dedicated spacing & touch container
                 var isMenuExpanded by remember { mutableStateOf(false) }
                 val menuRotation by animateFloatAsState(
                     targetValue = if (isMenuExpanded) 90f else 0f,
@@ -1177,15 +1188,16 @@ fun RecentsScreen(
                 )
 
                 Box {
-                    IconButton(
-                        onClick = {
-                            isMenuExpanded = !isMenuExpanded
-                        },
+                    Box(
                         modifier = Modifier
-                            .size(34.dp)
+                            .size(36.dp)
                             .clip(CircleShape)
                             .background(Color(0x18FFFFFF))
                             .border(0.8.dp, Color(0x30FFFFFF), CircleShape)
+                            .clickable {
+                                isMenuExpanded = !isMenuExpanded
+                            },
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Filled.MoreVert,
@@ -2037,7 +2049,7 @@ fun ContactsScreen(
             // LazyColumn extends edge-to-edge; items scroll fluidly underneath the transparent status bar!
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = statusBarTop + 110.dp, bottom = 120.dp, start = 20.dp, end = 20.dp),
+                contentPadding = PaddingValues(top = statusBarTop + 116.dp, bottom = 120.dp, start = 20.dp, end = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 groupedContacts.forEach { (sectionKey, contactsInSection) ->
@@ -2231,7 +2243,7 @@ fun ContactsScreen(
                     )
                 )
                 .statusBarsPadding()
-                .padding(top = 8.dp, start = 20.dp, end = 20.dp, bottom = 10.dp)
+                .padding(top = 14.dp, start = 20.dp, end = 20.dp, bottom = 10.dp)
         ) {
             Row(
                 modifier = Modifier
@@ -2250,14 +2262,14 @@ fun ContactsScreen(
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(14.dp))
                             .background(Color(0xFF1E2430))
                             .border(1.dp, Color(0x35FFFFFF), RoundedCornerShape(14.dp))
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
                     ) {
                         Text(
                             text = "${contacts.size} Total",
@@ -2275,22 +2287,23 @@ fun ContactsScreen(
                     )
 
                     Box {
-                        IconButton(
-                            onClick = {
-                                isMenuExpanded = !isMenuExpanded
-                            },
+                        Box(
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(36.dp)
                                 .clip(CircleShape)
                                 .background(Color(0x18FFFFFF))
                                 .border(0.8.dp, Color(0x30FFFFFF), CircleShape)
+                                .clickable {
+                                    isMenuExpanded = !isMenuExpanded
+                                },
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.MoreVert,
                                 contentDescription = "Options",
                                 tint = Color.White,
                                 modifier = Modifier
-                                    .size(17.dp)
+                                    .size(18.dp)
                                     .graphicsLayer { rotationZ = menuRotation }
                             )
                         }
