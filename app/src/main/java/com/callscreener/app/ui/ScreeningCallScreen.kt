@@ -413,6 +413,7 @@ fun ScreeningCallScreen(
                     onToggleSpeaker = onToggleSpeaker,
                     isRecording = state.isRecording,
                     onToggleRecording = onToggleRecording,
+                    onToggleSpeechJammer = onToggleSpeechJammer,
                     onToggleAiVoiceListening = onToggleAiVoiceListening,
                     onToggleAutoRelay = onToggleAutoRelay,
                     isFocusChatMode = isFocusChatMode,
@@ -610,33 +611,35 @@ fun SuperPremiumCallerCard(
                         )
                     }
 
-                    if (isSpeechJammerActive) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0x359C27B0))
-                                .border(0.8.dp, Color(0xFFFF4081), RoundedCornerShape(8.dp))
-                                .clickable { onToggleSpeechJammer() }
-                                .padding(horizontal = 7.dp, vertical = 2.5.dp)
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isSpeechJammerActive) Color(0x359C27B0) else Color(0x18FFFFFF))
+                            .border(
+                                0.8.dp,
+                                if (isSpeechJammerActive) Color(0xFFFF4081) else Color(0x30FFFFFF),
+                                RoundedCornerShape(8.dp)
+                            )
+                            .clickable { onToggleSpeechJammer() }
+                            .padding(horizontal = 7.dp, vertical = 2.5.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFFFF4081))
-                                )
-                                Text(
-                                    text = "JAMMER",
-                                    color = Color(0xFFFF80AB),
-                                    fontSize = 9.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isSpeechJammerActive) Color(0xFFFF4081) else Color(0xFFBA68C8))
+                            )
+                            Text(
+                                text = if (isSpeechJammerActive) "JAMMING" else "JAMMER",
+                                color = if (isSpeechJammerActive) Color(0xFFFF80AB) else Color.White,
+                                fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }
@@ -1030,11 +1033,13 @@ fun UnifiedLiquidCommandIsland(
     onToggleSpeaker: () -> Unit,
     isRecording: Boolean = false,
     onToggleRecording: () -> Unit = {},
+    onToggleSpeechJammer: () -> Unit = {},
     onToggleAiVoiceListening: () -> Unit = {},
     onToggleAutoRelay: (Boolean) -> Unit = {},
     isFocusChatMode: Boolean = false,
     ribbonContent: @Composable () -> Unit = {}
 ) {
+    val context = LocalContext.current
     val sendScale by animateFloatAsState(
         targetValue = if (text.isNotBlank()) 1.0f else 0.88f,
         animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
@@ -1386,6 +1391,82 @@ fun UnifiedLiquidCommandIsland(
                         activeContentColor = Color.Black,
                         onClick = onSwitchToDirectMic
                     )
+                }
+
+                // Speech Jammer (DAF Disruption) Live Trigger Pill in Assistant Screening
+                val jammerEngine = remember { com.callscreener.app.engine.SpeechJammerEngine.getInstance(context) }
+                if (jammerEngine.isEnabled) {
+                    val isJammerActive = state.isSpeechJammerActive
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.92f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (isJammerActive) Color(0x359C27B0) else Color(0x14FFFFFF))
+                            .border(
+                                width = if (isJammerActive) 1.5.dp else 0.8.dp,
+                                color = if (isJammerActive) Color(0xFFBA68C8) else Color(0x25FFFFFF),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                            .clickable { onToggleSpeechJammer() }
+                            .padding(horizontal = 14.dp, vertical = 9.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(30.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isJammerActive) Color(0xFFFF4081) else Color(0x28BA68C8)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Psychology,
+                                        contentDescription = null,
+                                        tint = if (isJammerActive) Color.White else Color(0xFFE1BEE7),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                                Column {
+                                    Text(
+                                        text = if (isJammerActive) "JAMMING CALLER ACTIVE" else "Acoustic Speech Jammer (DAF)",
+                                        color = if (isJammerActive) Color(0xFFFF80AB) else Color.White,
+                                        fontSize = 12.5.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = if (isJammerActive)
+                                            "${jammerEngine.delayMs}ms delayed feedback • caller speech motor paralyzed"
+                                        else
+                                            "Tap to disrupt caller with 200ms delayed auditory feedback",
+                                        color = TextSecondary,
+                                        fontSize = 10.5.sp
+                                    )
+                                }
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isJammerActive) Color(0xFFFF4081) else Color(0x25BA68C8))
+                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                            ) {
+                                Text(
+                                    text = if (isJammerActive) "STOP" else "ENGAGE",
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
+                    }
                 }
 
                 // Dedicated, Massive, Centered iOS Specular Liquid Glass Red End Call Button
@@ -2771,7 +2852,7 @@ fun StandardInCallScreen(
             }
 
             // Speech Jammer (DAF Disruption) Live Interactive Pill
-            if (status != CallStatus.ON_HOLD && status != CallStatus.DIALING) {
+            if (status != CallStatus.ENDED) {
                 val jammerEngine = remember { com.callscreener.app.engine.SpeechJammerEngine.getInstance(context) }
                 if (jammerEngine.isEnabled) {
                     Spacer(modifier = Modifier.height(12.dp))
