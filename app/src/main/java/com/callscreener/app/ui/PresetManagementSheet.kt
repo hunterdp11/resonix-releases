@@ -8,9 +8,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,7 +31,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -40,9 +45,11 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.rounded.DragIndicator
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.KeyboardDoubleArrowUp
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -70,7 +77,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
@@ -80,6 +89,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import com.callscreener.app.engine.AudioPresetManager
 import com.callscreener.app.engine.QuickReplyManager
 import com.callscreener.app.model.AudioPreset
@@ -92,10 +102,85 @@ enum class PresetManagerTab {
 }
 
 /**
+ * Smooth Drag-and-Drop state manager for LazyColumn reordering.
+ * Automatically recalculates target swap positions, compensates drag offset for zero visual jitter,
+ * and handles edge auto-scrolling when dragging items across long lists.
+ */
+class LazyListDragDropState(
+    val listState: LazyListState,
+    val onMove: (Int, Int) -> Unit
+) {
+    var draggedIndex by mutableStateOf<Int?>(null)
+    var dragOffset by mutableStateOf(0f)
+
+    fun onDragStart(index: Int) {
+        draggedIndex = index
+        dragOffset = 0f
+    }
+
+    fun onDrag(dragAmount: Float, totalCount: Int, onSwap: () -> Unit = {}) {
+        val currentDraggedIndex = draggedIndex ?: return
+        dragOffset += dragAmount
+
+        val visibleItems = listState.layoutInfo.visibleItemsInfo
+        val currentItemInfo = visibleItems.firstOrNull { it.index == currentDraggedIndex } ?: return
+
+        // Center of the dragged item in viewport coordinates
+        val currentItemCenter = currentItemInfo.offset + (currentItemInfo.size / 2) + dragOffset
+
+        // Find candidate overlapping item in valid range [0, totalCount - 1]
+        val targetItem = visibleItems.firstOrNull { item ->
+            item.index in 0 until totalCount &&
+            item.index != currentDraggedIndex &&
+            currentItemCenter.toInt() in item.offset..(item.offset + item.size)
+        }
+
+        if (targetItem != null) {
+            val targetIndex = targetItem.index
+            onMove(currentDraggedIndex, targetIndex)
+            onSwap()
+            // Offset compensation to keep item stable under user's finger
+            dragOffset += (currentItemInfo.offset - targetItem.offset)
+            draggedIndex = targetIndex
+        }
+
+        // Auto-scroll when dragging near viewport top/bottom edges
+        val viewportStart = listState.layoutInfo.viewportStartOffset
+        val viewportEnd = listState.layoutInfo.viewportEndOffset
+        val topThreshold = viewportStart + 130f
+        val bottomThreshold = viewportEnd - 130f
+
+        val itemTop = currentItemInfo.offset + dragOffset
+        val itemBottom = itemTop + currentItemInfo.size
+
+        if (itemTop < topThreshold) {
+            val scrollDelta = ((itemTop - topThreshold) * 0.22f).coerceIn(-30f, -4f)
+            val consumed = listState.dispatchRawDelta(scrollDelta)
+            dragOffset -= consumed
+        } else if (itemBottom > bottomThreshold) {
+            val scrollDelta = ((itemBottom - bottomThreshold) * 0.22f).coerceIn(4f, 30f)
+            val consumed = listState.dispatchRawDelta(scrollDelta)
+            dragOffset -= consumed
+        }
+    }
+
+    fun onDragEnd() {
+        draggedIndex = null
+        dragOffset = 0f
+    }
+
+    fun onDragCancel() {
+        draggedIndex = null
+        dragOffset = 0f
+    }
+}
+
+/**
  * Dedicated Full-Screen Frosted Glass Management Page:
  * Allows user to Reorder / Align, Edit, Delete, Import Audio, and Add Custom Quick Replies.
  * Changes immediately reflect in both the soundboard and in-call screening ribbons!
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PresetManagementScreen(
     presetManager: AudioPresetManager,
@@ -111,6 +196,28 @@ fun PresetManagementScreen(
     val playingId by presetManager.currentlyPlayingId.collectAsState()
 
     var activeTab by remember { mutableStateOf(PresetManagerTab.SOUNDBOARD_AUDIO) }
+
+    // LazyListStates and Drag-and-Drop managers
+    val soundboardListState = rememberLazyListState()
+    val quickRepliesListState = rememberLazyListState()
+
+    val soundboardDragDropState = remember(soundboardListState, presets) {
+        LazyListDragDropState(
+            listState = soundboardListState,
+            onMove = { from, to ->
+                presetManager.reorderPresets(from, to)
+            }
+        )
+    }
+
+    val quickRepliesDragDropState = remember(quickRepliesListState, quickReplies) {
+        LazyListDragDropState(
+            listState = quickRepliesListState,
+            onMove = { from, to ->
+                quickReplyManager.reorderQuickReplies(from, to)
+            }
+        )
+    }
 
     // Dialog States
     var editingPreset by remember { mutableStateOf<AudioPreset?>(null) }
@@ -347,8 +454,31 @@ fun PresetManagementScreen(
                             }
                         }
 
-                        // Presets List with Up/Down Alignment & Edit/Delete
+                        // Reorder & Arrangement Tip Banner
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 22.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.DragIndicator,
+                                contentDescription = null,
+                                tint = Color(0xFF64B5F6),
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = "Hold & drag ⠿ or tap ⏫ to jump any item straight to the top",
+                                color = Color(0x99FFFFFF),
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Normal
+                            )
+                        }
+
+                        // Presets List with Hold & Drag Reordering, Instant Move-to-Top & Up/Down Controls
                         LazyColumn(
+                            state = soundboardListState,
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth(),
@@ -356,11 +486,32 @@ fun PresetManagementScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             itemsIndexed(presets, key = { _, item -> item.id }) { index, preset ->
+                                val isDragging = soundboardDragDropState.draggedIndex == index
                                 SoundboardPresetItemRow(
                                     preset = preset,
                                     index = index,
                                     totalCount = presets.size,
                                     isPlaying = playingId == preset.id,
+                                    isDragging = isDragging,
+                                    dragOffset = if (isDragging) soundboardDragDropState.dragOffset else 0f,
+                                    onDragStart = {
+                                        val currIdx = presets.indexOfFirst { it.id == preset.id }
+                                        if (currIdx >= 0) soundboardDragDropState.onDragStart(currIdx)
+                                    },
+                                    onDrag = { deltaY ->
+                                        soundboardDragDropState.onDrag(deltaY, presets.size) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        }
+                                    },
+                                    onDragEnd = { soundboardDragDropState.onDragEnd() },
+                                    onDragCancel = { soundboardDragDropState.onDragCancel() },
+                                    onMoveToTop = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        scope.launch {
+                                            presetManager.movePresetToTop(preset.id)
+                                            soundboardListState.animateScrollToItem(0)
+                                        }
+                                    },
                                     onMoveUp = {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         presetManager.movePresetUp(preset.id)
@@ -379,7 +530,8 @@ fun PresetManagementScreen(
                                     onEdit = { editingPreset = preset },
                                     onDelete = {
                                         deleteConfirmationItem = preset.id to preset.title
-                                    }
+                                    },
+                                    modifier = Modifier.animateItemPlacement()
                                 )
                             }
 
@@ -447,8 +599,31 @@ fun PresetManagementScreen(
                             }
                         }
 
-                        // Quick Replies List with Up/Down Alignment & Edit/Delete
+                        // Reorder & Arrangement Tip Banner
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 22.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.DragIndicator,
+                                contentDescription = null,
+                                tint = Color(0xFF81C784),
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = "Hold & drag ⠿ or tap ⏫ to jump any item straight to the top",
+                                color = Color(0x99FFFFFF),
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Normal
+                            )
+                        }
+
+                        // Quick Replies List with Hold & Drag Reordering, Instant Move-to-Top & Up/Down Controls
                         LazyColumn(
+                            state = quickRepliesListState,
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth(),
@@ -456,10 +631,31 @@ fun PresetManagementScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             itemsIndexed(quickReplies, key = { _, item -> item.id }) { index, reply ->
+                                val isDragging = quickRepliesDragDropState.draggedIndex == index
                                 QuickReplyItemRow(
                                     reply = reply,
                                     index = index,
                                     totalCount = quickReplies.size,
+                                    isDragging = isDragging,
+                                    dragOffset = if (isDragging) quickRepliesDragDropState.dragOffset else 0f,
+                                    onDragStart = {
+                                        val currIdx = quickReplies.indexOfFirst { it.id == reply.id }
+                                        if (currIdx >= 0) quickRepliesDragDropState.onDragStart(currIdx)
+                                    },
+                                    onDrag = { deltaY ->
+                                        quickRepliesDragDropState.onDrag(deltaY, quickReplies.size) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        }
+                                    },
+                                    onDragEnd = { quickRepliesDragDropState.onDragEnd() },
+                                    onDragCancel = { quickRepliesDragDropState.onDragCancel() },
+                                    onMoveToTop = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        scope.launch {
+                                            quickReplyManager.moveToTop(reply.id)
+                                            quickRepliesListState.animateScrollToItem(0)
+                                        }
+                                    },
                                     onMoveUp = {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         quickReplyManager.moveUp(reply.id)
@@ -471,7 +667,8 @@ fun PresetManagementScreen(
                                     onEdit = { editingQuickReply = reply },
                                     onDelete = {
                                         deleteConfirmationItem = reply.id to reply.title
-                                    }
+                                    },
+                                    modifier = Modifier.animateItemPlacement()
                                 )
                             }
 
@@ -981,7 +1178,7 @@ fun PresetManagementScreen(
 }
 
 /**
- * Soundboard Preset Row: With Reorder buttons (Move Up / Down), Type badge, Preview Play & Edit/Delete
+ * Soundboard Preset Row: With Tactile Drag Handle, Long-Press Drag, Instant Move-to-Top, Up/Down controls, Type badge, Preview Play & Edit/Delete
  */
 @Composable
 fun SoundboardPresetItemRow(
@@ -989,69 +1186,153 @@ fun SoundboardPresetItemRow(
     index: Int,
     totalCount: Int,
     isPlaying: Boolean,
+    isDragging: Boolean = false,
+    dragOffset: Float = 0f,
+    onDragStart: () -> Unit,
+    onDrag: (Float) -> Unit,
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit,
+    onMoveToTop: () -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onPlayPreview: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
+    val haptic = LocalHapticFeedback.current
+
     Box(
-        modifier = Modifier
+        modifier = modifier
+            .zIndex(if (isDragging) 15f else 1f)
+            .graphicsLayer {
+                translationY = if (isDragging) dragOffset else 0f
+                scaleX = if (isDragging) 1.03f else 1.0f
+                scaleY = if (isDragging) 1.03f else 1.0f
+            }
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color(0x1AFFFFFF))
-            .border(
-                1.dp,
-                if (preset.isAudioFile) Color(0x40FFA726) else Color(0x22FFFFFF),
-                RoundedCornerShape(16.dp)
+            .shadow(
+                elevation = if (isDragging) 16.dp else 0.dp,
+                shape = RoundedCornerShape(16.dp),
+                spotColor = Color(0xFF64B5F6)
             )
-            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (isDragging) Color(0x38FFFFFF) else Color(0x1AFFFFFF))
+            .border(
+                width = if (isDragging) 1.5.dp else 1.dp,
+                color = if (isDragging) Color(0xFF64B5F6) else if (preset.isAudioFile) Color(0x40FFA726) else Color(0x22FFFFFF),
+                shape = RoundedCornerShape(16.dp)
+            )
+            .pointerInput(preset.id) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onDragStart()
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        onDrag(dragAmount.y)
+                    },
+                    onDragEnd = onDragEnd,
+                    onDragCancel = onDragCancel
+                )
+            }
+            .padding(horizontal = 10.dp, vertical = 9.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Reorder Up / Down Controls
+            // Tactile Drag Indicator Grip Handle (Instant Drag on Touch)
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (isDragging) Color(0xFF64B5F6).copy(alpha = 0.35f) else Color(0x12FFFFFF))
+                    .pointerInput(preset.id) {
+                        detectDragGestures(
+                            onDragStart = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onDragStart()
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                onDrag(dragAmount.y)
+                            },
+                            onDragEnd = onDragEnd,
+                            onDragCancel = onDragCancel
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.DragIndicator,
+                    contentDescription = "Hold and drag to reorder",
+                    tint = if (isDragging) Color(0xFF64B5F6) else Color(0xB0FFFFFF),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(6.dp))
+
+            // Reorder Controls: Instant Move-To-Top + Micro Up/Down + Position Index
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
+                // Instant Jump to Top Button
                 IconButton(
-                    onClick = onMoveUp,
+                    onClick = onMoveToTop,
                     enabled = index > 0,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(20.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.KeyboardArrowUp,
-                        contentDescription = "Move Up",
-                        tint = if (index > 0) Color.White else Color(0x25FFFFFF),
-                        modifier = Modifier.size(20.dp)
+                        imageVector = Icons.Rounded.KeyboardDoubleArrowUp,
+                        contentDescription = "Move Directly to Top",
+                        tint = if (index > 0) Color(0xFF64B5F6) else Color(0x20FFFFFF),
+                        modifier = Modifier.size(16.dp)
                     )
                 }
 
-                Text(
-                    text = "#${index + 1}",
-                    color = if (preset.isAudioFile) Color(0xFFFFA726) else Color(0x70FFFFFF),
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onMoveUp,
+                        enabled = index > 0,
+                        modifier = Modifier.size(18.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.KeyboardArrowUp,
+                            contentDescription = "Move Up",
+                            tint = if (index > 0) Color.White else Color(0x20FFFFFF),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
 
-                IconButton(
-                    onClick = onMoveDown,
-                    enabled = index < totalCount - 1,
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.KeyboardArrowDown,
-                        contentDescription = "Move Down",
-                        tint = if (index < totalCount - 1) Color.White else Color(0x25FFFFFF),
-                        modifier = Modifier.size(20.dp)
+                    Text(
+                        text = "#${index + 1}",
+                        color = if (preset.isAudioFile) Color(0xFFFFA726) else Color(0x70FFFFFF),
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 2.dp)
                     )
+
+                    IconButton(
+                        onClick = onMoveDown,
+                        enabled = index < totalCount - 1,
+                        modifier = Modifier.size(18.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.KeyboardArrowDown,
+                            contentDescription = "Move Down",
+                            tint = if (index < totalCount - 1) Color.White else Color(0x20FFFFFF),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
             // Main Info
             Column(modifier = Modifier.weight(1f)) {
@@ -1160,75 +1441,159 @@ fun SoundboardPresetItemRow(
 }
 
 /**
- * Quick Reply Row: With Reorder buttons (Move Up / Down), Language tag, Edit & Delete
+ * Quick Reply Row: With Tactile Drag Handle, Long-Press Drag, Instant Move-to-Top, Up/Down controls, Language tag, Edit & Delete
  */
 @Composable
 fun QuickReplyItemRow(
     reply: QuickReply,
     index: Int,
     totalCount: Int,
+    isDragging: Boolean = false,
+    dragOffset: Float = 0f,
+    onDragStart: () -> Unit,
+    onDrag: (Float) -> Unit,
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit,
+    onMoveToTop: () -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
+    val haptic = LocalHapticFeedback.current
+
     Box(
-        modifier = Modifier
+        modifier = modifier
+            .zIndex(if (isDragging) 15f else 1f)
+            .graphicsLayer {
+                translationY = if (isDragging) dragOffset else 0f
+                scaleX = if (isDragging) 1.03f else 1.0f
+                scaleY = if (isDragging) 1.03f else 1.0f
+            }
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color(0x1AFFFFFF))
-            .border(
-                1.dp,
-                if (reply.isHindi) Color(0x3566BB6A) else Color(0x22FFFFFF),
-                RoundedCornerShape(16.dp)
+            .shadow(
+                elevation = if (isDragging) 16.dp else 0.dp,
+                shape = RoundedCornerShape(16.dp),
+                spotColor = Color(0xFF81C784)
             )
-            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (isDragging) Color(0x38FFFFFF) else Color(0x1AFFFFFF))
+            .border(
+                width = if (isDragging) 1.5.dp else 1.dp,
+                color = if (isDragging) Color(0xFF81C784) else if (reply.isHindi) Color(0x3566BB6A) else Color(0x22FFFFFF),
+                shape = RoundedCornerShape(16.dp)
+            )
+            .pointerInput(reply.id) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onDragStart()
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        onDrag(dragAmount.y)
+                    },
+                    onDragEnd = onDragEnd,
+                    onDragCancel = onDragCancel
+                )
+            }
+            .padding(horizontal = 10.dp, vertical = 9.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Reorder Up / Down Controls
+            // Tactile Drag Indicator Grip Handle (Instant Drag on Touch)
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (isDragging) Color(0xFF81C784).copy(alpha = 0.35f) else Color(0x12FFFFFF))
+                    .pointerInput(reply.id) {
+                        detectDragGestures(
+                            onDragStart = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onDragStart()
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                onDrag(dragAmount.y)
+                            },
+                            onDragEnd = onDragEnd,
+                            onDragCancel = onDragCancel
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.DragIndicator,
+                    contentDescription = "Hold and drag to reorder",
+                    tint = if (isDragging) Color(0xFF81C784) else Color(0xB0FFFFFF),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(6.dp))
+
+            // Reorder Controls: Instant Move-To-Top + Micro Up/Down + Position Index
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
+                // Instant Jump to Top Button
                 IconButton(
-                    onClick = onMoveUp,
+                    onClick = onMoveToTop,
                     enabled = index > 0,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(20.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.KeyboardArrowUp,
-                        contentDescription = "Move Up",
-                        tint = if (index > 0) Color.White else Color(0x25FFFFFF),
-                        modifier = Modifier.size(20.dp)
+                        imageVector = Icons.Rounded.KeyboardDoubleArrowUp,
+                        contentDescription = "Move Directly to Top",
+                        tint = if (index > 0) Color(0xFF81C784) else Color(0x20FFFFFF),
+                        modifier = Modifier.size(16.dp)
                     )
                 }
 
-                Text(
-                    text = "#${index + 1}",
-                    color = if (reply.isHindi) Color(0xFF81C784) else Color(0x70FFFFFF),
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onMoveUp,
+                        enabled = index > 0,
+                        modifier = Modifier.size(18.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.KeyboardArrowUp,
+                            contentDescription = "Move Up",
+                            tint = if (index > 0) Color.White else Color(0x20FFFFFF),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
 
-                IconButton(
-                    onClick = onMoveDown,
-                    enabled = index < totalCount - 1,
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.KeyboardArrowDown,
-                        contentDescription = "Move Down",
-                        tint = if (index < totalCount - 1) Color.White else Color(0x25FFFFFF),
-                        modifier = Modifier.size(20.dp)
+                    Text(
+                        text = "#${index + 1}",
+                        color = if (reply.isHindi) Color(0xFF81C784) else Color(0x70FFFFFF),
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 2.dp)
                     )
+
+                    IconButton(
+                        onClick = onMoveDown,
+                        enabled = index < totalCount - 1,
+                        modifier = Modifier.size(18.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.KeyboardArrowDown,
+                            contentDescription = "Move Down",
+                            tint = if (index < totalCount - 1) Color.White else Color(0x20FFFFFF),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
             // Main Info
             Column(modifier = Modifier.weight(1f)) {

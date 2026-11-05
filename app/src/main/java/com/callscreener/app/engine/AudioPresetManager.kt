@@ -138,6 +138,26 @@ class AudioPresetManager(private val context: Context) {
         }
     }
 
+    fun movePresetToTop(id: String) {
+        val list = _presets.value.toMutableList()
+        val index = list.indexOfFirst { it.id == id }
+        if (index > 0) {
+            val item = list.removeAt(index)
+            list.add(0, item)
+            saveAllPresets(list)
+        }
+    }
+
+    fun reorderPresets(fromIndex: Int, toIndex: Int) {
+        if (fromIndex == toIndex) return
+        val list = _presets.value.toMutableList()
+        if (fromIndex in list.indices && toIndex in list.indices) {
+            val item = list.removeAt(fromIndex)
+            list.add(toIndex, item)
+            saveAllPresets(list)
+        }
+    }
+
     suspend fun importAudioFile(title: String, sourceUri: Uri, insertAtTop: Boolean = true): Result<AudioPreset> = withContext(Dispatchers.IO) {
         try {
             val destFileName = "preset_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}.wav"

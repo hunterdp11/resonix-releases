@@ -95,6 +95,26 @@ class QuickReplyManager(private val context: Context) {
         }
     }
 
+    fun moveToTop(id: String) {
+        val list = _quickReplies.value.toMutableList()
+        val index = list.indexOfFirst { it.id == id }
+        if (index > 0) {
+            val item = list.removeAt(index)
+            list.add(0, item)
+            saveQuickReplies(list)
+        }
+    }
+
+    fun reorderQuickReplies(fromIndex: Int, toIndex: Int) {
+        if (fromIndex == toIndex) return
+        val list = _quickReplies.value.toMutableList()
+        if (fromIndex in list.indices && toIndex in list.indices) {
+            val item = list.removeAt(fromIndex)
+            list.add(toIndex, item)
+            saveQuickReplies(list)
+        }
+    }
+
     fun addReply(title: String, spokenText: String, isHindi: Boolean = false, insertAtTop: Boolean = true) {
         val cleanTitle = title.trim()
         val cleanSpoken = spokenText.trim().ifBlank { cleanTitle }
