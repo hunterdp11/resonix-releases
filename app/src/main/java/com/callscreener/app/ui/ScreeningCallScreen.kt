@@ -769,20 +769,24 @@ fun LiquidWavyActionRibbon(
         ) {
             Row(
                 modifier = Modifier
+                    .height(30.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(LiquidGlassFillSubtle)
                     .border(0.8.dp, LiquidGlassBorderSubtle, RoundedCornerShape(12.dp))
                     .padding(2.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 // Tab 1: Quick Replies
                 val isReplies = activeTab == RibbonTab.QUICK_REPLIES
                 Box(
                     modifier = Modifier
+                        .fillMaxHeight()
                         .clip(RoundedCornerShape(10.dp))
                         .background(if (isReplies) AppleBlueGlassFill else SolidColor(Color.Transparent))
                         .clickable { onSelectTab(RibbonTab.QUICK_REPLIES) }
-                        .padding(horizontal = 9.dp, vertical = 4.dp)
+                        .padding(horizontal = 9.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "Quick Replies",
@@ -796,10 +800,12 @@ fun LiquidWavyActionRibbon(
                 val isSoundboard = activeTab == RibbonTab.SOUNDBOARD
                 Box(
                     modifier = Modifier
+                        .fillMaxHeight()
                         .clip(RoundedCornerShape(10.dp))
                         .background(if (isSoundboard) AppleAmberGlassFill else SolidColor(Color.Transparent))
                         .clickable { onSelectTab(RibbonTab.SOUNDBOARD) }
-                        .padding(horizontal = 9.dp, vertical = 4.dp)
+                        .padding(horizontal = 9.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "Soundboard",
@@ -813,10 +819,12 @@ fun LiquidWavyActionRibbon(
                 val isPersonas = activeTab == RibbonTab.VOICE_PERSONAS
                 Box(
                     modifier = Modifier
+                        .fillMaxHeight()
                         .clip(RoundedCornerShape(10.dp))
                         .background(if (isPersonas) AppleBlueGlassFill else SolidColor(Color.Transparent))
                         .clickable { onSelectTab(RibbonTab.VOICE_PERSONAS) }
-                        .padding(horizontal = 9.dp, vertical = 4.dp)
+                        .padding(horizontal = 9.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "Voice Personas",
@@ -830,11 +838,12 @@ fun LiquidWavyActionRibbon(
             // Sleek "Manage" Shortcut Pill
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
+                    .height(30.dp)
+                    .clip(RoundedCornerShape(12.dp))
                     .background(Color(0x18FFFFFF))
-                    .border(0.8.dp, Color(0x30FFFFFF), RoundedCornerShape(10.dp))
+                    .border(0.8.dp, Color(0x30FFFFFF), RoundedCornerShape(12.dp))
                     .clickable { onOpenPresetManager() }
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .padding(horizontal = 10.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Row(
@@ -845,7 +854,7 @@ fun LiquidWavyActionRibbon(
                         imageVector = Icons.Rounded.Tune,
                         contentDescription = "Manage",
                         tint = Color(0xDDFFFFFF),
-                        modifier = Modifier.size(12.dp)
+                        modifier = Modifier.size(13.dp)
                     )
                     Text(
                         text = "Manage",

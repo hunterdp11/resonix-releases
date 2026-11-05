@@ -505,18 +505,8 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
 
         if (isSimulated) {
             try {
-                // Ensure audio mode is normal so Bluetooth A2DP media stream delivers audio directly to earbuds
+                // Ensure audio mode is normal so Bluetooth A2DP / media stream delivers audio directly
                 audioManager.mode = AudioManager.MODE_NORMAL
-                if (audioManager.isBluetoothScoOn) {
-                    audioManager.stopBluetoothSco()
-                    audioManager.isBluetoothScoOn = false
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    audioManager.clearCommunicationDevice()
-                } else {
-                    @Suppress("DEPRECATION")
-                    audioManager.isSpeakerphoneOn = false
-                }
 
                 // Request transient audio focus for speech playback
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

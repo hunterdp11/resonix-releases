@@ -195,6 +195,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
      * Answer the call and initiate the AI voice screening loop.
      */
     fun startScreening(greeting: String? = "Hello. The person you have reached is using an automated assistant. Please state your name and reason for calling.") {
+        com.callscreener.app.telephony.RingtonePlayer.stop(appContext)
         pendingGreeting = if (_sessionState.value.isGreetingEnabled) greeting else null
 
         val isSim = _sessionState.value.isSimulated
@@ -249,6 +250,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
      * Answer incoming call directly without automated screening (standard everyday call).
      */
     fun answerCallDirectly() {
+        com.callscreener.app.telephony.RingtonePlayer.stop(appContext)
         pendingGreeting = null
         val isSim = _sessionState.value.isSimulated
 
@@ -721,10 +723,14 @@ class CallSessionManager private constructor(private val appContext: Context) {
         switchToDirectMicMode()
     }
 
+    fun answer() = answerCallDirectly()
+
     /**
      * End / Reject the call.
      */
     fun hangUp() {
+        com.callscreener.app.telephony.RingtonePlayer.stop(appContext)
+        com.callscreener.app.notification.NotificationHelper.cancelCallNotification(appContext)
         if (_sessionState.value.isIncoming && _sessionState.value.status == CallStatus.RINGING) {
             val num = _sessionState.value.callerNumber
             val name = _sessionState.value.callerName
@@ -753,6 +759,8 @@ class CallSessionManager private constructor(private val appContext: Context) {
     }
 
     fun onCallEnded() {
+        com.callscreener.app.telephony.RingtonePlayer.stop(appContext)
+        com.callscreener.app.notification.NotificationHelper.cancelCallNotification(appContext)
         if (_sessionState.value.isIncoming && _sessionState.value.status == CallStatus.RINGING) {
             val num = _sessionState.value.callerNumber
             val name = _sessionState.value.callerName
@@ -816,11 +824,36 @@ class CallSessionManager private constructor(private val appContext: Context) {
                         audioManager.setCommunicationDevice(speaker)
                     }
                 } else {
-                    audioManager.clearCommunicationDevice()
+                    val btDevice = audioManager.availableCommunicationDevices.firstOrNull {
+                        it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                        it.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
+                        it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
+                        it.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES
+                    }
+                    if (btDevice != null) {
+                        Log.i(TAG, "Routing audio to connected Bluetooth/Headset device: ${btDevice.productName}")
+                        audioManager.setCommunicationDevice(btDevice)
+                    } else {
+                        val earpiece = audioManager.availableCommunicationDevices.firstOrNull {
+                            it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE
+                        }
+                        if (earpiece != null) {
+                            audioManager.setCommunicationDevice(earpiece)
+                        } else {
+                            audioManager.clearCommunicationDevice()
+                        }
+                    }
                 }
             } else {
                 @Suppress("DEPRECATION")
                 audioManager.isSpeakerphoneOn = on
+                if (!on) {
+                    @Suppress("DEPRECATION")
+                    if (audioManager.isBluetoothScoAvailableOffCall) {
+                        audioManager.startBluetoothSco()
+                        audioManager.isBluetoothScoOn = true
+                    }
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to toggle speakerphone", e)

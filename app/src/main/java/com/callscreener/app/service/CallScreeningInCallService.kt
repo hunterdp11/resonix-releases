@@ -8,9 +8,11 @@ import android.telecom.CallAudioState
 import android.telecom.InCallService
 import android.util.Log
 import com.callscreener.app.data.DialerRepository
+import com.callscreener.app.model.CallStatus
 import com.callscreener.app.notification.NotificationHelper
 import com.callscreener.app.root.RootPrivilegeManager
 import com.callscreener.app.session.CallSessionManager
+import com.callscreener.app.telephony.RingtonePlayer
 import com.callscreener.app.ui.ScreeningCallActivity
 
 class CallScreeningInCallService : InCallService() {
@@ -27,6 +29,12 @@ class CallScreeningInCallService : InCallService() {
                 Log.d(TAG, "Call state changed: $state")
                 when (state) {
                     Call.STATE_RINGING -> {
+                        RingtonePlayer.start(applicationContext)
+                        NotificationHelper.postIncomingCallNotification(
+                            applicationContext,
+                            currentCallerNumber ?: extractPhoneNumber(call),
+                            currentCallerName
+                        )
                         CallSessionManager.getInstance(applicationContext).onCallRinging()
                     }
                     Call.STATE_DIALING, Call.STATE_CONNECTING -> {
@@ -35,13 +43,22 @@ class CallScreeningInCallService : InCallService() {
                     Call.STATE_ACTIVE -> {
                         Log.i(TAG, "Call is now ACTIVE")
                         wasCallAnswered = true
+                        RingtonePlayer.stop(applicationContext)
                         currentCallerNumber?.let {
                             NotificationHelper.cancelMissedCallNotification(applicationContext, it)
                         }
+                        NotificationHelper.postOngoingCallNotification(
+                            applicationContext,
+                            currentCallerNumber ?: extractPhoneNumber(call),
+                            currentCallerName,
+                            CallSessionManager.getInstance(applicationContext).sessionState.value.status == CallStatus.SCREENING_ACTIVE
+                        )
                         CallSessionManager.getInstance(applicationContext).onCallConnected()
                     }
                     Call.STATE_DISCONNECTED -> {
                         Log.i(TAG, "Call DISCONNECTED")
+                        RingtonePlayer.stop(applicationContext)
+                        NotificationHelper.cancelCallNotification(applicationContext)
                         if (isCurrentCallIncoming && !wasCallAnswered) {
                             val number = currentCallerNumber ?: extractPhoneNumber(call)
                             val name = currentCallerName ?: DialerRepository.lookupContactName(applicationContext, number) ?: call.details.callerDisplayName
@@ -66,6 +83,8 @@ class CallScreeningInCallService : InCallService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        RingtonePlayer.stop(applicationContext)
+        NotificationHelper.cancelCallNotification(applicationContext)
         currentInstance = null
         Log.d(TAG, "CallScreeningInCallService destroyed")
     }
@@ -104,6 +123,11 @@ class CallScreeningInCallService : InCallService() {
             val sessionManager = CallSessionManager.getInstance(applicationContext)
             sessionManager.attachCall(call, callerNumber, resolvedCallerName, isIncoming)
 
+            if (isIncoming && call.state == Call.STATE_RINGING) {
+                RingtonePlayer.start(applicationContext)
+                NotificationHelper.postIncomingCallNotification(applicationContext, callerNumber, resolvedCallerName)
+            }
+
             // Launch the interactive live screening screen
             val intent = Intent(this, ScreeningCallActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -118,6 +142,8 @@ class CallScreeningInCallService : InCallService() {
         try {
             super.onCallRemoved(call)
             Log.d(TAG, "onCallRemoved: $call")
+            RingtonePlayer.stop(applicationContext)
+            NotificationHelper.cancelCallNotification(applicationContext)
             call.unregisterCallback(callback)
             CallSessionManager.getInstance(applicationContext).onCallEnded()
         } catch (t: Throwable) {
@@ -136,6 +162,18 @@ class CallScreeningInCallService : InCallService() {
                 Log.w(TAG, "Failed to re-enforce setMuted", e)
             }
         }
+
+        // Automatic Bluetooth preference: If Bluetooth buds/headset is connected and Telecom defaulted to earpiece, switch to Bluetooth
+        if (audioState != null && (audioState.supportedRouteMask and CallAudioState.ROUTE_BLUETOOTH) != 0) {
+            if (audioState.route == CallAudioState.ROUTE_EARPIECE) {
+                Log.i(TAG, "Connected Bluetooth headset detected; auto-routing Telecom audio to ROUTE_BLUETOOTH")
+                try {
+                    setAudioRoute(CallAudioState.ROUTE_BLUETOOTH)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to route Telecom to Bluetooth", e)
+                }
+            }
+        }
     }
 
     fun setSpeakerRoute(on: Boolean) {
@@ -144,8 +182,17 @@ class CallScreeningInCallService : InCallService() {
                 Log.i(TAG, "Executing Telecom setAudioRoute(ROUTE_SPEAKER)")
                 setAudioRoute(CallAudioState.ROUTE_SPEAKER)
             } else {
-                Log.i(TAG, "Executing Telecom setAudioRoute(ROUTE_EARPIECE)")
-                setAudioRoute(CallAudioState.ROUTE_EARPIECE)
+                val supportedMask = callAudioState?.supportedRouteMask ?: 0
+                if ((supportedMask and CallAudioState.ROUTE_BLUETOOTH) != 0) {
+                    Log.i(TAG, "Executing Telecom setAudioRoute(ROUTE_BLUETOOTH)")
+                    setAudioRoute(CallAudioState.ROUTE_BLUETOOTH)
+                } else if ((supportedMask and CallAudioState.ROUTE_WIRED_HEADSET) != 0) {
+                    Log.i(TAG, "Executing Telecom setAudioRoute(ROUTE_WIRED_HEADSET)")
+                    setAudioRoute(CallAudioState.ROUTE_WIRED_HEADSET)
+                } else {
+                    Log.i(TAG, "Executing Telecom setAudioRoute(ROUTE_EARPIECE)")
+                    setAudioRoute(CallAudioState.ROUTE_EARPIECE)
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error switching Telecom audio route", e)
