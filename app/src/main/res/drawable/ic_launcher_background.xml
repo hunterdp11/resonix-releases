@@ -5,71 +5,19 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-
-    <!-- Base Canvas: Deep Space Obsidian -->
+    <!-- Classic Vibrant Dialer Green (Full-Bleed 108dp Canvas) -->
     <path
         android:pathData="M0,0h108v108h-108z">
         <aapt:attr name="android:fillColor">
             <gradient
-                android:startX="0"
-                android:startY="0"
-                android:endX="108"
-                android:endY="108"
+                android:startX="15"
+                android:startY="15"
+                android:endX="93"
+                android:endY="93"
                 android:type="linear">
-                <item android:offset="0.0" android:color="#0F172A" />
-                <item android:offset="0.45" android:color="#090E17" />
-                <item android:offset="1.0" android:color="#030508" />
-            </gradient>
-        </aapt:attr>
-    </path>
-
-    <!-- Liquid Caustic Aura 1: Molten Emerald & Cyan Glow -->
-    <path
-        android:pathData="M30,30m-40,0a40,40 0,1 1,80 0a40,40 0,1 1,-80 0">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:centerX="30"
-                android:centerY="30"
-                android:gradientRadius="45"
-                android:type="radial">
-                <item android:offset="0.0" android:color="#3530D158" />
-                <item android:offset="0.55" android:color="#150A84FF" />
-                <item android:offset="1.0" android:color="#00000000" />
-            </gradient>
-        </aapt:attr>
-    </path>
-
-    <!-- Liquid Caustic Aura 2: Deep Sapphire & Violet Glow -->
-    <path
-        android:pathData="M80,78m-45,0a45,45 0,1 1,90 0a45,45 0,1 1,-90 0">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:centerX="80"
-                android:centerY="78"
-                android:gradientRadius="50"
-                android:type="radial">
-                <item android:offset="0.0" android:color="#405E5CE6" />
-                <item android:offset="0.5" android:color="#200A84FF" />
-                <item android:offset="1.0" android:color="#00000000" />
-            </gradient>
-        </aapt:attr>
-    </path>
-
-    <!-- Dynamic Liquid Wave Ribbon across Lower Bleed -->
-    <path
-        android:pathData="M0,88 C30,76 75,98 108,82 L108,108 L0,108 Z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:startX="0"
-                android:startY="80"
-                android:endX="108"
-                android:endY="108"
-                android:type="linear">
-                <item android:offset="0.0" android:color="#1830D158" />
-                <item android:offset="0.5" android:color="#250A84FF" />
-                <item android:offset="1.0" android:color="#05000000" />
+                <item android:offset="0.0" android:color="#34C759" />
+                <item android:offset="1.0" android:color="#248A3D" />
             </gradient>
         </aapt:attr>
     </path>
 </vector>
-

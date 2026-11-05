@@ -1643,7 +1643,7 @@ fun ContactsScreen(
             // LazyColumn extends edge-to-edge; items scroll fluidly underneath the transparent status bar!
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = statusBarTop + 116.dp, bottom = 120.dp, start = 20.dp, end = 20.dp),
+                contentPadding = PaddingValues(top = statusBarTop + 124.dp, bottom = 120.dp, start = 20.dp, end = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 groupedContacts.forEach { (sectionKey, contactsInSection) ->
@@ -1781,16 +1781,29 @@ fun ContactsScreen(
             }
         }
 
-        // Pinned Top Header and Search Bar
+        // Pinned Top Header and Search Bar (Solid Background so scrolling contacts never bleed through or hide it)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = statusBarTop + 6.dp, start = 20.dp, end = 20.dp, bottom = 8.dp)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xFF000000),
+                            Color(0xFF000000),
+                            Color(0xFF000000),
+                            Color(0xF5000000),
+                            Color(0xD0000000),
+                            Color.Transparent
+                        )
+                    )
+                )
+                .statusBarsPadding()
+                .padding(top = 4.dp, start = 20.dp, end = 20.dp, bottom = 14.dp)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 8.dp),
+                    .padding(bottom = 10.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -1805,34 +1818,35 @@ fun ContactsScreen(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0x18FFFFFF))
-                        .border(0.8.dp, Color(0x30FFFFFF), RoundedCornerShape(14.dp))
+                        .background(Color(0xFF1E2430))
+                        .border(1.dp, Color(0x35FFFFFF), RoundedCornerShape(14.dp))
                         .padding(horizontal = 10.dp, vertical = 4.dp)
                 ) {
                     Text(
                         text = "${contacts.size} Total",
-                        color = TextSecondary,
+                        color = Color(0xCCFFFFFF),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
                     )
                 }
             }
 
-            // Minimalist Frosted Search Bar
+            // Visible, High-Contrast Solid Search Bar (Never gets hidden or blurred into scrolling text)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .shadow(elevation = 6.dp, shape = RoundedCornerShape(16.dp), spotColor = Color(0x60000000))
                     .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0x18FFFFFF))
-                    .border(0.8.dp, Color(0x30FFFFFF), RoundedCornerShape(16.dp))
-                    .padding(horizontal = 14.dp, vertical = 9.dp)
+                    .background(Color(0xFF1A1F2C))
+                    .border(1.2.dp, Color(0x38FFFFFF), RoundedCornerShape(16.dp))
+                    .padding(horizontal = 14.dp, vertical = 11.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Filled.Search,
                         contentDescription = "Search",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(17.dp)
+                        tint = Color(0xB5FFFFFF),
+                        modifier = Modifier.size(19.dp)
                     )
 
                     Spacer(modifier = Modifier.width(10.dp))
@@ -1851,7 +1865,7 @@ fun ContactsScreen(
                             if (searchQuery.isEmpty()) {
                                 Text(
                                     text = "Search contacts...",
-                                    color = TextTertiary,
+                                    color = Color(0x65FFFFFF),
                                     fontSize = 15.sp
                                 )
                             }
@@ -1862,17 +1876,17 @@ fun ContactsScreen(
                     if (searchQuery.isNotEmpty()) {
                         Box(
                             modifier = Modifier
-                                .size(20.dp)
+                                .size(22.dp)
                                 .clip(CircleShape)
-                                .background(Color(0x35FFFFFF))
-                            .clickable { searchQuery = "" },
+                                .background(Color(0x30FFFFFF))
+                                .clickable { searchQuery = "" },
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Clear,
                                 contentDescription = "Clear",
                                 tint = Color.White,
-                                modifier = Modifier.size(12.dp)
+                                modifier = Modifier.size(14.dp)
                             )
                         }
                     }
@@ -2125,27 +2139,27 @@ fun KeypadScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             if (typedNumber.isEmpty()) {
-                // Frosted Search Pill
+                // Solid High-Contrast Search Pill in Keypad
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0x14FFFFFF))
-                        .border(0.8.dp, Color(0x22FFFFFF), RoundedCornerShape(20.dp))
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color(0xFF1A1F2C))
+                        .border(1.dp, Color(0x35FFFFFF), RoundedCornerShape(18.dp))
+                        .padding(horizontal = 16.dp, vertical = 11.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Search,
                         contentDescription = "Search",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(16.dp)
+                        tint = Color(0xB5FFFFFF),
+                        modifier = Modifier.size(17.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = "Search contacts or dial number",
-                        color = TextTertiary,
-                        fontSize = 13.5.sp
+                        color = Color(0x75FFFFFF),
+                        fontSize = 14.sp
                     )
                 }
 
