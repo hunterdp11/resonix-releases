@@ -24,23 +24,37 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.WindowCompat
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.WindowInsets
@@ -207,6 +221,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.callscreener.app.data.CallLogItem
 import com.callscreener.app.data.ContactItem
 import com.callscreener.app.data.DialerRepository
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -461,46 +476,128 @@ fun MainDashboard(
         Box(
             modifier = Modifier.fillMaxSize()
         ) {
-            when (currentTab) {
-                DialerTab.RECENTS -> RecentsScreen(
-                    callLogs = callLogs,
-                    isLoading = isLoadingLogs,
-                    presets = presets,
-                    onPlayPreset = { sessionManager.playAudioPreset(it) },
-                    onCall = { number -> DialerRepository.placeCall(context, number) },
-                    onScreen = { log ->
-                        sessionManager.startSimulatedCall(
-                            simulatedNumber = log.number,
-                            simulatedName = log.name ?: "Unknown Caller"
+            AnimatedContent(
+                targetState = currentTab,
+                transitionSpec = {
+                    val fromIndex = initialState.ordinal
+                    val toIndex = targetState.ordinal
+                    val isForward = toIndex > fromIndex
+                    if (isForward) {
+                        (slideInHorizontally(
+                            animationSpec = spring(
+                                dampingRatio = 0.85f,
+                                stiffness = Spring.StiffnessMediumLow
+                            ),
+                            initialOffsetX = { fullWidth -> (fullWidth * 0.16f).toInt() }
+                        ) + fadeIn(
+                            animationSpec = tween(220, easing = LinearOutSlowInEasing)
+                        ) + scaleIn(
+                            initialScale = 0.97f,
+                            animationSpec = spring(
+                                dampingRatio = 0.85f,
+                                stiffness = Spring.StiffnessMediumLow
+                            )
+                        )).togetherWith(
+                            slideOutHorizontally(
+                                animationSpec = spring(
+                                    dampingRatio = 0.85f,
+                                    stiffness = Spring.StiffnessMediumLow
+                                ),
+                                targetOffsetX = { fullWidth -> (-fullWidth * 0.16f).toInt() }
+                            ) + fadeOut(
+                                animationSpec = tween(180, easing = FastOutLinearInEasing)
+                            ) + scaleOut(
+                                targetScale = 0.97f,
+                                animationSpec = spring(
+                                    dampingRatio = 0.85f,
+                                    stiffness = Spring.StiffnessMediumLow
+                                )
+                            )
                         )
-                        context.startActivity(Intent(context, ScreeningCallActivity::class.java))
-                    },
-                    onOpenDetails = { contact -> selectedContactForDetails = contact }
-                )
-                DialerTab.CONTACTS -> ContactsScreen(
-                    contacts = contacts,
-                    isLoading = isLoadingContacts,
-                    onCall = { number -> DialerRepository.placeCall(context, number) },
-                    onOpenDetails = { contact -> selectedContactForDetails = contact }
-                )
-                DialerTab.KEYPAD -> KeypadScreen(
-                    contacts = contacts,
-                    callLogs = callLogs,
-                    onCall = { number -> DialerRepository.placeCall(context, number) },
-                    onOpenDetails = { contact -> selectedContactForDetails = contact },
-                    onOpenSettings = { isSettingsOpen = true }
-                )
-                DialerTab.ASSISTANT -> AssistantTabScreen(
-                    onStartSimulation = onStartSimulation,
-                    selectedPersona = selectedPersona,
-                    onSelectPersona = { selectedPersona = it },
-                    isLiveMicActive = isLiveMicActive,
-                    onToggleLiveMic = { isLiveMicActive = !isLiveMicActive },
-                    isGreetingEnabled = sessionState.isGreetingEnabled,
-                    onToggleGreeting = { sessionManager.setGreetingEnabled(it) },
-                    presetManager = sessionManager.presetManager,
-                    onOpenPresetManager = { isPresetManagerOpen = true }
-                )
+                    } else {
+                        (slideInHorizontally(
+                            animationSpec = spring(
+                                dampingRatio = 0.85f,
+                                stiffness = Spring.StiffnessMediumLow
+                            ),
+                            initialOffsetX = { fullWidth -> (-fullWidth * 0.16f).toInt() }
+                        ) + fadeIn(
+                            animationSpec = tween(220, easing = LinearOutSlowInEasing)
+                        ) + scaleIn(
+                            initialScale = 0.97f,
+                            animationSpec = spring(
+                                dampingRatio = 0.85f,
+                                stiffness = Spring.StiffnessMediumLow
+                            )
+                        )).togetherWith(
+                            slideOutHorizontally(
+                                animationSpec = spring(
+                                    dampingRatio = 0.85f,
+                                    stiffness = Spring.StiffnessMediumLow
+                                ),
+                                targetOffsetX = { fullWidth -> (fullWidth * 0.16f).toInt() }
+                            ) + fadeOut(
+                                animationSpec = tween(180, easing = FastOutLinearInEasing)
+                            ) + scaleOut(
+                                targetScale = 0.97f,
+                                animationSpec = spring(
+                                    dampingRatio = 0.85f,
+                                    stiffness = Spring.StiffnessMediumLow
+                                )
+                            )
+                        )
+                    }
+                },
+                label = "MainTabTransition",
+                modifier = Modifier.fillMaxSize()
+            ) { targetTab ->
+                when (targetTab) {
+                    DialerTab.RECENTS -> RecentsScreen(
+                        callLogs = callLogs,
+                        isLoading = isLoadingLogs,
+                        presets = presets,
+                        onPlayPreset = { sessionManager.playAudioPreset(it) },
+                        onCall = { number -> DialerRepository.placeCall(context, number) },
+                        onScreen = { log ->
+                            sessionManager.startSimulatedCall(
+                                simulatedNumber = log.number,
+                                simulatedName = log.name ?: "Unknown Caller"
+                            )
+                            context.startActivity(Intent(context, ScreeningCallActivity::class.java))
+                        },
+                        onOpenDetails = { contact -> selectedContactForDetails = contact },
+                        onOpenSettings = { isSettingsOpen = true },
+                        onOpenPresetManager = { isPresetManagerOpen = true }
+                    )
+                    DialerTab.CONTACTS -> ContactsScreen(
+                        contacts = contacts,
+                        isLoading = isLoadingContacts,
+                        onCall = { number -> DialerRepository.placeCall(context, number) },
+                        onOpenDetails = { contact -> selectedContactForDetails = contact },
+                        onOpenSettings = { isSettingsOpen = true },
+                        onOpenPresetManager = { isPresetManagerOpen = true }
+                    )
+                    DialerTab.KEYPAD -> KeypadScreen(
+                        contacts = contacts,
+                        callLogs = callLogs,
+                        onCall = { number -> DialerRepository.placeCall(context, number) },
+                        onOpenDetails = { contact -> selectedContactForDetails = contact },
+                        onOpenSettings = { isSettingsOpen = true },
+                        onOpenPresetManager = { isPresetManagerOpen = true },
+                        onSwitchTab = { currentTab = it }
+                    )
+                    DialerTab.ASSISTANT -> AssistantTabScreen(
+                        onStartSimulation = onStartSimulation,
+                        selectedPersona = selectedPersona,
+                        onSelectPersona = { selectedPersona = it },
+                        isLiveMicActive = isLiveMicActive,
+                        onToggleLiveMic = { isLiveMicActive = !isLiveMicActive },
+                        isGreetingEnabled = sessionState.isGreetingEnabled,
+                        onToggleGreeting = { sessionManager.setGreetingEnabled(it) },
+                        presetManager = sessionManager.presetManager,
+                        onOpenPresetManager = { isPresetManagerOpen = true }
+                    )
+                }
             }
         }
 
@@ -800,7 +897,9 @@ fun RecentsScreen(
     onPlayPreset: (AudioPreset) -> Unit = {},
     onCall: (String) -> Unit,
     onScreen: (CallLogItem) -> Unit = {},
-    onOpenDetails: (ContactItem) -> Unit = {}
+    onOpenDetails: (ContactItem) -> Unit = {},
+    onOpenSettings: () -> Unit = {},
+    onOpenPresetManager: () -> Unit = {}
 ) {
     var selectedFilter by remember { mutableStateOf("All") }
     var selectedLogForDetails by remember { mutableStateOf<CallLogItem?>(null) }
@@ -987,7 +1086,7 @@ fun RecentsScreen(
             }
         }
 
-        // Pinned Top Header with Segmented Filter
+        // Pinned Top Header with Segmented Filter & 3-Dot Options Menu
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1003,31 +1102,107 @@ fun RecentsScreen(
                 letterSpacing = (-0.5).sp
             )
 
-            // Minimalist Monochromatic Frosted Capsule: All | Missed
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(Color(0x18FFFFFF))
-                    .border(0.8.dp, Color(0x30FFFFFF), RoundedCornerShape(18.dp))
-                    .padding(3.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row {
-                    listOf("All", "Missed").forEach { filter ->
-                        val isSel = selectedFilter == filter
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(15.dp))
-                                .background(if (isSel) Color(0x35FFFFFF) else Color.Transparent)
-                                .clickable { selectedFilter = filter }
-                                .padding(horizontal = 14.dp, vertical = 5.dp)
-                        ) {
-                            Text(
-                                text = filter,
-                                color = if (isSel) Color.White else TextSecondary,
-                                fontSize = 13.sp,
-                                fontWeight = if (isSel) FontWeight.SemiBold else FontWeight.Normal
-                            )
+                // Minimalist Monochromatic Frosted Capsule: All | Missed
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color(0x18FFFFFF))
+                        .border(0.8.dp, Color(0x30FFFFFF), RoundedCornerShape(18.dp))
+                        .padding(3.dp)
+                ) {
+                    Row {
+                        listOf("All", "Missed").forEach { filter ->
+                            val isSel = selectedFilter == filter
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(15.dp))
+                                    .background(if (isSel) Color(0x35FFFFFF) else Color.Transparent)
+                                    .clickable { selectedFilter = filter }
+                                    .padding(horizontal = 14.dp, vertical = 5.dp)
+                            ) {
+                                Text(
+                                    text = filter,
+                                    color = if (isSel) Color.White else TextSecondary,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSel) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                            }
                         }
+                    }
+                }
+
+                // 3-Dot Options Menu
+                var isMenuExpanded by remember { mutableStateOf(false) }
+                val menuRotation by animateFloatAsState(
+                    targetValue = if (isMenuExpanded) 90f else 0f,
+                    animationSpec = spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow),
+                    label = "recentsMenuRotate"
+                )
+
+                Box {
+                    IconButton(
+                        onClick = {
+                            isMenuExpanded = !isMenuExpanded
+                        },
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(Color(0x18FFFFFF))
+                            .border(0.8.dp, Color(0x30FFFFFF), CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.MoreVert,
+                            contentDescription = "Options",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .size(18.dp)
+                                .graphicsLayer { rotationZ = menuRotation }
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = isMenuExpanded,
+                        onDismissRequest = { isMenuExpanded = false },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(Color(0xF0151926))
+                            .border(1.dp, Color(0x30FFFFFF), RoundedCornerShape(18.dp))
+                            .padding(vertical = 4.dp)
+                    ) {
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Icon(Icons.Rounded.Settings, contentDescription = null, tint = AppleBlue, modifier = Modifier.size(18.dp))
+                                    Text("Call Settings", color = Color.White, fontSize = 14.sp)
+                                }
+                            },
+                            onClick = {
+                                isMenuExpanded = false
+                                onOpenSettings()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Icon(Icons.Rounded.Tune, contentDescription = null, tint = AppleAmber, modifier = Modifier.size(18.dp))
+                                    Text("Audio Presets & Personas", color = Color.White, fontSize = 14.sp)
+                                }
+                            },
+                            onClick = {
+                                isMenuExpanded = false
+                                onOpenPresetManager()
+                            }
+                        )
                     }
                 }
             }
@@ -1078,92 +1253,131 @@ fun Ios26LiquidContactDetailsSheet(
     var selectedPersona by remember { mutableStateOf(VoicePersona.DEFAULT) }
     var autoScreenThisContact by remember { mutableStateOf(false) }
 
+    var isVisible by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        isVisible = true
+    }
+
+    fun animateDismiss() {
+        if (!isVisible) return
+        coroutineScope.launch {
+            isVisible = false
+            delay(200)
+            onDismiss()
+        }
+    }
+
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { animateDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        val scrimAlpha by animateFloatAsState(
+            targetValue = if (isVisible) 0.65f else 0f,
+            animationSpec = tween(durationMillis = 240, easing = LinearOutSlowInEasing),
+            label = "detailsScrimAlpha"
+        )
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0x95000000))
-                .clickable { onDismiss() }
+                .background(Color.Black.copy(alpha = scrimAlpha))
+                .clickable { animateDismiss() }
                 .navigationBarsPadding(),
             contentAlignment = Alignment.BottomCenter
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(enabled = false) {}
-                    .shadow(
-                        elevation = 40.dp,
-                        shape = RoundedCornerShape(topStart = 44.dp, topEnd = 44.dp),
-                        spotColor = Color(0xD0000000),
-                        ambientColor = Color(0x99000000)
+            AnimatedVisibility(
+                visible = isVisible,
+                enter = slideInVertically(
+                    initialOffsetY = { fullHeight -> fullHeight },
+                    animationSpec = spring(
+                        dampingRatio = 0.82f,
+                        stiffness = Spring.StiffnessMediumLow
                     )
-                    .clip(RoundedCornerShape(topStart = 44.dp, topEnd = 44.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0xF2121722),
-                                Color(0xF80A0E16),
-                                Color(0xFF04060A)
-                            )
-                        )
-                    )
-                    .border(
-                        1.2.dp,
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0x80FFFFFF),
-                                Color(0x20FFFFFF),
-                                Color(0x06FFFFFF)
-                            )
-                        ),
-                        RoundedCornerShape(topStart = 44.dp, topEnd = 44.dp)
-                    )
-                    .padding(horizontal = 22.dp, vertical = 14.dp)
+                ) + fadeIn(animationSpec = tween(180)),
+                exit = slideOutVertically(
+                    targetOffsetY = { fullHeight -> fullHeight },
+                    animationSpec = tween(200, easing = FastOutLinearInEasing)
+                ) + fadeOut(animationSpec = tween(150))
             ) {
-                Column(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {}
+                        .shadow(
+                            elevation = 40.dp,
+                            shape = RoundedCornerShape(topStart = 44.dp, topEnd = 44.dp),
+                            spotColor = Color(0xD0000000),
+                            ambientColor = Color(0x99000000)
+                        )
+                        .clip(RoundedCornerShape(topStart = 44.dp, topEnd = 44.dp))
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color(0xF2121722),
+                                    Color(0xF80A0E16),
+                                    Color(0xFF04060A)
+                                )
+                            )
+                        )
+                        .border(
+                            1.2.dp,
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color(0x80FFFFFF),
+                                    Color(0x20FFFFFF),
+                                    Color(0x06FFFFFF)
+                                )
+                            ),
+                            RoundedCornerShape(topStart = 44.dp, topEnd = 44.dp)
+                        )
+                        .padding(horizontal = 22.dp, vertical = 14.dp)
                 ) {
-                    // Grabber handle
-                    Box(
+                    Column(
                         modifier = Modifier
-                            .width(42.dp)
-                            .height(5.dp)
-                            .clip(CircleShape)
-                            .background(Color(0x40FFFFFF))
-                    )
-
-                    // Top Bar (ColorOS / MIUI Minimalist Bar: Close, Title, Share)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        // Grabber handle
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .width(42.dp)
+                                .height(5.dp)
                                 .clip(CircleShape)
-                                .background(Color(0x1EFFFFFF))
-                                .border(0.8.dp, Color(0x30FFFFFF), CircleShape)
-                                .clickable {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    onDismiss()
-                                },
-                            contentAlignment = Alignment.Center
+                                .background(Color(0x40FFFFFF))
+                        )
+
+                        // Top Bar (ColorOS / MIUI Minimalist Bar: Close, Title, Share)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Close,
-                                contentDescription = "Close",
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0x1EFFFFFF))
+                                    .border(0.8.dp, Color(0x30FFFFFF), CircleShape)
+                                    .clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        animateDismiss()
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Close,
+                                    contentDescription = "Close",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
 
                         Text("Contact Info", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
 
@@ -1511,6 +1725,7 @@ fun Ios26LiquidContactDetailsSheet(
         }
     }
 }
+}
 
 @Composable
 fun ContactHeroActionPill(
@@ -1569,7 +1784,9 @@ fun ContactsScreen(
     contacts: List<ContactItem>,
     isLoading: Boolean,
     onCall: (String) -> Unit,
-    onOpenDetails: (ContactItem) -> Unit = {}
+    onOpenDetails: (ContactItem) -> Unit = {},
+    onOpenSettings: () -> Unit = {},
+    onOpenPresetManager: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
@@ -1815,19 +2032,94 @@ fun ContactsScreen(
                     letterSpacing = (-0.5).sp
                 )
 
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFF1E2430))
-                        .border(1.dp, Color(0x35FFFFFF), RoundedCornerShape(14.dp))
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = "${contacts.size} Total",
-                        color = Color(0xCCFFFFFF),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color(0xFF1E2430))
+                            .border(1.dp, Color(0x35FFFFFF), RoundedCornerShape(14.dp))
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "${contacts.size} Total",
+                            color = Color(0xCCFFFFFF),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    var isMenuExpanded by remember { mutableStateOf(false) }
+                    val menuRotation by animateFloatAsState(
+                        targetValue = if (isMenuExpanded) 90f else 0f,
+                        animationSpec = spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow),
+                        label = "contactsMenuRotate"
                     )
+
+                    Box {
+                        IconButton(
+                            onClick = {
+                                isMenuExpanded = !isMenuExpanded
+                            },
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(Color(0x18FFFFFF))
+                                .border(0.8.dp, Color(0x30FFFFFF), CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.MoreVert,
+                                contentDescription = "Options",
+                                tint = Color.White,
+                                modifier = Modifier
+                                    .size(17.dp)
+                                    .graphicsLayer { rotationZ = menuRotation }
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = isMenuExpanded,
+                            onDismissRequest = { isMenuExpanded = false },
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(Color(0xF0151926))
+                                .border(1.dp, Color(0x30FFFFFF), RoundedCornerShape(18.dp))
+                                .padding(vertical = 4.dp)
+                        ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Icon(Icons.Rounded.Settings, contentDescription = null, tint = AppleBlue, modifier = Modifier.size(18.dp))
+                                        Text("Call Settings", color = Color.White, fontSize = 14.sp)
+                                    }
+                                },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    onOpenSettings()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Icon(Icons.Rounded.Tune, contentDescription = null, tint = AppleAmber, modifier = Modifier.size(18.dp))
+                                        Text("Audio Presets & Personas", color = Color.White, fontSize = 14.sp)
+                                    }
+                                },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    onOpenPresetManager()
+                                }
+                            )
+                        }
+                    }
                 }
             }
 
@@ -2021,7 +2313,9 @@ fun KeypadScreen(
     callLogs: List<CallLogItem> = emptyList(),
     onCall: (String) -> Unit,
     onOpenDetails: (ContactItem) -> Unit = {},
-    onOpenSettings: () -> Unit = {}
+    onOpenSettings: () -> Unit = {},
+    onOpenPresetManager: () -> Unit = {},
+    onSwitchTab: (DialerTab) -> Unit = {}
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -2091,7 +2385,7 @@ fun KeypadScreen(
             .padding(bottom = 86.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // ColorOS Top Header: Title & 3-Dots Settings Action with Generous Status Bar Clearance
+        // ColorOS Top Header: Title & Animated 3-Dots Menu with Generous Status Bar Clearance
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -2109,195 +2403,280 @@ fun KeypadScreen(
                 )
             )
 
-            IconButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onOpenSettings()
-                },
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .background(Color(0x18FFFFFF))
-                    .border(0.8.dp, Color(0x30FFFFFF), CircleShape)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.MoreVert,
-                    contentDescription = "Settings",
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp)
-                )
+            var isMenuExpanded by remember { mutableStateOf(false) }
+            val menuRotation by animateFloatAsState(
+                targetValue = if (isMenuExpanded) 90f else 0f,
+                animationSpec = spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow),
+                label = "keypadMenuRotate"
+            )
+
+            Box {
+                IconButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        isMenuExpanded = !isMenuExpanded
+                    },
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x18FFFFFF))
+                        .border(0.8.dp, Color(0x30FFFFFF), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.MoreVert,
+                        contentDescription = "Menu",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .graphicsLayer { rotationZ = menuRotation }
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = isMenuExpanded,
+                    onDismissRequest = { isMenuExpanded = false },
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color(0xF0151926))
+                        .border(1.dp, Color(0x30FFFFFF), RoundedCornerShape(18.dp))
+                        .padding(vertical = 4.dp)
+                ) {
+                    DropdownMenuItem(
+                        text = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(Icons.Rounded.Settings, contentDescription = null, tint = AppleBlue, modifier = Modifier.size(18.dp))
+                                Text("Call Settings", color = Color.White, fontSize = 14.sp)
+                            }
+                        },
+                        onClick = {
+                            isMenuExpanded = false
+                            onOpenSettings()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(Icons.Rounded.Tune, contentDescription = null, tint = AppleAmber, modifier = Modifier.size(18.dp))
+                                Text("Audio Presets & Personas", color = Color.White, fontSize = 14.sp)
+                            }
+                        },
+                        onClick = {
+                            isMenuExpanded = false
+                            onOpenPresetManager()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = AppleGreen, modifier = Modifier.size(18.dp))
+                                Text("AI Screening Studio", color = Color.White, fontSize = 14.sp)
+                            }
+                        },
+                        onClick = {
+                            isMenuExpanded = false
+                            onSwitchTab(DialerTab.ASSISTANT)
+                        }
+                    )
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Top Section: Purposeful Compact Display Area (No huge empty void!)
-        Column(
+        // Top Section: Purposeful Compact Display Area with Fluid Spring Crossfade
+        AnimatedContent(
+            targetState = typedNumber.isEmpty(),
+            transitionSpec = {
+                (slideInVertically(
+                    initialOffsetY = { -it / 3 },
+                    animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
+                ) + fadeIn(animationSpec = tween(180)))
+                .togetherWith(
+                    slideOutVertically(
+                        targetOffsetY = { -it / 3 },
+                        animationSpec = tween(140)
+                    ) + fadeOut(animationSpec = tween(120))
+                )
+            },
+            label = "KeypadDisplayTransition",
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            if (typedNumber.isEmpty()) {
-                // Solid High-Contrast Search Pill in Keypad
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(Color(0xFF1A1F2C))
-                        .border(1.dp, Color(0x35FFFFFF), RoundedCornerShape(18.dp))
-                        .padding(horizontal = 16.dp, vertical = 11.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Search,
-                        contentDescription = "Search",
-                        tint = Color(0xB5FFFFFF),
-                        modifier = Modifier.size(17.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "Search contacts or dial number",
-                        color = Color(0x75FFFFFF),
-                        fontSize = 14.sp
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Quick Recents / Frequent Dial Carousel
-                val recentLogs = remember(callLogs) { callLogs.distinctBy { it.number }.take(4) }
-                if (recentLogs.isNotEmpty()) {
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(recentLogs) { log ->
-                            Row(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(Color(0x16FFFFFF))
-                                    .border(0.8.dp, Color(0x26FFFFFF), RoundedCornerShape(14.dp))
-                                    .clickable {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        typedNumber = log.number
-                                    }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(22.dp)
-                                        .clip(CircleShape)
-                                        .background(AppleGreen.copy(alpha = 0.2f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Schedule,
-                                        contentDescription = null,
-                                        tint = AppleGreen,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                }
-                                Text(
-                                    text = log.name ?: DialerRepository.formatPhoneNumber(log.number),
-                                    color = Color.White,
-                                    fontSize = 12.5.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    Text(
-                        text = "Press & hold 0 for +, 1 for Voicemail",
-                        color = TextMuted,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    )
-                }
-            } else {
-                // T9 Matched Contact Capsule
-                if (t9Matches.isNotEmpty()) {
-                    val match = t9Matches.first()
+                .padding(horizontal = 20.dp)
+        ) { isEmpty ->
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (isEmpty) {
+                    // Solid High-Contrast Search Pill in Keypad
                     Row(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color(0x18FFFFFF))
-                            .border(0.8.dp, Color(0x30FFFFFF), RoundedCornerShape(14.dp))
-                            .clickable { onOpenDetails(match) }
-                            .padding(horizontal = 12.dp, vertical = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(Color(0xFF1A1F2C))
+                            .border(1.dp, Color(0x35FFFFFF), RoundedCornerShape(18.dp))
+                            .padding(horizontal = 16.dp, vertical = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = match.name,
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold
+                        Icon(
+                            imageVector = Icons.Filled.Search,
+                            contentDescription = "Search",
+                            tint = Color(0xB5FFFFFF),
+                            modifier = Modifier.size(17.dp)
                         )
+                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = DialerRepository.formatPhoneNumber(match.number),
-                            color = TextSecondary,
-                            fontSize = 12.sp,
-                            fontFamily = FontFamily.Monospace
+                            text = "Search contacts or dial number",
+                            color = Color(0x75FFFFFF),
+                            fontSize = 14.sp
                         )
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
-                }
 
-                // Dialed Number Display (Auto-scaling clean ColorOS typography)
-                val textSize = when {
-                    typedNumber.length > 15 -> 22.sp
-                    typedNumber.length > 12 -> 26.sp
-                    typedNumber.length > 9 -> 32.sp
-                    else -> 38.sp
-                }
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                Text(
-                    text = formattedNumber,
-                    color = Color.White,
-                    fontSize = textSize,
-                    fontWeight = FontWeight.Normal,
-                    fontFamily = FontFamily.SansSerif,
-                    letterSpacing = (-0.5).sp,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                Spacer(modifier = Modifier.height(2.dp))
-
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable {
-                            val intent = Intent(Intent.ACTION_INSERT).apply {
-                                type = ContactsContract.RawContacts.CONTENT_TYPE
-                                putExtra(ContactsContract.Intents.Insert.PHONE, typedNumber)
-                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    // Quick Recents / Frequent Dial Carousel
+                    val recentLogs = remember(callLogs) { callLogs.distinctBy { it.number }.take(4) }
+                    if (recentLogs.isNotEmpty()) {
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(recentLogs) { log ->
+                                Row(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(Color(0x16FFFFFF))
+                                        .border(0.8.dp, Color(0x26FFFFFF), RoundedCornerShape(14.dp))
+                                        .clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            typedNumber = log.number
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(22.dp)
+                                            .clip(CircleShape)
+                                            .background(AppleGreen.copy(alpha = 0.2f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Schedule,
+                                            contentDescription = null,
+                                            tint = AppleGreen,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                    }
+                                    Text(
+                                        text = log.name ?: DialerRepository.formatPhoneNumber(log.number),
+                                        color = Color.White,
+                                        fontSize = 12.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
-                            try { context.startActivity(intent) } catch (_: Exception) {}
                         }
-                        .padding(horizontal = 8.dp, vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.PersonAdd,
-                        contentDescription = null,
-                        tint = AppleBlue,
-                        modifier = Modifier.size(14.dp)
-                    )
+                    } else {
+                        Text(
+                            text = "Press & hold 0 for +, 1 for Voicemail",
+                            color = TextMuted,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+                    }
+                } else {
+                    // T9 Matched Contact Capsule
+                    if (t9Matches.isNotEmpty()) {
+                        val match = t9Matches.first()
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color(0x18FFFFFF))
+                                .border(0.8.dp, Color(0x30FFFFFF), RoundedCornerShape(14.dp))
+                                .clickable { onOpenDetails(match) }
+                                .padding(horizontal = 12.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = match.name,
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = DialerRepository.formatPhoneNumber(match.number),
+                                color = TextSecondary,
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+
+                    // Dialed Number Display (Auto-scaling clean ColorOS typography)
+                    val textSize = when {
+                        typedNumber.length > 15 -> 22.sp
+                        typedNumber.length > 12 -> 26.sp
+                        typedNumber.length > 9 -> 32.sp
+                        else -> 38.sp
+                    }
+
                     Text(
-                        text = "Add to Contacts",
-                        color = AppleBlue,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium
+                        text = formattedNumber,
+                        color = Color.White,
+                        fontSize = textSize,
+                        fontWeight = FontWeight.Normal,
+                        fontFamily = FontFamily.SansSerif,
+                        letterSpacing = (-0.5).sp,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
+
+                    Spacer(modifier = Modifier.height(2.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable {
+                                val intent = Intent(Intent.ACTION_INSERT).apply {
+                                    type = ContactsContract.RawContacts.CONTENT_TYPE
+                                    putExtra(ContactsContract.Intents.Insert.PHONE, typedNumber)
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                try { context.startActivity(intent) } catch (_: Exception) {}
+                            }
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.PersonAdd,
+                            contentDescription = null,
+                            tint = AppleBlue,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = "Add to Contacts",
+                            color = AppleBlue,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
         }
@@ -2363,12 +2742,28 @@ fun KeypadScreen(
                     }
                 )
 
-                // Column 3: Backspace Button in 75dp slot (never causes dialpad to shift!)
+                // Column 3: Backspace Button in 75dp slot with spring pop animation
                 Box(
                     modifier = Modifier.size(75.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (typedNumber.isNotEmpty()) {
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = typedNumber.isNotEmpty(),
+                        enter = scaleIn(
+                            initialScale = 0.65f,
+                            animationSpec = spring(
+                                dampingRatio = 0.72f,
+                                stiffness = Spring.StiffnessMediumLow
+                            )
+                        ) + fadeIn(animationSpec = tween(150)),
+                        exit = scaleOut(
+                            targetScale = 0.65f,
+                            animationSpec = spring(
+                                dampingRatio = 0.8f,
+                                stiffness = Spring.StiffnessMediumLow
+                            )
+                        ) + fadeOut(animationSpec = tween(120))
+                    ) {
                         Box(
                             modifier = Modifier
                                 .size(52.dp)
@@ -4524,108 +4919,142 @@ fun DialerSettingsSheet(
     var isModuleInstalled by remember { mutableStateOf(RootPrivilegeManager.isMagiskModuleInstalled()) }
     var isInstalling by remember { mutableStateOf(false) }
 
+    var isVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        isVisible = true
+    }
+
+    fun animateDismiss() {
+        if (!isVisible) return
+        coroutineScope.launch {
+            isVisible = false
+            delay(200)
+            onDismiss()
+        }
+    }
+
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { animateDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        val scrimAlpha by animateFloatAsState(
+            targetValue = if (isVisible) 0.65f else 0f,
+            animationSpec = tween(durationMillis = 240, easing = LinearOutSlowInEasing),
+            label = "settingsScrimAlpha"
+        )
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0x95000000))
-                .clickable { onDismiss() },
+                .background(Color.Black.copy(alpha = scrimAlpha))
+                .clickable { animateDismiss() },
             contentAlignment = Alignment.BottomCenter
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.92f)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) {}
-                    .shadow(
-                        elevation = 28.dp,
-                        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
-                        spotColor = Color(0xB5000000),
-                        ambientColor = Color(0x70000000)
+            AnimatedVisibility(
+                visible = isVisible,
+                enter = slideInVertically(
+                    initialOffsetY = { fullHeight -> fullHeight },
+                    animationSpec = spring(
+                        dampingRatio = 0.82f,
+                        stiffness = Spring.StiffnessMediumLow
                     )
-                    .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0xFA141824),
-                                Color(0xF50D111A)
+                ) + fadeIn(animationSpec = tween(180)),
+                exit = slideOutVertically(
+                    targetOffsetY = { fullHeight -> fullHeight },
+                    animationSpec = tween(200, easing = FastOutLinearInEasing)
+                ) + fadeOut(animationSpec = tween(150))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.92f)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {}
+                        .shadow(
+                            elevation = 28.dp,
+                            shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+                            spotColor = Color(0xB5000000),
+                            ambientColor = Color(0x70000000)
+                        )
+                        .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color(0xFA141824),
+                                    Color(0xF50D111A)
+                                )
                             )
                         )
-                    )
-                    .border(
-                        1.2.dp,
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0x60FFFFFF),
-                                Color(0x18FFFFFF)
-                            )
-                        ),
-                        RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
-                    )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                        .border(
+                            1.2.dp,
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color(0x60FFFFFF),
+                                    Color(0x18FFFFFF)
+                                )
+                            ),
+                            RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+                        )
                 ) {
-                    // Drag Handle Pill
-                    Box(
+                    Column(
                         modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .width(42.dp)
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(Color(0x40FFFFFF))
-                    )
-
-                    // Header Row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        Column {
-                            Text(
-                                text = "Settings",
-                                color = Color.White,
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = (-0.5).sp
-                            )
-                            Text(
-                                text = "Telephony, Recording & Privileges",
-                                color = TextSecondary,
-                                fontSize = 12.5.sp
-                            )
-                        }
-
-                        IconButton(
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onDismiss()
-                            },
+                        // Drag Handle Pill
+                        Box(
                             modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Color(0x1AFFFFFF))
-                                .border(0.8.dp, Color(0x30FFFFFF), CircleShape)
+                                .align(Alignment.CenterHorizontally)
+                                .width(42.dp)
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(Color(0x40FFFFFF))
+                        )
+
+                        // Header Row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Close,
-                                contentDescription = "Close",
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Column {
+                                Text(
+                                    text = "Settings",
+                                    color = Color.White,
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = (-0.5).sp
+                                )
+                                Text(
+                                    text = "Telephony, Recording & Privileges",
+                                    color = TextSecondary,
+                                    fontSize = 12.5.sp
+                                )
+                            }
+
+                            IconButton(
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    animateDismiss()
+                                },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0x1AFFFFFF))
+                                    .border(0.8.dp, Color(0x30FFFFFF), CircleShape)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Close,
+                                    contentDescription = "Close",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
-                    }
 
                     // ==========================================
                     // GROUP 1: CALL HANDLING & SCREENING
@@ -5125,6 +5554,7 @@ fun DialerSettingsSheet(
             }
         }
     }
+}
 
     if (showRecordingsDialog) {
         SavedRecordingsDialog(onDismiss = { showRecordingsDialog = false })
