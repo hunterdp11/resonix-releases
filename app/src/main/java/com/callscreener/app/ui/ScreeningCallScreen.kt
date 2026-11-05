@@ -15,7 +15,9 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
@@ -362,43 +364,9 @@ fun ScreeningCallScreen(
                     onToggle = { isFocusChatMode = !isFocusChatMode }
                 )
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                // Tier 1: Liquid Wavy Swipe Ribbon (Toggleable Quick Replies vs Soundboard vs Voice Personas)
-                // Fluidly collapses in Chat Focus Mode to give 100% full-screen presence to the conversation
-                AnimatedVisibility(
-                    visible = !isFocusChatMode,
-                    enter = fadeIn(tween(240)) + expandVertically(spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessMediumLow)),
-                    exit = fadeOut(tween(180)) + shrinkVertically(spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessMediumLow))
-                ) {
-                    Column {
-                        LiquidWavyActionRibbon(
-                            activeTab = activeRibbonTab,
-                            onSelectTab = { activeRibbonTab = it },
-                            quickReplies = state.quickReplies,
-                            onReplySelected = { reply ->
-                                onSendReply(reply.spokenText)
-                                if (state.isSimulated) {
-                                    val mockResponse = when (reply.id) {
-                                        "who" -> "Hello, this is Dave from Courier Logistics."
-                                        "reason" -> "I am calling regarding your express delivery."
-                                        "busy" -> "Understood, I will call back at a later time."
-                                        else -> "Thank you, noted."
-                                    }
-                                    onSimulateCallerReply(mockResponse)
-                                }
-                            },
-                            presets = presets,
-                            onPlayPreset = onPlayPreset,
-                            currentPersona = state.currentPersona,
-                            onSelectPersona = onSelectPersona,
-                            onOpenPresetManager = { isPresetManagerOpen = true }
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                }
-
-                // Tier 2: Unified Liquid Input & In-Call Command Island
+                // Unified Liquid Input & In-Call Command Island (Coordinated Single-Spring Fluid Animation)
                 UnifiedLiquidCommandIsland(
                     text = inputText,
                     onTextChanged = { inputText = it },
@@ -425,7 +393,31 @@ fun ScreeningCallScreen(
                     onToggleRecording = onToggleRecording,
                     onToggleAiVoiceListening = onToggleAiVoiceListening,
                     onToggleAutoRelay = onToggleAutoRelay,
-                    isFocusChatMode = isFocusChatMode
+                    isFocusChatMode = isFocusChatMode,
+                    ribbonContent = {
+                        LiquidWavyActionRibbon(
+                            activeTab = activeRibbonTab,
+                            onSelectTab = { activeRibbonTab = it },
+                            quickReplies = state.quickReplies,
+                            onReplySelected = { reply ->
+                                onSendReply(reply.spokenText)
+                                if (state.isSimulated) {
+                                    val mockResponse = when (reply.id) {
+                                        "who" -> "Hello, this is Dave from Courier Logistics."
+                                        "reason" -> "I am calling regarding your express delivery."
+                                        "busy" -> "Understood, I will call back at a later time."
+                                        else -> "Thank you, noted."
+                                    }
+                                    onSimulateCallerReply(mockResponse)
+                                }
+                            },
+                            presets = presets,
+                            onPlayPreset = onPlayPreset,
+                            currentPersona = state.currentPersona,
+                            onSelectPersona = onSelectPersona,
+                            onOpenPresetManager = { isPresetManagerOpen = true }
+                        )
+                    }
                 )
             }
 
@@ -1006,7 +998,8 @@ fun UnifiedLiquidCommandIsland(
     onToggleRecording: () -> Unit = {},
     onToggleAiVoiceListening: () -> Unit = {},
     onToggleAutoRelay: (Boolean) -> Unit = {},
-    isFocusChatMode: Boolean = false
+    isFocusChatMode: Boolean = false,
+    ribbonContent: @Composable () -> Unit = {}
 ) {
     val sendScale by animateFloatAsState(
         targetValue = if (text.isNotBlank()) 1.0f else 0.88f,
@@ -1083,9 +1076,11 @@ fun UnifiedLiquidCommandIsland(
             }
         }
 
-        // Type-to-Speak Input Bar (Minimalist Frosted Titanium)
+        // Type-to-Speak Input Bar (Fluid Apple Liquid Glass with Coordinated Horizontal Expansion)
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)),
             verticalAlignment = Alignment.CenterVertically
         ) {
             OutlinedTextField(
@@ -1161,13 +1156,19 @@ fun UnifiedLiquidCommandIsland(
                 }
             }
 
-            // Compact Liquid Glass Decline Button in Chat Focus Mode (Inline so user can decline anytime without clutter)
+            // Compact Liquid Glass Decline Button in Chat Focus Mode (Glides in/out horizontally with Apple physics)
             AnimatedVisibility(
                 visible = isFocusChatMode,
-                enter = fadeIn(tween(200)) + scaleIn(spring(dampingRatio = 0.72f)),
-                exit = fadeOut(tween(150)) + scaleOut()
+                enter = fadeIn(animationSpec = tween(220)) + expandHorizontally(
+                    animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow),
+                    expandFrom = Alignment.End
+                ),
+                exit = fadeOut(animationSpec = tween(160)) + shrinkHorizontally(
+                    animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow),
+                    shrinkTowards = Alignment.End
+                )
             ) {
-                Row {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Spacer(modifier = Modifier.width(8.dp))
                     Box(
                         modifier = Modifier
@@ -1206,18 +1207,26 @@ fun UnifiedLiquidCommandIsland(
             }
         }
 
-        // ColorOS 2x3 Grid of 56dp Circular In-Call Control Buttons & Massive Decline Button
-        // Smoothly collapses in Chat Focus Mode
+        // ColorOS 2x3 Grid of 56dp Circular In-Call Control Buttons & Massive Decline Button + Action Ribbon
+        // Smoothly collapses downwards/upwards in ONE synchronized fluid motion in Chat Focus Mode
         AnimatedVisibility(
             visible = !isFocusChatMode,
-            enter = fadeIn(tween(240)) + expandVertically(spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessMediumLow)),
-            exit = fadeOut(tween(180)) + shrinkVertically(spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessMediumLow))
+            enter = fadeIn(animationSpec = tween(240)) + expandVertically(
+                animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow),
+                expandFrom = Alignment.Top
+            ),
+            exit = fadeOut(animationSpec = tween(180)) + shrinkVertically(
+                animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow),
+                shrinkTowards = Alignment.Top
+            )
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
+                // Tier 1: Action Ribbon (Quick replies, soundboard, voice personas)
+                ribbonContent()
                 // Row 1: Mute | Speaker | Record
                 Row(
                     modifier = Modifier.fillMaxWidth(),

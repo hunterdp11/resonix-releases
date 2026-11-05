@@ -128,6 +128,7 @@ import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.chrisbanes.haze.HazeState
@@ -582,69 +583,102 @@ fun MainDashboard(
 }
 
 /**
- * Authentic Apple Pure Liquid Backdrop:
- * Seamless, silky smooth monochromatic titanium radial gradient on pure deep OLED black.
- * Zero boxy artifacts, zero rainbow saturation — pure minimalist luxury.
+ * Authentic Apple Liquid Glass Canvas Backdrop:
+ * Deep obsidian OLED black with dynamic flowing chromatic caustics:
+ * - Molten liquid amber & copper caustics sweeping through the bottom-left dock region
+ * - Deep metallic sapphire & electric cyan caustics sweeping through the bottom-right dock region
+ * - Luminous liquid ripples catching specular highlights
+ * Captures real optical refraction through the dock and glass surfaces.
  */
 @Composable
 fun AppleLiquidBackdrop() {
     Canvas(modifier = Modifier.fillMaxSize()) {
-        // Pure Obsidian OLED Black with Top Status Bar Liquid Titanium Sheen
-        drawRect(color = Color(0xFF000000))
+        val width = size.width
+        val height = size.height
 
+        // Pure Obsidian OLED Black Base
+        drawRect(color = Color(0xFF030508))
+
+        // Top Status Bar subtle titanium atmospheric glow
         drawRect(
             brush = Brush.verticalGradient(
                 listOf(
-                    Color(0xFF181F2C),
-                    Color(0xFF0F141E),
-                    Color(0xFF000000)
+                    Color(0xFF141A24),
+                    Color(0xFF0A0E15),
+                    Color.Transparent
                 ),
                 startY = 0f,
-                endY = size.height * 0.35f
+                endY = height * 0.30f
             )
         )
 
-        // Ethereal, whisper-soft top ambient radiance (monochromatic titanium glow)
+        // Apple Liquid Chromatic Caustics flowing dynamically behind the floating dock:
+        // Wave 1: Molten Amber / Bronze liquid caustic glow (Left dock refraction)
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    Color(0x18202E42), // Subtle celestial titanium
-                    Color(0x08121C2A),
+                    Color(0x60D97706), // Rich molten amber
+                    Color(0x35B45309), // Burnished bronze
+                    Color(0x1078350F),
                     Color.Transparent
                 ),
-                center = center.copy(y = size.height * 0.12f),
-                radius = size.width * 0.95f
+                center = Offset(width * 0.22f, height * 0.91f),
+                radius = width * 0.68f
             )
         )
 
-        // Subtle bottom ambient refraction for floating dock
+        // Wave 2: Deep Metallic Sapphire / Electric Azure liquid caustic glow (Right dock refraction)
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    Color(0x12162232),
+                    Color(0x551D4ED8), // Royal sapphire
+                    Color(0x300284C7), // Electric cyan
+                    Color(0x100369A1),
                     Color.Transparent
                 ),
-                center = center.copy(y = size.height * 0.96f),
-                radius = size.width * 0.75f
+                center = Offset(width * 0.80f, height * 0.92f),
+                radius = width * 0.72f
             )
         )
 
-        // Hairline specular top rim reflection
+        // Wave 3: Flowing organic caustic ridge sweeping through the dock
         drawRect(
-            brush = Brush.verticalGradient(
-                listOf(
-                    Color(0x12FFFFFF),
-                    Color(0x04FFFFFF),
+            brush = Brush.linearGradient(
+                colors = listOf(
+                    Color.Transparent,
+                    Color(0x20F59E0B),
+                    Color(0x2838BDF8),
+                    Color(0x35FFFFFF),
                     Color.Transparent
                 ),
-                startY = 0f,
-                endY = size.height * 0.20f
+                start = Offset(0f, height * 0.84f),
+                end = Offset(width, height * 0.96f)
+            )
+        )
+
+        // Wave 4: Secondary deep violet caustic depth beneath the amber & sapphire
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color(0x356D28D9),
+                    Color.Transparent
+                ),
+                center = Offset(width * 0.52f, height * 0.96f),
+                radius = width * 0.55f
             )
         )
     }
 }
+
 /**
- * Docked Floating Minimal Frosted Glass Bottom Navigation Bar with Dynamic Sliding Indicator & Frosted Blur
+ * Authentic Apple Liquid Glass Floating Capsule Dock:
+ * Matches Apple's signature optical glass dock from iOS 18 / iOS 26 (as in attached screenshot):
+ * - Stadium capsule pill geometry with 42dp corner radius
+ * - Lateral dark refraction crescent shadows on the curved ends (optical cylinder compression)
+ * - Razor-sharp top specular reflection crest
+ * - Ultra-clear optical transmission with 34dp hardware backdrop blur
+ * - 4 Authentic Apple Liquid Glass Squircle Tiles (Emerald, Molten Amber, Electric Azure, Royal Violet)
+ *   with specular top domes, active liquid droplet glows, and smooth spring physics.
  */
 @Composable
 fun LiquidGlassBottomBar(
@@ -664,51 +698,78 @@ fun LiquidGlassBottomBar(
         )
     }
 
-    val selectedIndex = when (currentTab) {
-        DialerTab.RECENTS -> 0
-        DialerTab.CONTACTS -> 1
-        DialerTab.KEYPAD -> 2
-        DialerTab.ASSISTANT -> 3
-    }
-
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 18.dp)
+            .padding(horizontal = 16.dp)
             .shadow(
-                elevation = 28.dp,
-                shape = RoundedCornerShape(36.dp),
-                spotColor = Color(0x75000000),
-                ambientColor = Color(0x40000000)
+                elevation = 32.dp,
+                shape = CircleShape,
+                spotColor = Color(0x95000000),
+                ambientColor = Color(0x45000000)
             )
             .hazeChild(
                 state = hazeState,
-                shape = RoundedCornerShape(36.dp),
+                shape = CircleShape,
                 style = HazeStyle(
-                    tint = Color(0x18FFFFFF),
-                    blurRadius = 38.dp,
+                    tint = Color(0x10FFFFFF), // Ultra-clear optical transmission
+                    blurRadius = 34.dp,
                     noiseFactor = 0f
                 )
             )
-            .clip(RoundedCornerShape(36.dp))
-            .background(LiquidGlassDockFill)
+            .clip(CircleShape)
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0x28FFFFFF), // Crystalline specular top
+                        Color(0x0CFFFFFF), // Crystal clear transmission
+                        Color(0x1EFFFFFF)  // Caustic bottom return
+                    )
+                )
+            )
             .border(
-                1.4.dp,
-                LiquidGlassDockBorder,
-                RoundedCornerShape(36.dp)
+                1.3.dp,
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xF5FFFFFF), // Razor-sharp top specular catch
+                        Color(0x45FFFFFF), // Translucent sides
+                        Color(0x18FFFFFF),
+                        Color(0x60FFFFFF)  // Bottom caustic return rim
+                    )
+                ),
+                CircleShape
             )
     ) {
-        // Apple Signature Specular Top Sheen (refraction crest reflecting across curved crystal glass)
+        // Lateral Dark Optical Refraction Crescents (Physical cylinder compression along curved ends)
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .clip(CircleShape)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            Color(0x85000000), // Left curved edge refraction shadow
+                            Color(0x35000000),
+                            Color.Transparent,
+                            Color.Transparent,
+                            Color(0x35000000),
+                            Color(0x85000000)  // Right curved edge refraction shadow
+                        )
+                    )
+                )
+        )
+
+        // Apple Signature Specular Top Sheen (Refraction crest reflecting across curved crystal glass)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(30.dp)
-                .clip(RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp))
+                .height(28.dp)
+                .clip(RoundedCornerShape(topStart = 42.dp, topEnd = 42.dp))
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            Color(0x48FFFFFF),
-                            Color(0x14FFFFFF),
+                            Color(0x55FFFFFF),
+                            Color(0x16FFFFFF),
                             Color.Transparent
                         )
                     )
@@ -724,134 +785,140 @@ fun LiquidGlassBottomBar(
                     0.8.dp,
                     Brush.verticalGradient(
                         listOf(
-                            Color(0x70FFFFFF),
-                            Color(0x18FFFFFF),
+                            Color(0x75FFFFFF),
+                            Color(0x15FFFFFF),
                             Color(0x35FFFFFF)
                         )
                     ),
-                    RoundedCornerShape(34.5.dp)
+                    CircleShape
                 )
         )
 
-        // Bottom refraction return rim
-        Box(
+        // Tab Content: 4 Authentic Apple Liquid Glass Squircle Tiles
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(1.dp)
-                .align(Alignment.BottomCenter)
-                .clip(RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp))
-                .background(Color(0x30FFFFFF))
-        )
-
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(68.dp)
-                .padding(horizontal = 4.dp, vertical = 6.dp)
+                .height(78.dp)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceAround
         ) {
-            val totalWidth = maxWidth
-            val tabWidth = totalWidth / 4
+            tabs.forEach { (tab, icon, label) ->
+                val isSelected = currentTab == tab
 
-            val indicatorOffset by animateDpAsState(
-                targetValue = tabWidth * selectedIndex,
-                animationSpec = spring(
-                    dampingRatio = 0.80f,
-                    stiffness = Spring.StiffnessMediumLow
-                ),
-                label = "dockIndicatorOffset"
-            )
+                val tileScale by animateFloatAsState(
+                    targetValue = if (isSelected) 1.06f else 0.94f,
+                    animationSpec = spring(
+                        dampingRatio = 0.72f,
+                        stiffness = Spring.StiffnessMediumLow
+                    ),
+                    label = "dockTileScale"
+                )
 
-            // Ultra-Clear Liquid Glass Sliding Active Droplet
-            Box(
-                modifier = Modifier
-                    .offset(x = indicatorOffset)
-                    .width(tabWidth)
-                    .fillMaxHeight()
-                    .padding(horizontal = 4.dp, vertical = 2.dp)
-                    .shadow(
-                        elevation = 12.dp,
-                        shape = RoundedCornerShape(26.dp),
-                        spotColor = Color(0x55000000),
-                        ambientColor = Color(0x25000000)
+                // Dedicated Vibrant Apple Liquid Glass Gradient per Tab
+                val (activeGradient, spotColor) = when (tab) {
+                    DialerTab.RECENTS -> Pair(
+                        Brush.verticalGradient(listOf(Color(0xFF34C759), Color(0xFF1B8A38))),
+                        Color(0x9934C759)
                     )
-                    .clip(RoundedCornerShape(26.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0x48FFFFFF), // Luminous liquid glass top sheen
-                                Color(0x16FFFFFF), // High-transparency crystal body
-                                Color(0x28FFFFFF)  // Curved base caustic return
-                            )
-                        )
+                    DialerTab.CONTACTS -> Pair(
+                        Brush.verticalGradient(listOf(Color(0xFFFF9F0A), Color(0xFFD66000))),
+                        Color(0x99FF9F0A)
                     )
-                    .border(
-                        1.2.dp,
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0xA5FFFFFF), // Razor-sharp top light catch
-                                Color(0x40FFFFFF),
-                                Color(0x1AFFFFFF)
-                            )
-                        ),
-                        RoundedCornerShape(26.dp)
+                    DialerTab.KEYPAD -> Pair(
+                        Brush.verticalGradient(listOf(Color(0xFF0A84FF), Color(0xFF0055D6))),
+                        Color(0x990A84FF)
                     )
-            )
+                    DialerTab.ASSISTANT -> Pair(
+                        Brush.verticalGradient(listOf(Color(0xFFAF52DE), Color(0xFF5856D6))),
+                        Color(0x99AF52DE)
+                    )
+                }
 
-            // Tab Icons & Text centered in equal 4ths with perfect fitting
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                tabs.forEach { (tab, icon, label) ->
-                    val isSelected = currentTab == tab
-                    val iconScale by animateFloatAsState(
-                        targetValue = if (isSelected) 1.04f else 0.94f,
-                        animationSpec = spring(dampingRatio = 0.70f),
-                        label = "tabIconScale"
-                    )
-                    val contentColor by animateColorAsState(
-                        targetValue = if (isSelected) Color.White else Color(0x80FFFFFF),
-                        animationSpec = tween(durationMillis = 180),
-                        label = "tabContentColor"
-                    )
-
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .scale(tileScale)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onTabSelected(tab)
+                        }
+                ) {
+                    // Apple Liquid Glass Squircle Icon Tile (52dp x 48dp)
                     Box(
                         modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(20.dp))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onTabSelected(tab)
-                            },
+                            .size(width = 52.dp, height = 48.dp)
+                            .shadow(
+                                elevation = if (isSelected) 12.dp else 4.dp,
+                                shape = RoundedCornerShape(16.dp),
+                                spotColor = if (isSelected) spotColor else Color(0x35000000),
+                                ambientColor = Color(0x20000000)
+                            )
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                if (isSelected) activeGradient
+                                else Brush.verticalGradient(
+                                    listOf(
+                                        Color(0x24FFFFFF),
+                                        Color(0x10FFFFFF)
+                                    )
+                                )
+                            )
+                            .border(
+                                width = if (isSelected) 1.2.dp else 0.8.dp,
+                                brush = Brush.verticalGradient(
+                                    if (isSelected) listOf(
+                                        Color(0xE5FFFFFF),
+                                        Color(0x40FFFFFF)
+                                    ) else listOf(
+                                        Color(0x45FFFFFF),
+                                        Color(0x14FFFFFF)
+                                    )
+                                ),
+                                shape = RoundedCornerShape(16.dp)
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = label,
-                                tint = contentColor,
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .scale(iconScale)
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = label,
-                                color = contentColor,
-                                fontSize = 10.sp,
-                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                letterSpacing = (-0.1).sp,
-                                maxLines = 1
-                            )
-                        }
+                        // Top Specular Glass Reflection Dome on the tile
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(22.dp)
+                                .align(Alignment.TopCenter)
+                                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            Color(0x60FFFFFF),
+                                            Color.Transparent
+                                        )
+                                    )
+                                )
+                        )
+
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = label,
+                            tint = if (isSelected) Color.White else Color(0xCCFFFFFF),
+                            modifier = Modifier.size(22.dp)
+                        )
                     }
+
+                    Spacer(modifier = Modifier.height(3.dp))
+
+                    // Sleek Micro-Label
+                    Text(
+                        text = label,
+                        color = if (isSelected) Color.White else Color(0x80FFFFFF),
+                        fontSize = 9.5.sp,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                        letterSpacing = (-0.1).sp,
+                        maxLines = 1
+                    )
                 }
             }
         }
@@ -3303,69 +3370,39 @@ fun GlassVoiceStudioCard(
             // Header Row: Minimalist Titanium Glass
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(Color(0x18FFFFFF))
-                            .border(0.8.dp, Color(0x30FFFFFF), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.RecordVoiceOver,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    Column {
-                        Text(
-                            text = "AI Voice Studio",
-                            color = Color.White,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = (-0.3).sp
-                        )
-                        Text(
-                            text = "Select neural voice for live calls & screening",
-                            color = Color(0x99FFFFFF),
-                            fontSize = 11.5.sp
-                        )
-                    }
-                }
-
-                // Active Persona Tag Pill
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0x22FFFFFF))
-                        .border(0.8.dp, Color(0x38FFFFFF), RoundedCornerShape(10.dp))
-                        .padding(horizontal = 9.dp, vertical = 4.dp)
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x18FFFFFF))
+                        .border(0.8.dp, Color(0x30FFFFFF), CircleShape),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(Color.White)
-                        )
-                        Text(
-                            text = selectedPersona.name,
-                            color = Color.White,
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Rounded.RecordVoiceOver,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column {
+                    Text(
+                        text = "AI Voice Studio",
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = (-0.3).sp
+                    )
+                    Text(
+                        text = "Select neural voice for live calls & screening",
+                        color = Color(0x99FFFFFF),
+                        fontSize = 11.5.sp
+                    )
                 }
             }
 
