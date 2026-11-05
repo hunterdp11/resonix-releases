@@ -235,10 +235,44 @@ object DialerRepository {
         list
     }
 
-    fun placeCall(context: Context, rawNumber: String) {
-        val cleanNumber = rawNumber.filter { it.isDigit() || it == '+' || it == '*' || it == '#' || it == ',' || it == ';' }
+    fun placeCall(
+        context: Context,
+        rawNumber: String,
+        isSavedContact: Boolean = false,
+        forceIncognito: Boolean? = null
+    ) {
+        var cleanNumber = rawNumber.filter { it.isDigit() || it == '+' || it == '*' || it == '#' || it == ',' || it == ';' }
         if (cleanNumber.isBlank()) return
-        val uri = Uri.fromParts("tel", cleanNumber, null)
+
+        // Resolve CLIR (#31#) Caller ID Masking
+        val sessionManager = com.callscreener.app.session.CallSessionManager.getInstance(context)
+        val sessionState = sessionManager.sessionState.value
+
+        val bareDigits = cleanNumber.removePrefix("+").removePrefix("#31#")
+        val isEmergency = setOf("100", "101", "102", "108", "112", "911", "999", "000").contains(bareDigits)
+
+        val shouldInjectClir = !isEmergency && (
+            forceIncognito == true ||
+            (forceIncognito == null && sessionState.isIncognitoDialActive) ||
+            (sessionState.isClirMaskingEnabled && (!isSavedContact || sessionState.isClirMaskSavedContactsEnabled))
+        )
+
+        if (shouldInjectClir) {
+            if (!cleanNumber.startsWith("#31#")) {
+                cleanNumber = "#31#$cleanNumber"
+            }
+            if (sessionState.isIncognitoDialActive) {
+                sessionManager.setIncognitoDialActive(false)
+            }
+            Toast.makeText(context, "🕵️ Private Call: Caller ID masked (#31#)", Toast.LENGTH_SHORT).show()
+            Log.i(TAG, "Placed call with CLIR #31# mask: $cleanNumber (isSavedContact: $isSavedContact)")
+        }
+
+        val uri = if (cleanNumber.contains("#")) {
+            Uri.parse("tel:" + Uri.encode(cleanNumber))
+        } else {
+            Uri.fromParts("tel", cleanNumber, null)
+        }
 
         val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
         val hasCallPermission = ActivityCompat.checkSelfPermission(
