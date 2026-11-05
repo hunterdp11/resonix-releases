@@ -447,7 +447,6 @@ fun MainDashboard(
     var selectedContactForDetails by remember { mutableStateOf<ContactItem?>(null) }
     var isSettingsOpen by remember { mutableStateOf(false) }
     var isPresetManagerOpen by remember { mutableStateOf(false) }
-    val hazeState = remember { HazeState() }
     val presets by sessionManager.presetManager.presets.collectAsState()
 
     Box(
@@ -455,72 +454,64 @@ fun MainDashboard(
             .fillMaxSize()
             .background(Color(0xFF000000))
     ) {
-        // Container captured by Haze: Both the flowing caustics backdrop and the tab content
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .haze(state = hazeState)
-        ) {
-            // Pure Apple Liquid Glass Canvas Backdrop with chromatic caustics flowing directly behind dock
-            AppleLiquidBackdrop()
+        // Pure Static Minimalist Obsidian Backdrop
+        AppleLiquidBackdrop()
 
-            // Tab Content extending full edge-to-edge behind floating glass dock
-            Box(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                when (currentTab) {
-                    DialerTab.RECENTS -> RecentsScreen(
-                        callLogs = callLogs,
-                        isLoading = isLoadingLogs,
-                        presets = presets,
-                        onPlayPreset = { sessionManager.playAudioPreset(it) },
-                        onCall = { number -> DialerRepository.placeCall(context, number) },
-                        onScreen = { log ->
-                            sessionManager.startSimulatedCall(
-                                simulatedNumber = log.number,
-                                simulatedName = log.name ?: "Unknown Caller"
-                            )
-                            context.startActivity(Intent(context, ScreeningCallActivity::class.java))
-                        },
-                        onOpenDetails = { contact -> selectedContactForDetails = contact }
-                    )
-                    DialerTab.CONTACTS -> ContactsScreen(
-                        contacts = contacts,
-                        isLoading = isLoadingContacts,
-                        onCall = { number -> DialerRepository.placeCall(context, number) },
-                        onOpenDetails = { contact -> selectedContactForDetails = contact }
-                    )
-                    DialerTab.KEYPAD -> KeypadScreen(
-                        contacts = contacts,
-                        callLogs = callLogs,
-                        onCall = { number -> DialerRepository.placeCall(context, number) },
-                        onOpenDetails = { contact -> selectedContactForDetails = contact },
-                        onOpenSettings = { isSettingsOpen = true }
-                    )
-                    DialerTab.ASSISTANT -> AssistantTabScreen(
-                        onStartSimulation = onStartSimulation,
-                        selectedPersona = selectedPersona,
-                        onSelectPersona = { selectedPersona = it },
-                        isLiveMicActive = isLiveMicActive,
-                        onToggleLiveMic = { isLiveMicActive = !isLiveMicActive },
-                        isGreetingEnabled = sessionState.isGreetingEnabled,
-                        onToggleGreeting = { sessionManager.setGreetingEnabled(it) },
-                        presetManager = sessionManager.presetManager,
-                        onOpenPresetManager = { isPresetManagerOpen = true }
-                    )
-                }
+        // Tab Content extending full edge-to-edge behind floating dock
+        Box(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            when (currentTab) {
+                DialerTab.RECENTS -> RecentsScreen(
+                    callLogs = callLogs,
+                    isLoading = isLoadingLogs,
+                    presets = presets,
+                    onPlayPreset = { sessionManager.playAudioPreset(it) },
+                    onCall = { number -> DialerRepository.placeCall(context, number) },
+                    onScreen = { log ->
+                        sessionManager.startSimulatedCall(
+                            simulatedNumber = log.number,
+                            simulatedName = log.name ?: "Unknown Caller"
+                        )
+                        context.startActivity(Intent(context, ScreeningCallActivity::class.java))
+                    },
+                    onOpenDetails = { contact -> selectedContactForDetails = contact }
+                )
+                DialerTab.CONTACTS -> ContactsScreen(
+                    contacts = contacts,
+                    isLoading = isLoadingContacts,
+                    onCall = { number -> DialerRepository.placeCall(context, number) },
+                    onOpenDetails = { contact -> selectedContactForDetails = contact }
+                )
+                DialerTab.KEYPAD -> KeypadScreen(
+                    contacts = contacts,
+                    callLogs = callLogs,
+                    onCall = { number -> DialerRepository.placeCall(context, number) },
+                    onOpenDetails = { contact -> selectedContactForDetails = contact },
+                    onOpenSettings = { isSettingsOpen = true }
+                )
+                DialerTab.ASSISTANT -> AssistantTabScreen(
+                    onStartSimulation = onStartSimulation,
+                    selectedPersona = selectedPersona,
+                    onSelectPersona = { selectedPersona = it },
+                    isLiveMicActive = isLiveMicActive,
+                    onToggleLiveMic = { isLiveMicActive = !isLiveMicActive },
+                    isGreetingEnabled = sessionState.isGreetingEnabled,
+                    onToggleGreeting = { sessionManager.setGreetingEnabled(it) },
+                    presetManager = sessionManager.presetManager,
+                    onOpenPresetManager = { isPresetManagerOpen = true }
+                )
             }
         }
 
-        // Docked Liquid Glass Floating Bottom Navigation Bar with Hardware GPU Backdrop Blur
+        // Static Premium Minimalist Floating Navigation Bar
         LiquidGlassBottomBar(
             currentTab = currentTab,
             onTabSelected = { currentTab = it },
-            hazeState = hazeState,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
-                .padding(bottom = 8.dp)
+                .padding(bottom = 10.dp)
         )
 
         // iOS 26 Full Specular Liquid Glass Contact Details Modal Sheet
@@ -587,136 +578,57 @@ fun MainDashboard(
 }
 
 /**
- * Authentic Apple Liquid Chromatic Backdrop:
- * Deep obsidian OLED black space with vibrant liquid metallic caustics sweeping directly across
- * the bottom dock region (inspired by deepika-builds/liquid-glass & Apple iOS 26 liquid glass).
- * Provides rich chromatic light for the dock's backdrop-filter blur (hazeChild) to refract.
+ * Static Minimalist Obsidian Backdrop:
+ * Deep, pure OLED black (#000000) with a whisper-soft static titanium gradient at the top.
+ * Completely static, zero animated blur/waves, 100% minimalist luxury.
  */
 @Composable
 fun AppleLiquidBackdrop() {
-    val infiniteTransition = rememberInfiniteTransition(label = "liquidCaustic")
-    val waveOffset by infiniteTransition.animateFloat(
-        initialValue = -18f,
-        targetValue = 18f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 6000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "causticShift"
-    )
-
     Canvas(modifier = Modifier.fillMaxSize()) {
         val width = size.width
         val height = size.height
 
-        // 1. Pure Obsidian OLED Black Base
+        // 1. Pure OLED Obsidian Black Base
         drawRect(color = Color(0xFF000000))
 
-        // 2. Subtle Top Status Bar Titanium Sheen
+        // 2. Subtle Static Top Status Bar Titanium Sheen
         drawRect(
             brush = Brush.verticalGradient(
                 listOf(
-                    Color(0xFF161C26),
-                    Color(0xFF0B0E14),
+                    Color(0xFF141822),
+                    Color(0xFF090C10),
                     Color(0xFF000000)
                 ),
                 startY = 0f,
-                endY = height * 0.30f
+                endY = height * 0.28f
             )
         )
 
-        // 3. Ethereal Top Radial Titanium Radiance
+        // 3. Subtle Static Top Radiance
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    Color(0x18202E42),
-                    Color(0x06121C2A),
+                    Color(0x101E293B),
                     Color.Transparent
                 ),
-                center = Offset(width * 0.5f, height * 0.10f),
-                radius = width * 0.90f
+                center = Offset(width * 0.5f, height * 0.08f),
+                radius = width * 0.85f
             )
-        )
-
-        // 4. Vibrant Liquid Caustics directly behind dock zone (for liquid glass backdrop-filter blur)
-        // Left: Rich Molten Amber/Bronze Caustic
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    Color(0xCCE67E22), // Vibrant molten amber
-                    Color(0x88D35400),
-                    Color(0x25A04000),
-                    Color.Transparent
-                ),
-                center = Offset(width * 0.20f + waveOffset, height * 0.94f),
-                radius = width * 0.55f
-            )
-        )
-
-        // Center: Luminous Electric Cyan / Platinum Specular Caustic
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    Color(0xBB00E5FF), // Electric cyan
-                    Color(0x5500B0FF),
-                    Color.Transparent
-                ),
-                center = Offset(width * 0.50f, height * 0.93f - (waveOffset * 0.4f)),
-                radius = width * 0.42f
-            )
-        )
-
-        // Right: Rich Royal Sapphire / Electric Violet Caustic
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    Color(0xCC3B82F6), // Royal sapphire
-                    Color(0x886366F1), // Electric indigo
-                    Color(0x221E1B4B),
-                    Color.Transparent
-                ),
-                center = Offset(width * 0.82f - waveOffset, height * 0.94f),
-                radius = width * 0.55f
-            )
-        )
-
-        // Luminous liquid caustics ribbon curving across the dock line
-        drawLine(
-            brush = Brush.horizontalGradient(
-                listOf(
-                    Color.Transparent,
-                    Color(0x50E67E22),
-                    Color(0x7000E5FF),
-                    Color(0x603B82F6),
-                    Color.Transparent
-                )
-            ),
-            start = Offset(0f, height * 0.91f),
-            end = Offset(width, height * 0.92f),
-            strokeWidth = 3f
         )
     }
 }
 
 /**
- * Authentic Apple Liquid Glass Dock (Engineered after deepika-builds/liquid-glass):
- * Uses the proven Apple liquid glass formula:
- * - Real-time GPU backdrop blur (hazeChild blur = 24.dp, ultra-clear optical transmission)
- * - CSS Dressing recipe:
- *     background: linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.03) 100%)
- *     box-shadow: 0 24px 60px rgba(0,0,0,0.45)
- *     inset 0 1.5px 1px rgba(255,255,255,0.65) (specular top highlight)
- *     inset 0 -1px 1px rgba(255,255,255,0.25) (bottom reflection)
- *     inset 0 0 24px rgba(255,255,255,0.08) (ambient inner luminescence)
- *     border: 1px solid rgba(255,255,255,0.22)
- * - Refraction bulge rim with subtle chromatic fringe (chroma dispersion)
- * - Clean, minimalist luxury tabs & sliding liquid droplet indicator
+ * Static Premium Minimalist Floating Navigation Bar:
+ * - Completely static, zero runtime blur/haze overhead
+ * - Clean obsidian titanium finish with hairline border and soft depth shadow
+ * - Sleek, quiet sliding active indicator pill with spring physics
+ * - Minimalist luxury icons and typography
  */
 @Composable
 fun LiquidGlassBottomBar(
     currentTab: DialerTab,
     onTabSelected: (DialerTab) -> Unit,
-    hazeState: HazeState,
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
@@ -737,118 +649,60 @@ fun LiquidGlassBottomBar(
         DialerTab.ASSISTANT -> 3
     }
 
-    // Outer Liquid Glass Capsule (deepika-builds/liquid-glass specification)
+    // Static Obsidian Titanium Capsule
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            // 1. Deep Drop Shadow: box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45)
+            .padding(horizontal = 20.dp)
             .shadow(
-                elevation = 24.dp,
+                elevation = 16.dp,
                 shape = RoundedCornerShape(32.dp),
-                spotColor = Color(0x75000000),
-                ambientColor = Color(0x35000000)
-            )
-            // 2. Real-Time Backdrop Blur: backdrop-filter: blur(24px) saturate(180%)
-            .hazeChild(
-                state = hazeState,
-                shape = RoundedCornerShape(32.dp),
-                style = HazeStyle(
-                    tint = Color(0x0CFFFFFF), // Ultra-clear optical transmission
-                    blurRadius = 24.dp,
-                    noiseFactor = 0f
-                )
+                spotColor = Color(0x90000000),
+                ambientColor = Color(0x40000000)
             )
             .clip(RoundedCornerShape(32.dp))
-            // 3. Liquid Glass Body: background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.03))
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        Color(0x24FFFFFF), // 14% white top sheen
-                        Color(0x08FFFFFF)  // 3% white optical body
+                        Color(0xF51A1F2C),
+                        Color(0xFA11141E)
                     )
                 )
             )
-            // 4. Glass Structural Border: border: 1px solid rgba(255, 255, 255, 0.22)
             .border(
-                width = 1.2.dp,
+                width = 1.dp,
                 brush = Brush.verticalGradient(
                     listOf(
-                        Color(0x85FFFFFF), // Razor-sharp top specular catch
-                        Color(0x35FFFFFF), // Translucent sides
-                        Color(0x18FFFFFF),
-                        Color(0x45FFFFFF)  // Bottom caustic return rim
+                        Color(0x35FFFFFF),
+                        Color(0x10FFFFFF),
+                        Color(0x20FFFFFF)
                     )
                 ),
                 shape = RoundedCornerShape(32.dp)
             )
     ) {
-        // Inset Layer 1: Ambient Inner Glass Luminescence (inset 0 0 24px rgba(255, 255, 255, 0.08))
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .padding(1.dp)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            Color(0x14FFFFFF),
-                            Color.Transparent
-                        )
-                    )
-                )
-        )
-
-        // Inset Layer 2: Chromatic Refraction Fringe along the rim (deepika-builds/liquid-glass chroma simulation)
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .padding(1.dp)
-                .border(
-                    width = 1.dp,
-                    brush = Brush.horizontalGradient(
-                        listOf(
-                            Color(0x1500E5FF), // Subtle cyan dispersion
-                            Color.Transparent,
-                            Color(0x15FF007F)  // Subtle magenta dispersion
-                        )
-                    ),
-                    shape = RoundedCornerShape(31.dp)
-                )
-        )
-
-        // Inset Layer 3: Razor-Sharp Specular Top Highlight (inset 0 1.5px 1px rgba(255, 255, 255, 0.65))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(20.dp)
-                .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color(0x90FFFFFF),
-                            Color(0x25FFFFFF),
-                            Color.Transparent
-                        )
-                    )
-                )
-        )
-
-        // Inset Layer 4: Specular Bottom Return Rim (inset 0 -1px 1px rgba(255, 255, 255, 0.25))
+        // Subtle top highlight hairline
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(1.dp)
-                .align(Alignment.BottomCenter)
-                .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
-                .background(Color(0x40FFFFFF))
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            Color.Transparent,
+                            Color(0x30FFFFFF),
+                            Color.Transparent
+                        )
+                    )
+                )
         )
 
-        // Interactive Layer: Sliding Liquid Droplet Lens + Clean Minimalist Tab Icons
+        // Interactive Layer: Sliding Indicator Pill + Minimalist Tab Items
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(72.dp)
-                .padding(horizontal = 4.dp, vertical = 6.dp)
+                .height(66.dp)
+                .padding(horizontal = 4.dp, vertical = 5.dp)
         ) {
             val totalWidth = maxWidth
             val tabWidth = totalWidth / 4
@@ -856,65 +710,25 @@ fun LiquidGlassBottomBar(
             val indicatorOffset by animateDpAsState(
                 targetValue = tabWidth * selectedIndex,
                 animationSpec = spring(
-                    dampingRatio = 0.82f,
+                    dampingRatio = 0.85f,
                     stiffness = Spring.StiffnessMediumLow
                 ),
                 label = "dockIndicatorOffset"
             )
 
-            // Ultra-Clear Liquid Glass Sliding Active Droplet Lens
+            // Sleek Static Active Indicator Pill
             Box(
                 modifier = Modifier
                     .offset(x = indicatorOffset)
                     .width(tabWidth)
                     .fillMaxHeight()
                     .padding(horizontal = 4.dp, vertical = 2.dp)
-                    .shadow(
-                        elevation = 12.dp,
-                        shape = RoundedCornerShape(24.dp),
-                        spotColor = Color(0x50000000),
-                        ambientColor = Color(0x20000000)
-                    )
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0x40FFFFFF), // Specular crown
-                                Color(0x12FFFFFF), // Crystalline body
-                                Color(0x25FFFFFF)  // Base caustic return
-                            )
-                        )
-                    )
-                    .border(
-                        1.2.dp,
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0xB5FFFFFF), // Razor top catch
-                                Color(0x35FFFFFF),
-                                Color(0x15FFFFFF)
-                            )
-                        ),
-                        RoundedCornerShape(24.dp)
-                    )
-            ) {
-                // Specular Light Dome on the Sliding Droplet
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(18.dp)
-                        .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color(0x50FFFFFF),
-                                    Color.Transparent
-                                )
-                            )
-                        )
-                )
-            }
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(Color(0x1AFFFFFF))
+                    .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(22.dp))
+            )
 
-            // Clean Minimalist Tab Icons & Text centered in equal 4ths with spring bounce
+            // Tab Icons & Text centered in equal 4ths
             Row(
                 modifier = Modifier.fillMaxSize(),
                 verticalAlignment = Alignment.CenterVertically
@@ -922,13 +736,13 @@ fun LiquidGlassBottomBar(
                 tabs.forEach { (tab, icon, label) ->
                     val isSelected = currentTab == tab
                     val iconScale by animateFloatAsState(
-                        targetValue = if (isSelected) 1.08f else 0.94f,
-                        animationSpec = spring(dampingRatio = 0.72f),
+                        targetValue = if (isSelected) 1.05f else 0.94f,
+                        animationSpec = spring(dampingRatio = 0.75f),
                         label = "tabIconScale"
                     )
                     val contentColor by animateColorAsState(
-                        targetValue = if (isSelected) Color.White else Color(0x80FFFFFF),
-                        animationSpec = tween(durationMillis = 180),
+                        targetValue = if (isSelected) Color.White else Color(0x65FFFFFF),
+                        animationSpec = tween(durationMillis = 160),
                         label = "tabContentColor"
                     )
 
@@ -936,7 +750,7 @@ fun LiquidGlassBottomBar(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
-                            .clip(RoundedCornerShape(20.dp))
+                            .clip(RoundedCornerShape(18.dp))
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null
@@ -955,10 +769,10 @@ fun LiquidGlassBottomBar(
                                 contentDescription = label,
                                 tint = contentColor,
                                 modifier = Modifier
-                                    .size(21.dp)
+                                    .size(20.dp)
                                     .scale(iconScale)
                             )
-                            Spacer(modifier = Modifier.height(3.dp))
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = label,
                                 color = contentColor,
