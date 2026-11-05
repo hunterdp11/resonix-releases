@@ -98,11 +98,13 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.rounded.Chat
 import androidx.compose.material.icons.rounded.Check
@@ -110,6 +112,7 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Dialpad
+import androidx.compose.material.icons.rounded.DragIndicator
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.GraphicEq
@@ -2473,7 +2476,7 @@ fun AssistantTabScreen(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(start = 20.dp, end = 20.dp, top = statusBarTop + 8.dp, bottom = 120.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // App Header: Minimalist Luxury Glass
         Row(
@@ -2482,40 +2485,40 @@ fun AssistantTabScreen(
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0x18FFFFFF))
-                    .border(0.8.dp, Color(0x30FFFFFF), RoundedCornerShape(12.dp)),
+                    .size(42.dp)
+                    .clip(RoundedCornerShape(13.dp))
+                    .background(Color(0x16FFFFFF))
+                    .border(0.8.dp, Color(0x30FFFFFF), RoundedCornerShape(13.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Rounded.GraphicEq,
                     contentDescription = null,
                     tint = Color.White,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(22.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(14.dp))
 
             Column {
                 Text(
-                    text = "Assistant Studio",
+                    text = "Assistant",
                     color = Color.White,
-                    fontSize = 22.sp,
+                    fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = (-0.4).sp
+                    letterSpacing = (-0.5).sp
                 )
                 Text(
-                    text = "AI Voice Personas, Speech Relay & Soundboard",
-                    color = TextSecondary,
+                    text = "Neural speech synthesis, voice personas & soundboard",
+                    color = Color(0x99FFFFFF),
                     fontSize = 12.5.sp
                 )
             }
         }
 
         // Section 1: Real-Time Voice Studio & Live DSP
-        SettingsSectionHeader(title = "AI VOICE PERSONAS & REAL-TIME RELAY")
+        SettingsSectionHeader(title = "VOICE STUDIO")
         GlassVoiceStudioCard(
             selectedPersona = selectedPersona,
             onSelectPersona = onSelectPersona,
@@ -2525,7 +2528,7 @@ fun AssistantTabScreen(
 
         // Section 2: Audio Presets & Direct Hardware Uplink Soundboard
         presetManager?.let { pm ->
-            SettingsSectionHeader(title = "IN-CALL AUDIO PRESETS & SOUNDBOARD")
+            SettingsSectionHeader(title = "SOUNDBOARD & PRESETS")
             GlassAudioPresetsCard(
                 presetManager = pm,
                 onOpenManager = onOpenPresetManager
@@ -2544,16 +2547,16 @@ fun AssistantTabScreen(
                 subtitle = if (isGreetingEnabled)
                     "Speaks automated assistant greeting on call pickup"
                 else
-                    "Silent pickup: ready for speech relay without robotic intro",
+                    "Silent pickup: ready for speech relay without intro",
                 trailingContent = {
                     Switch(
                         checked = isGreetingEnabled,
                         onCheckedChange = onToggleGreeting,
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
-                            checkedTrackColor = Color(0x40FFFFFF),
-                            uncheckedThumbColor = TextMuted,
-                            uncheckedTrackColor = Color(0x22FFFFFF)
+                            checkedTrackColor = Color(0x50FFFFFF),
+                            uncheckedThumbColor = Color(0x80FFFFFF),
+                            uncheckedTrackColor = Color(0x18FFFFFF)
                         )
                     )
                 }
@@ -2591,7 +2594,7 @@ fun AssistantTabScreen(
                                 text = "Launch",
                                 color = Color.White,
                                 fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
@@ -3259,7 +3262,10 @@ fun GlassSimulatorCard(onStartSimulation: () -> Unit) {
 }
 
 /**
- * iOS Frosted Glass Card: Single-Device Real-Time Voice Studio & Live Mic Test
+ * Minimalist Luxury Monochromatic Voice Studio:
+ * Streamlined category pill switch (Hindi & Hinglish, English Studio, Specialty Voices),
+ * Monochromatic frosted glass chips with clean typography,
+ * Monochromatic sample playback & speech relay mic controls with zero rainbow clutter.
  */
 @Composable
 fun GlassVoiceStudioCard(
@@ -3269,23 +3275,32 @@ fun GlassVoiceStudioCard(
     onToggleLiveMic: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     val sessionManager = remember { CallSessionManager.getInstance(context) }
     val sessionState by sessionManager.sessionState.collectAsState()
+
+    var activeCategoryIndex by remember { mutableStateOf(0) }
+    val categories = remember { listOf("Hindi & Hinglish", "English Studio", "Specialty") }
+
+    val currentPersonas = remember(activeCategoryIndex) {
+        when (activeCategoryIndex) {
+            0 -> VoicePersona.HINDI_PERSONAS
+            1 -> VoicePersona.PURE_GIRL_PERSONAS
+            else -> VoicePersona.CLASSIC_PERSONAS
+        }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(elevation = 14.dp, shape = RoundedCornerShape(26.dp), spotColor = Color(0x60000000), ambientColor = Color(0x40000000))
-            .clip(RoundedCornerShape(26.dp))
-            .background(LiquidGlassFill)
-            .border(
-                1.2.dp,
-                LiquidGlassBorder,
-                RoundedCornerShape(26.dp)
-            )
-            .padding(18.dp)
+            .shadow(elevation = 14.dp, shape = RoundedCornerShape(24.dp), spotColor = Color(0x60000000), ambientColor = Color(0x40000000))
+            .clip(RoundedCornerShape(24.dp))
+            .background(Color(0x14FFFFFF))
+            .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(24.dp))
+            .padding(16.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            // Header Row: Minimalist Titanium Glass
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -3294,21 +3309,17 @@ fun GlassVoiceStudioCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(38.dp)
+                            .size(36.dp)
                             .clip(CircleShape)
                             .background(Color(0x18FFFFFF))
-                            .border(
-                                0.8.dp,
-                                Color(0x30FFFFFF),
-                                CircleShape
-                            ),
+                            .border(0.8.dp, Color(0x30FFFFFF), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.RecordVoiceOver,
                             contentDescription = null,
-                            tint = AppleGreen,
-                            modifier = Modifier.size(20.dp)
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
 
@@ -3317,347 +3328,301 @@ fun GlassVoiceStudioCard(
                     Column {
                         Text(
                             text = "AI Voice Studio",
-                            color = TextPrimary,
+                            color = Color.White,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = (-0.3).sp
                         )
                         Text(
-                            text = "Studio neural voice personas & AI Voice Relay",
-                            color = TextSecondary,
-                            fontSize = 12.sp
+                            text = "Select neural voice for live calls & screening",
+                            color = Color(0x99FFFFFF),
+                            fontSize = 11.5.sp
+                        )
+                    }
+                }
+
+                // Active Persona Tag Pill
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0x22FFFFFF))
+                        .border(0.8.dp, Color(0x38FFFFFF), RoundedCornerShape(10.dp))
+                        .padding(horizontal = 9.dp, vertical = 4.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(Color.White)
+                        )
+                        Text(
+                            text = selectedPersona.name,
+                            color = Color.White,
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
             }
 
-            // Section 1: Hindi & Hinglish Neural Voices (भारतीय हिंदी मॉडल्स • Real Calls & Pranks)
-            Text(
-                text = "Hindi & Hinglish Neural Voices (भारतीय हिंदी मॉडल्स)",
-                color = AppleGreen,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.2).sp
-            )
+            // Monochromatic Category Segmented Switcher
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0x10FFFFFF))
+                    .border(0.8.dp, Color(0x20FFFFFF), RoundedCornerShape(14.dp))
+                    .padding(3.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                categories.forEachIndexed { idx, categoryTitle ->
+                    val isTabActive = activeCategoryIndex == idx
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(11.dp))
+                            .background(if (isTabActive) Color(0x28FFFFFF) else Color.Transparent)
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                activeCategoryIndex = idx
+                            }
+                            .padding(vertical = 7.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = categoryTitle,
+                            color = if (isTabActive) Color.White else Color(0x80FFFFFF),
+                            fontSize = 11.5.sp,
+                            fontWeight = if (isTabActive) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
+                }
+            }
 
+            // Horizontal Persona Carousel
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(VoicePersona.HINDI_PERSONAS, key = { it.id }) { persona ->
+                items(currentPersonas, key = { it.id }) { persona ->
                     val isSelected = persona.id == selectedPersona.id
                     Box(
                         modifier = Modifier
-                            .shadow(elevation = if (isSelected) 8.dp else 2.dp, shape = RoundedCornerShape(16.dp), spotColor = Color(0x40000000))
+                            .width(155.dp)
+                            .shadow(
+                                elevation = if (isSelected) 10.dp else 0.dp,
+                                shape = RoundedCornerShape(16.dp),
+                                spotColor = Color(0x60000000)
+                            )
                             .clip(RoundedCornerShape(16.dp))
-                            .background(if (isSelected) LiquidGlassFillElevated else LiquidGlassFillSubtle)
+                            .background(if (isSelected) Color(0x32FFFFFF) else Color(0x10FFFFFF))
                             .border(
-                                1.2.dp,
-                                if (isSelected) SolidColor(AppleGreen) else LiquidGlassBorderSubtle,
-                                RoundedCornerShape(16.dp)
+                                width = if (isSelected) 1.2.dp else 0.8.dp,
+                                color = if (isSelected) Color(0xE0FFFFFF) else Color(0x20FFFFFF),
+                                shape = RoundedCornerShape(16.dp)
                             )
                             .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 onSelectPersona(persona)
                                 sessionManager.setVoicePersona(persona)
                             }
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .padding(12.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(if (isSelected) AppleGreen.copy(alpha = 0.35f) else Color(0x18FFFFFF))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = persona.code,
-                                    color = if (isSelected) AppleGreen else TextTertiary,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(if (isSelected) Color(0x40FFFFFF) else Color(0x18FFFFFF))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = persona.code,
+                                        color = Color.White,
+                                        fontSize = 9.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+
+                                if (isSelected) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(7.dp)
+                                            .clip(CircleShape)
+                                            .background(Color.White)
+                                    )
+                                }
                             }
-                            Spacer(modifier = Modifier.width(6.dp))
+
                             Text(
                                 text = persona.name,
-                                color = TextPrimary,
-                                fontSize = 13.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                color = Color.White,
+                                fontSize = 13.5.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+
+                            Text(
+                                text = persona.tag,
+                                color = Color(0x85FFFFFF),
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
                 }
             }
 
-            // Section 2: Assamese Neural Voices (অসমীয়া মডেল • Regional Native Voice)
-            Text(
-                text = "Assamese Neural Voices (অসমীয়া মডেল)",
-                color = AppleAmber,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.2).sp
-            )
-
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(VoicePersona.ASSAMESE_PERSONAS, key = { it.id }) { persona ->
-                    val isSelected = persona.id == selectedPersona.id
-                    Box(
-                        modifier = Modifier
-                            .shadow(elevation = if (isSelected) 8.dp else 2.dp, shape = RoundedCornerShape(16.dp), spotColor = Color(0x40000000))
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (isSelected) LiquidGlassFillElevated else LiquidGlassFillSubtle)
-                            .border(
-                                1.2.dp,
-                                if (isSelected) SolidColor(AppleAmber) else LiquidGlassBorderSubtle,
-                                RoundedCornerShape(16.dp)
-                            )
-                            .clickable {
-                                onSelectPersona(persona)
-                                sessionManager.setVoicePersona(persona)
-                            }
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(if (isSelected) AppleAmber.copy(alpha = 0.35f) else Color(0x18FFFFFF))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = persona.code,
-                                    color = if (isSelected) AppleAmber else TextTertiary,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = persona.name,
-                                color = TextPrimary,
-                                fontSize = 13.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Section 3: Pure Girl Voices (English • Real-Life Neural)
-            Text(
-                text = "Pure Girl Voices (English • Real-Life Neural)",
-                color = TextSecondary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.2).sp
-            )
-
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(VoicePersona.PURE_GIRL_PERSONAS, key = { it.id }) { persona ->
-                    val isSelected = persona.id == selectedPersona.id
-                    Box(
-                        modifier = Modifier
-                            .shadow(elevation = if (isSelected) 8.dp else 2.dp, shape = RoundedCornerShape(16.dp), spotColor = Color(0x40000000))
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (isSelected) LiquidGlassFillElevated else LiquidGlassFillSubtle)
-                            .border(
-                                1.2.dp,
-                                if (isSelected) Brush.verticalGradient(listOf(AppleTeal, AppleBlue)) else LiquidGlassBorderSubtle,
-                                RoundedCornerShape(16.dp)
-                            )
-                            .clickable {
-                                onSelectPersona(persona)
-                                sessionManager.setVoicePersona(persona)
-                            }
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(if (isSelected) AppleTeal.copy(alpha = 0.35f) else Color(0x18FFFFFF))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = persona.code,
-                                    color = if (isSelected) AppleTeal else TextTertiary,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = persona.name,
-                                color = TextPrimary,
-                                fontSize = 13.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Section B: Classic & Specialty Voices
-            Text(
-                text = "Classic & Specialty Profiles",
-                color = TextTertiary,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium
-            )
-
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(VoicePersona.CLASSIC_PERSONAS, key = { it.id }) { persona ->
-                    val isSelected = persona.id == selectedPersona.id
-                    Box(
-                        modifier = Modifier
-                            .shadow(elevation = if (isSelected) 8.dp else 2.dp, shape = RoundedCornerShape(16.dp), spotColor = Color(0x40000000))
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (isSelected) LiquidGlassFillElevated else LiquidGlassFillSubtle)
-                            .border(
-                                1.2.dp,
-                                if (isSelected) LiquidGlassBorder else LiquidGlassBorderSubtle,
-                                RoundedCornerShape(16.dp)
-                            )
-                            .clickable {
-                                onSelectPersona(persona)
-                                sessionManager.setVoicePersona(persona)
-                            }
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(if (isSelected) AppleBlue.copy(alpha = 0.35f) else Color(0x18FFFFFF))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = persona.code,
-                                    color = if (isSelected) AppleTeal else TextTertiary,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = persona.name,
-                                color = TextPrimary,
-                                fontSize = 13.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Description of active persona
+            // Description Showcase of selected persona
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
-                    .background(LiquidGlassFillSubtle)
-                    .border(1.dp, LiquidGlassBorderSubtle, RoundedCornerShape(14.dp))
+                    .background(Color(0x0CFFFFFF))
+                    .border(0.8.dp, Color(0x18FFFFFF), RoundedCornerShape(14.dp))
                     .padding(12.dp)
             ) {
                 Text(
-                    text = "${selectedPersona.name} (${selectedPersona.tag}): ${selectedPersona.description} (Pitch: ${selectedPersona.pitch}x, Rate: ${selectedPersona.speed}x)",
-                    color = TextSecondary,
-                    fontSize = 12.sp,
+                    text = "${selectedPersona.name} • ${selectedPersona.tag}: ${selectedPersona.description}",
+                    color = Color(0x95FFFFFF),
+                    fontSize = 11.5.sp,
                     lineHeight = 16.sp
                 )
             }
 
-            // Live AI Voice Relay Transcript Banner
+            // Live AI Voice Relay Transcript Capsule
             AnimatedVisibility(visible = sessionState.isListeningToUserSpeech || sessionState.userLiveTranscript.isNotBlank()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0x2830D158))
-                        .border(1.dp, AppleGreen.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
+                        .background(Color(0x20FFFFFF))
+                        .border(1.dp, Color(0x60FFFFFF), RoundedCornerShape(14.dp))
                         .padding(12.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(8.dp)
+                                .size(7.dp)
                                 .clip(CircleShape)
-                                .background(AppleGreen)
+                                .background(Color.White)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = if (sessionState.userLiveTranscript.isNotBlank())
                                 "Recognized: \"${sessionState.userLiveTranscript}\""
                             else
-                                "AI Voice Relay: Listening to mic... Speak now!",
-                            color = AppleGreen,
+                                "AI Voice Relay: Listening to microphone... Speak now",
+                            color = Color.White,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            // Monochromatic Action Controls: Sample Voice & Test AI Voice Relay
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Button 1: Sample Voice
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(42.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0x18FFFFFF))
+                        .border(0.8.dp, Color(0x35FFFFFF), RoundedCornerShape(14.dp))
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            val sampleText = when (selectedPersona.id) {
+                                "hindi_pooja" -> "नमस्ते! मैं पूजा बोल रही हूँ। बताइए, क्या काम था? यह आवाज़ बिल्कुल असली लगती है।"
+                                "hindi_ananya" -> "नमस्ते जी, मैं अनन्या हूँ। आपकी कॉल स्क्रीन की जा रही है, आप अपना संदेश बताइए।"
+                                "hindi_kavya" -> "Hello! मैं काव्या बोल रही हूँ, how can I help you? सब कुछ एकदम natural sound कर रहा है।"
+                                "hindi_aarav" -> "नमस्ते, मैं आरव बोल रहा हूँ। कृपया बताइए आपने किस सिलसिले में कॉल किया है?"
+                                "hindi_vikram" -> "नमस्ते। विक्रम बात कर रहा हूँ। इस नंबर पर फालतू कॉल करना तुरंत बंद कर दें।"
+                                "girl_chloe" -> "Hey! How is it going? I am Chloe. Ready to screen your call?"
+                                "girl_zoe" -> "Hi there! Zoe here, everything sounds completely natural and real."
+                                "girl_mia" -> "Hey, what is up? It is Mia. I am all set for your call."
+                                else -> "Hello, this is ${selectedPersona.name}. How can I assist you today?"
+                            }
+                            Toast.makeText(context, "Playing ${selectedPersona.name} sample...", Toast.LENGTH_SHORT).show()
+                            sessionManager.testSpeech(sampleText)
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.VolumeUp,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Text(
+                            text = "Sample Voice",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                // Button 2: Test AI Voice Relay Mic
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(42.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(if (sessionState.isListeningToUserSpeech) Color(0x40FFFFFF) else Color(0x14FFFFFF))
+                        .border(
+                            0.8.dp,
+                            if (sessionState.isListeningToUserSpeech) Color.White else Color(0x28FFFFFF),
+                            RoundedCornerShape(14.dp)
+                        )
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            sessionManager.toggleAiVoiceListening()
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (sessionState.isListeningToUserSpeech) Icons.Filled.Mic else Icons.Filled.MicOff,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Text(
+                            text = if (sessionState.isListeningToUserSpeech) "Listening..." else "Test Relay Mic",
+                            color = Color.White,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
             }
-
-            // Primary Button: AI Voice Relay (Speech-to-AI-Voice)
-            Button(
-                onClick = {
-                    sessionManager.toggleAiVoiceListening()
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (sessionState.isListeningToUserSpeech) AppleGreen else AppleIndigo
-                ),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.2.dp, LiquidGlassBorder, RoundedCornerShape(16.dp))
-            ) {
-                Icon(Icons.Filled.Mic, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (sessionState.isListeningToUserSpeech) "Listening... Tap to Send AI Voice" else "Speak to AI Voice Relay",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp
-                )
-            }
-
-            // Secondary Button: Sample Neural Voice Persona
-            OutlinedButton(
-                onClick = {
-                    val sampleText = when (selectedPersona.id) {
-                        "hindi_pooja" -> "नमस्ते! मैं पूजा बोल रही हूँ। बताइए, क्या काम था? यह आवाज़ बिल्कुल असली लगती है।"
-                        "hindi_ananya" -> "नमस्ते जी, मैं अनन्या हूँ। आपकी कॉल स्क्रीन की जा रही है, आप अपना संदेश बताइए।"
-                        "hindi_kavya" -> "Hello! मैं काव्या बोल रही हूँ, how can I help you? सब कुछ एकदम natural sound कर रहा है।"
-                        "hindi_aarav" -> "नमस्ते, मैं आरव बोल रहा हूँ। कृपया बताइए आपने किस सिलसिले में कॉल किया है?"
-                        "hindi_vikram" -> "नमस्ते। विक्रम बात कर रहा हूँ। इस नंबर पर फालतू कॉल करना तुरंत बंद कर दें।"
-                        "as_juri" -> "নমস্কাৰ! মই জুৰি কৈছোঁ। কওকচোন, কি কথাত ফোন কৰিছিল? এইটো সম্পূৰ্ণ প্ৰাকৃতিক মাত।"
-                        "as_priyanka" -> "নমস্কাৰ, মই প্ৰিয়ংকা। আপোনাৰ ফোনটো স্ক্ৰীণ কৰা হৈছে, আপোনাৰ বার্তা কওক।"
-                        "as_ratul" -> "নমস্কাৰ, মই ৰাতুল কৈছোঁ। অনুগ্ৰহ কৰি কওক কি সম্পৰ্কে ফোন কৰিছে?"
-                        "as_bhaskar" -> "নমস্কাৰ, ভাস্কৰ কৈছোঁ। এই নম্বৰত অনাহকত ফোন নকৰিব।"
-                        "girl_chloe" -> "Hey! How is it going? I am Chloe. Ready to prank your friends?"
-                        "girl_zoe" -> "Hi there! Zoe here, everything sounds completely natural and real."
-                        "girl_mia" -> "Hey, what is up? It is Mia. I am all set for your call."
-                        else -> "Hello, this is ${selectedPersona.name}. How can I assist you today?"
-                    }
-                    Toast.makeText(context, "Playing ${selectedPersona.name} sample...", Toast.LENGTH_SHORT).show()
-                    sessionManager.testSpeech(sampleText)
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
-                border = androidx.compose.foundation.BorderStroke(1.2.dp, LiquidGlassBorder)
-            ) {
-                Icon(Icons.AutoMirrored.Rounded.VolumeUp, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Sample Voice Persona", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-            }
         }
     }
 }
 
-
-
 /**
- * iOS Liquid Specular Card: In-Call Audio Presets & Direct Hardware Uplink Soundboard
+ * iOS Minimalist Liquid Card: In-Call Audio Presets & Direct Hardware Uplink Soundboard
+ * Clean, non-colourful, titanium glass aesthetic with direct link to the reorder/management hub.
  */
 @Composable
 fun GlassAudioPresetsCard(
@@ -3701,18 +3666,14 @@ fun GlassAudioPresetsCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(elevation = 14.dp, shape = RoundedCornerShape(26.dp), spotColor = Color(0x60000000), ambientColor = Color(0x40000000))
-            .clip(RoundedCornerShape(26.dp))
-            .background(LiquidGlassFill)
-            .border(
-                1.2.dp,
-                LiquidGlassBorder,
-                RoundedCornerShape(26.dp)
-            )
-            .padding(14.dp)
+            .shadow(elevation = 14.dp, shape = RoundedCornerShape(24.dp), spotColor = Color(0x60000000), ambientColor = Color(0x40000000))
+            .clip(RoundedCornerShape(24.dp))
+            .background(Color(0x14FFFFFF))
+            .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(24.dp))
+            .padding(16.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            // Header Row: Perfectly aligned and weighted
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Header Row: Minimalist Titanium Glass
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -3724,7 +3685,7 @@ fun GlassAudioPresetsCard(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(34.dp)
+                            .size(36.dp)
                             .clip(CircleShape)
                             .background(Color(0x18FFFFFF))
                             .border(0.8.dp, Color(0x30FFFFFF), CircleShape),
@@ -3733,12 +3694,12 @@ fun GlassAudioPresetsCard(
                         Icon(
                             imageVector = Icons.Rounded.GraphicEq,
                             contentDescription = null,
-                            tint = AppleAmber,
+                            tint = Color.White,
                             modifier = Modifier.size(18.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
 
                     Column {
                         Row(
@@ -3747,44 +3708,43 @@ fun GlassAudioPresetsCard(
                         ) {
                             Text(
                                 text = "Audio Presets",
-                                color = TextPrimary,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
                                 letterSpacing = (-0.3).sp
                             )
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(6.dp))
-                                    .background(AppleAmber.copy(alpha = 0.20f))
-                                    .border(0.6.dp, AppleAmber.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                                    .background(Color(0x1AFFFFFF))
+                                    .border(0.6.dp, Color(0x30FFFFFF), RoundedCornerShape(6.dp))
                                     .padding(horizontal = 5.dp, vertical = 2.dp)
                             ) {
                                 Text(
                                     text = "ALSA",
-                                    color = AppleAmber,
+                                    color = Color(0xDDFFFFFF),
                                     fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                         }
                         Text(
-                            text = "Hardware uplink soundboard (0% noise)",
-                            color = TextSecondary,
-                            fontSize = 11.sp,
+                            text = "Direct hardware soundboard (${presets.size} items)",
+                            color = Color(0x99FFFFFF),
+                            fontSize = 11.5.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
-
-                // Reorder / Manage Pill Button - Clean, perfectly sized, never squished
+                // Manage / Reorder Pill Button
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0x28FFFFFF))
-                        .border(0.8.dp, Color(0x44FFFFFF), RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(11.dp))
+                        .background(Color(0x22FFFFFF))
+                        .border(0.8.dp, Color(0x38FFFFFF), RoundedCornerShape(11.dp))
                         .clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onOpenManager()
@@ -3797,12 +3757,12 @@ fun GlassAudioPresetsCard(
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Tune,
-                            contentDescription = "Reorder",
+                            contentDescription = "Manage",
                             tint = Color.White,
                             modifier = Modifier.size(13.dp)
                         )
                         Text(
-                            text = "Reorder",
+                            text = "Arrange",
                             color = Color.White,
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.SemiBold
@@ -3811,7 +3771,7 @@ fun GlassAudioPresetsCard(
                 }
             }
 
-            // Compact Quick Access Preview (Top 3 Presets)
+            // Quick Access Preview (Top 3 Presets in Clean Monochromatic Glass)
             val previewPresets = remember(presets) { presets.take(3) }
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 previewPresets.forEach { preset ->
@@ -3820,12 +3780,12 @@ fun GlassAudioPresetsCard(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(if (isPlaying) SolidColor(AppleGreen.copy(alpha = 0.20f)) else LiquidGlassFillSubtle)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isPlaying) Color(0x25FFFFFF) else Color(0x0EFFFFFF))
                             .border(
-                                1.dp,
-                                if (isPlaying) SolidColor(AppleGreen.copy(alpha = 0.7f)) else LiquidGlassBorderSubtle,
-                                RoundedCornerShape(14.dp)
+                                0.8.dp,
+                                if (isPlaying) Color.White else Color(0x1AFFFFFF),
+                                RoundedCornerShape(12.dp)
                             )
                             .padding(horizontal = 10.dp, vertical = 7.dp)
                     ) {
@@ -3835,17 +3795,16 @@ fun GlassAudioPresetsCard(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(30.dp)
+                                    .size(28.dp)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0x18FFFFFF))
-                                    .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(8.dp)),
+                                    .background(Color(0x16FFFFFF)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = if (preset.isAudioFile) Icons.Rounded.GraphicEq else Icons.AutoMirrored.Rounded.VolumeUp,
                                     contentDescription = null,
-                                    tint = if (preset.isAudioFile) AppleAmber else Color.White,
-                                    modifier = Modifier.size(15.dp)
+                                    tint = Color.White,
+                                    modifier = Modifier.size(14.dp)
                                 )
                             }
 
@@ -3854,15 +3813,15 @@ fun GlassAudioPresetsCard(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = preset.title,
-                                    color = TextPrimary,
+                                    color = Color.White,
                                     fontSize = 12.5.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = if (preset.isAudioFile) "Custom Audio File • Hardware Uplink" else "\"${preset.textOrPath}\"",
-                                    color = TextSecondary,
+                                    text = if (preset.isAudioFile) "Custom Audio Track" else preset.textOrPath,
+                                    color = Color(0x75FFFFFF),
                                     fontSize = 10.5.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -3873,9 +3832,9 @@ fun GlassAudioPresetsCard(
 
                             Box(
                                 modifier = Modifier
-                                    .size(30.dp)
+                                    .size(28.dp)
                                     .clip(CircleShape)
-                                    .background(if (isPlaying) AppleRed.copy(alpha = 0.3f) else AppleTeal.copy(alpha = 0.25f))
+                                    .background(if (isPlaying) Color(0x40FFFFFF) else Color(0x18FFFFFF))
                                     .clickable {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         if (isPlaying) {
@@ -3887,10 +3846,10 @@ fun GlassAudioPresetsCard(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                    imageVector = if (isPlaying) Icons.Filled.Stop else Icons.Filled.PlayArrow,
                                     contentDescription = "Preview",
-                                    tint = if (isPlaying) AppleRed else AppleTeal,
-                                    modifier = Modifier.size(15.dp)
+                                    tint = Color.White,
+                                    modifier = Modifier.size(14.dp)
                                 )
                             }
                         }
@@ -3902,21 +3861,14 @@ fun GlassAudioPresetsCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                AppleAmber.copy(alpha = 0.20f),
-                                Color(0x18FFFFFF)
-                            )
-                        )
-                    )
-                    .border(1.dp, AppleAmber.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0x14FFFFFF))
+                    .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(14.dp))
                     .clickable {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onOpenManager()
                     }
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .padding(horizontal = 12.dp, vertical = 9.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -3925,32 +3877,24 @@ fun GlassAudioPresetsCard(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(AppleAmber.copy(alpha = 0.25f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Tune,
-                                contentDescription = null,
-                                tint = AppleAmber,
-                                modifier = Modifier.size(15.dp)
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Rounded.DragIndicator,
+                            contentDescription = null,
+                            tint = Color(0xCCFFFFFF),
+                            modifier = Modifier.size(18.dp)
+                        )
                         Column {
                             Text(
-                                text = "Manage Soundboard (${presets.size} presets)",
-                                color = TextPrimary,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
+                                text = "Hold & Drag to Reorder (${presets.size} Presets)",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = "Reorder, delete, edit & organize soundboard",
-                                color = TextSecondary,
+                                text = "Align in-call audio tracks, arrange & organize",
+                                color = Color(0x80FFFFFF),
                                 fontSize = 10.5.sp
                             )
                         }
@@ -3958,7 +3902,7 @@ fun GlassAudioPresetsCard(
                     Icon(
                         imageVector = Icons.Rounded.ChevronRight,
                         contentDescription = "Open",
-                        tint = AppleAmber,
+                        tint = Color(0x80FFFFFF),
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -3969,36 +3913,48 @@ fun GlassAudioPresetsCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedButton(
-                    onClick = {
-                        textPresetTitle = ""
-                        textPresetPhrase = ""
-                        showAddTextDialog = true
-                    },
-                    modifier = Modifier.weight(1f).height(38.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, LiquidGlassBorder),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(36.dp)
+                        .clip(RoundedCornerShape(11.dp))
+                        .background(Color(0x12FFFFFF))
+                        .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(11.dp))
+                        .clickable {
+                            textPresetTitle = ""
+                            textPresetPhrase = ""
+                            showAddTextDialog = true
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Rounded.RecordVoiceOver, contentDescription = null, modifier = Modifier.size(13.dp))
-                    Spacer(modifier = Modifier.width(5.dp))
-                    Text("Add Phrase", fontSize = 11.5.sp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Icon(Icons.Rounded.RecordVoiceOver, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+                        Text("Add Phrase", color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.Medium)
+                    }
                 }
 
-                Button(
-                    onClick = {
-                        audioPickerLauncher.launch("audio/*")
-                    },
-                    modifier = Modifier.weight(1f).height(38.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AppleAmber.copy(alpha = 0.35f)),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, AppleAmber.copy(alpha = 0.6f)),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(36.dp)
+                        .clip(RoundedCornerShape(11.dp))
+                        .background(Color(0x20FFFFFF))
+                        .border(0.8.dp, Color(0x38FFFFFF), RoundedCornerShape(11.dp))
+                        .clickable {
+                            audioPickerLauncher.launch("audio/*")
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Rounded.GraphicEq, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Import Audio", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+                        Text("Import Audio", color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
         }

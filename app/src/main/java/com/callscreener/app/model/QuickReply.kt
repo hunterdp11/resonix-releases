@@ -59,40 +59,6 @@ data class QuickReply(
             )
         )
 
-        // Industry-Ready Native Assamese Quick Replies (অসমীয়া)
-        val ASSAMESE_REPLIES = listOf(
-            QuickReply(
-                id = "as_who",
-                title = "Kon koise? (কোন কৈছে?)",
-                spokenText = "নমস্কাৰ, আপুনি কোন কৈছে আৰু কাৰ লগত কথা পাতিব বিচাৰিছে?",
-                isHindi = false
-            ),
-            QuickReply(
-                id = "as_reason",
-                title = "Kiba kaam aase? (কি কাৰণে?)",
-                spokenText = "অনুগ্ৰহ কৰি কওক আপুনি কি সম্পৰ্কে ফোন কৰিছে?",
-                isHindi = false
-            ),
-            QuickReply(
-                id = "as_busy",
-                title = "Moi byasto aasu (ব্যস্ত আছোঁ)",
-                spokenText = "বেয়া নাপাব, মই এতিয়া অকণমান ব্যস্ত আছোঁ। পাছত ফোন কৰিব পাৰিবনে?",
-                isHindi = false
-            ),
-            QuickReply(
-                id = "as_delivery",
-                title = "Parcel / Delivery (দুৱাৰমুখত)",
-                spokenText = "নমস্কাৰ, যদি কোনো পাৰ্চেল বা কুৰিয়াৰ আছে, দুৱাৰমুখত থৈ দিয়ক।",
-                isHindi = false
-            ),
-            QuickReply(
-                id = "as_wrong_number",
-                title = "Bhul number (ভুল নম্বৰ)",
-                spokenText = "এইটো ভুল নম্বৰ হয়। অনুগ্ৰহ কৰি নম্বৰটো পৰীক্ষা কৰি সঠিক নম্বৰত ফোন কৰক।",
-                isHindi = false
-            )
-        )
-
         // Standard Professional English Quick Replies
         val ENGLISH_REPLIES = listOf(
             QuickReply(
@@ -133,6 +99,6 @@ data class QuickReply(
             )
         )
 
-        val DEFAULT_REPLIES = HINDI_REPLIES + ASSAMESE_REPLIES + ENGLISH_REPLIES
+        val DEFAULT_REPLIES = HINDI_REPLIES + ENGLISH_REPLIES
     }
 }

@@ -227,64 +227,6 @@ data class AudioPreset(
                 textOrPath = "If you are calling to give me a million dollars, press 1. If you want something from me, please hang up immediately.",
                 iconEmoji = "",
                 category = "Prank / Voice"
-            ),
-
-            // Assamese / অসমীয়া Presets
-            AudioPreset(
-                id = "preset_as_who",
-                title = "নমস্কাৰ, কোন কৈছে?",
-                textOrPath = "নমস্কাৰ, আপুনি কোন কৈছে আৰু কাৰ লগত কথা পাতিব বিচাৰিছে?",
-                iconEmoji = "",
-                category = "Assamese / অসমীয়া"
-            ),
-            AudioPreset(
-                id = "preset_as_busy",
-                title = "মই ব্যস্ত আছোঁ (পাছত কৰক)",
-                textOrPath = "বেয়া নাপাব, মই এতিয়া অকণমান ব্যস্ত আছোঁ। পাছত ফোন কৰিব পাৰিবনে?",
-                iconEmoji = "",
-                category = "Assamese / অসমীয়া"
-            ),
-            AudioPreset(
-                id = "preset_as_delivery",
-                title = "পাৰ্চেলটো দুৱাৰমুখত থওক",
-                textOrPath = "নমস্কাৰ, যদি কোনো পাৰ্চেল বা কুৰিয়াৰ আছে, দুৱাৰমুখত বা ওচৰ-চুবুৰীয়াৰ তাত থৈ দিয়ক। ধন্যবাদ।",
-                iconEmoji = "",
-                category = "Assamese / অসমীয়া"
-            ),
-            AudioPreset(
-                id = "preset_as_wrong_number",
-                title = "ভুল নম্বৰত ফোন কৰিলে",
-                textOrPath = "এইটো ভুল নম্বৰ হয়। অনুগ্ৰহ কৰি নম্বৰটো পৰীক্ষা কৰি সঠিক নম্বৰত ফোন কৰক।",
-                iconEmoji = "",
-                category = "Assamese / অসমীয়া"
-            ),
-            AudioPreset(
-                id = "preset_as_hold",
-                title = "এক চেকেণ্ড ৰ'ব",
-                textOrPath = "এক চেকেণ্ড ৰ'ব, ফোনটো নাকাটিব।",
-                iconEmoji = "",
-                category = "Assamese / অসমীয়া"
-            ),
-            AudioPreset(
-                id = "preset_as_driving",
-                title = "গাড়ী চলাই আছোঁ",
-                textOrPath = "মই এতিয়া গাড়ী চলাই আছোঁ, গৈ পাই নিজেই ফোন কৰিম।",
-                iconEmoji = "",
-                category = "Assamese / অসমীয়া"
-            ),
-            AudioPreset(
-                id = "preset_as_not_interested",
-                title = "প্ৰয়োজন নাই (ফোন নকৰিব)",
-                textOrPath = "ধন্যবাদ, মোৰ কোনো প্ৰয়োজন নাই। অনুগ্ৰহ কৰি এই নম্বৰত আৰু ফোন নকৰিব।",
-                iconEmoji = "",
-                category = "Assamese / অসমীয়া"
-            ),
-            AudioPreset(
-                id = "preset_as_funny",
-                title = "মাছৰ বজাৰ নহয় ভাই! (Funny)",
-                textOrPath = "আৰে ভাই, ভুল নম্বৰত ফোন কৰিলা! ইয়াত মাছৰ বজাৰ নহয়, ভালকৈ নম্বৰ চাই ফোন কৰা!",
-                iconEmoji = "",
-                category = "Assamese / অসমীয়া"
             )
         )
     }

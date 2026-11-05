@@ -32,8 +32,7 @@ data class VoicePersona(
     val languageCode: String = "en",
     val countryCode: String = "US",
     val localeTag: String = "en-US",
-    val isHindi: Boolean = false,
-    val isAssamese: Boolean = false
+    val isHindi: Boolean = false
 ) {
     val locale: Locale get() = Locale(languageCode, countryCode)
 
@@ -127,80 +126,6 @@ data class VoicePersona(
                 localeTag = "hi-IN",
                 effectType = VoiceEffectType.DEEP_ANONYMOUS,
                 description = "Low resonant, stern Hindi deterrent voice engineered to immediately deflect spam calls, telemarketers, and fraudsters."
-            )
-        )
-
-        // Industry-Ready Neural Assamese Voice Models (অসমীয়া মডেল)
-        val ASSAMESE_PERSONAS = listOf(
-            VoicePersona(
-                id = "as_juri",
-                name = "Juri (জুৰি)",
-                tag = "Assamese • Real Girl",
-                code = "AS1",
-                gender = VoiceGender.FEMALE,
-                pitch = 1.0f,
-                speed = 1.0f,
-                dspPitchFactor = 1.30f,
-                voiceKeywords = listOf("as-in", "as_in", "as-in-x", "assamese", "female", "as"),
-                isPureGirlVoice = true,
-                isAssamese = true,
-                languageCode = "as",
-                countryCode = "IN",
-                localeTag = "as-IN",
-                effectType = VoiceEffectType.NONE,
-                description = "Ultra-lifelike, authentic young Assamese woman voice (অসমীয়া কন্ঠ). Natural human cadence for daily calls & screening."
-            ),
-            VoicePersona(
-                id = "as_priyanka",
-                name = "Priyanka (প্ৰিয়ংকা)",
-                tag = "Assamese • Soft Spoken",
-                code = "AS2",
-                gender = VoiceGender.FEMALE,
-                pitch = 1.02f,
-                speed = 0.98f,
-                dspPitchFactor = 1.32f,
-                voiceKeywords = listOf("as-in", "as_in", "as-in-x", "female", "as"),
-                isPureGirlVoice = true,
-                isAssamese = true,
-                languageCode = "as",
-                countryCode = "IN",
-                localeTag = "as-IN",
-                effectType = VoiceEffectType.NONE,
-                description = "Sweet, articulate young female Assamese voice with gentle and warm presence."
-            ),
-            VoicePersona(
-                id = "as_ratul",
-                name = "Ratul (ৰাতুল)",
-                tag = "Assamese • Pro Male",
-                code = "AS3",
-                gender = VoiceGender.MALE,
-                pitch = 0.74f,
-                speed = 1.0f,
-                dspPitchFactor = 0.75f,
-                voiceKeywords = listOf("as-in", "as_in", "male", "-m-", "as"),
-                isAssamese = true,
-                languageCode = "as",
-                countryCode = "IN",
-                localeTag = "as-IN",
-                effectType = VoiceEffectType.NONE,
-                description = "Respectful, crisp Assamese male assistant voice. Ideal for formal call screening, parcel deliveries, and official calls."
-            ),
-            VoicePersona(
-                id = "as_bhaskar",
-                name = "Bhaskar (ভাস্কৰ)",
-                tag = "Assamese • Deterrent Guard",
-                code = "AS4",
-                gender = VoiceGender.MALE,
-                pitch = 0.64f,
-                speed = 0.93f,
-                dspPitchFactor = 0.65f,
-                voiceKeywords = listOf("as-in", "as_in", "male", "as"),
-                isAssamese = true,
-                languageCode = "as",
-                countryCode = "IN",
-                localeTag = "as-IN",
-                effectType = VoiceEffectType.DEEP_ANONYMOUS,
-                description = "Low resonant, stern Assamese deterrent voice engineered to immediately deflect spam calls, telemarketers, and fraudsters."
             )
         )
 
@@ -356,7 +281,7 @@ data class VoicePersona(
             )
         )
 
-        val ALL_PERSONAS = HINDI_PERSONAS + ASSAMESE_PERSONAS + PURE_GIRL_PERSONAS + CLASSIC_PERSONAS
+        val ALL_PERSONAS = HINDI_PERSONAS + PURE_GIRL_PERSONAS + CLASSIC_PERSONAS
 
         val DEFAULT = HINDI_PERSONAS[0] // Default is Pooja (Real Hindi Girl)
     }
