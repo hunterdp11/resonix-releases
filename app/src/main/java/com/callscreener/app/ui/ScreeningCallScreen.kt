@@ -15,6 +15,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
@@ -64,10 +66,13 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.Dialpad
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Keyboard
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.RecordVoiceOver
 import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material.icons.rounded.Tune
@@ -175,6 +180,7 @@ fun ScreeningCallScreen(
     var inputText by remember { mutableStateOf("") }
     var activeRibbonTab by remember { mutableStateOf(RibbonTab.QUICK_REPLIES) }
     var isPresetManagerOpen by remember { mutableStateOf(false) }
+    var isFocusChatMode by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
     // Smooth auto-scroll to the newest message
@@ -348,33 +354,49 @@ fun ScreeningCallScreen(
                 }
             }
 
-            // Streamlined Liquid Hub (Debloated, Pure Elegance)
+            // Streamlined Liquid Hub (Debloated, Pure Elegance with Expand/Collapse Focus Toggle)
             if (isInCall) {
-                // Tier 1: Liquid Wavy Swipe Ribbon (Toggleable Quick Replies vs Soundboard vs Voice Personas)
-                LiquidWavyActionRibbon(
-                    activeTab = activeRibbonTab,
-                    onSelectTab = { activeRibbonTab = it },
-                    quickReplies = state.quickReplies,
-                    onReplySelected = { reply ->
-                        onSendReply(reply.spokenText)
-                        if (state.isSimulated) {
-                            val mockResponse = when (reply.id) {
-                                "who" -> "Hello, this is Dave from Courier Logistics."
-                                "reason" -> "I am calling regarding your express delivery."
-                                "busy" -> "Understood, I will call back at a later time."
-                                else -> "Thank you, noted."
-                            }
-                            onSimulateCallerReply(mockResponse)
-                        }
-                    },
-                    presets = presets,
-                    onPlayPreset = onPlayPreset,
-                    currentPersona = state.currentPersona,
-                    onSelectPersona = onSelectPersona,
-                    onOpenPresetManager = { isPresetManagerOpen = true }
+                // Fluid Apple Liquid Glass Mode Toggle Pill (Full Screen Chat Focus vs Expand Controls)
+                LiquidGlassModeTogglePill(
+                    isFocusChatMode = isFocusChatMode,
+                    onToggle = { isFocusChatMode = !isFocusChatMode }
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Tier 1: Liquid Wavy Swipe Ribbon (Toggleable Quick Replies vs Soundboard vs Voice Personas)
+                // Fluidly collapses in Chat Focus Mode to give 100% full-screen presence to the conversation
+                AnimatedVisibility(
+                    visible = !isFocusChatMode,
+                    enter = fadeIn(tween(240)) + expandVertically(spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessMediumLow)),
+                    exit = fadeOut(tween(180)) + shrinkVertically(spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessMediumLow))
+                ) {
+                    Column {
+                        LiquidWavyActionRibbon(
+                            activeTab = activeRibbonTab,
+                            onSelectTab = { activeRibbonTab = it },
+                            quickReplies = state.quickReplies,
+                            onReplySelected = { reply ->
+                                onSendReply(reply.spokenText)
+                                if (state.isSimulated) {
+                                    val mockResponse = when (reply.id) {
+                                        "who" -> "Hello, this is Dave from Courier Logistics."
+                                        "reason" -> "I am calling regarding your express delivery."
+                                        "busy" -> "Understood, I will call back at a later time."
+                                        else -> "Thank you, noted."
+                                    }
+                                    onSimulateCallerReply(mockResponse)
+                                }
+                            },
+                            presets = presets,
+                            onPlayPreset = onPlayPreset,
+                            currentPersona = state.currentPersona,
+                            onSelectPersona = onSelectPersona,
+                            onOpenPresetManager = { isPresetManagerOpen = true }
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
 
                 // Tier 2: Unified Liquid Input & In-Call Command Island
                 UnifiedLiquidCommandIsland(
@@ -402,7 +424,8 @@ fun ScreeningCallScreen(
                     isRecording = state.isRecording,
                     onToggleRecording = onToggleRecording,
                     onToggleAiVoiceListening = onToggleAiVoiceListening,
-                    onToggleAutoRelay = onToggleAutoRelay
+                    onToggleAutoRelay = onToggleAutoRelay,
+                    isFocusChatMode = isFocusChatMode
                 )
             }
 
@@ -982,7 +1005,8 @@ fun UnifiedLiquidCommandIsland(
     isRecording: Boolean = false,
     onToggleRecording: () -> Unit = {},
     onToggleAiVoiceListening: () -> Unit = {},
-    onToggleAutoRelay: (Boolean) -> Unit = {}
+    onToggleAutoRelay: (Boolean) -> Unit = {},
+    isFocusChatMode: Boolean = false
 ) {
     val sendScale by animateFloatAsState(
         targetValue = if (text.isNotBlank()) 1.0f else 0.88f,
@@ -1136,116 +1160,166 @@ fun UnifiedLiquidCommandIsland(
                     )
                 }
             }
-        }
 
-        // ColorOS 2x3 Grid of 56dp Circular In-Call Control Buttons
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Row 1: Mute | Speaker | Record
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceAround,
-                verticalAlignment = Alignment.CenterVertically
+            // Compact Liquid Glass Decline Button in Chat Focus Mode (Inline so user can decline anytime without clutter)
+            AnimatedVisibility(
+                visible = isFocusChatMode,
+                enter = fadeIn(tween(200)) + scaleIn(spring(dampingRatio = 0.72f)),
+                exit = fadeOut(tween(150)) + scaleOut()
             ) {
-                // Button 1: Mute
-                OemInCallControlButton(
-                    icon = if (isMuted) Icons.Filled.MicOff else Icons.Filled.Mic,
-                    label = if (isMuted) "Unmute" else "Mute",
-                    isActive = isMuted,
-                    activeColor = Color.White,
-                    activeContentColor = Color.Black,
-                    onClick = onToggleMute
-                )
-
-                // Button 2: Speaker
-                OemInCallControlButton(
-                    icon = Icons.AutoMirrored.Filled.VolumeUp,
-                    label = "Speaker",
-                    isActive = isSpeakerOn,
-                    activeColor = Color.White,
-                    activeContentColor = Color.Black,
-                    onClick = onToggleSpeaker
-                )
-
-                // Button 3: Record
-                OemInCallControlButton(
-                    icon = Icons.Rounded.GraphicEq,
-                    label = if (isRecording) "${state.recordingDurationSeconds}s" else "Record",
-                    isActive = isRecording,
-                    activeColor = AppleRed,
-                    activeContentColor = Color.White,
-                    onClick = onToggleRecording
-                )
-            }
-
-            // Row 2: AI Voice Relay | Direct Mic
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(48.dp, Alignment.CenterHorizontally),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Button 4: AI Voice Relay Mode
-                val isAi = audioMode == AudioCallMode.AI_TYPE_SPEAK
-                OemInCallControlButton(
-                    icon = Icons.Rounded.RecordVoiceOver,
-                    label = "AI Voice",
-                    isActive = isAi,
-                    activeColor = AppleGreen,
-                    activeContentColor = Color.Black,
-                    onClick = onSwitchToAiType
-                )
-
-                // Button 5: Direct Mic Mode
-                val isDirect = audioMode == AudioCallMode.DIRECT_MIC
-                OemInCallControlButton(
-                    icon = Icons.Filled.Call,
-                    label = "Direct Mic",
-                    isActive = isDirect,
-                    activeColor = Color.White,
-                    activeContentColor = Color.Black,
-                    onClick = onSwitchToDirectMic
-                )
-            }
-        }
-
-        // Dedicated, Massive, Centered iOS Specular Liquid Glass Red End Call Button
-        Box(
-            modifier = Modifier
-                .padding(top = 8.dp, bottom = 4.dp)
-                .size(72.dp)
-                .shadow(elevation = 22.dp, shape = CircleShape, spotColor = Color(0xAAFF3B30))
-                .clip(CircleShape)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color(0xFFFF453A),
-                            Color(0xFFD70015)
+                Row {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .shadow(elevation = 14.dp, shape = CircleShape, spotColor = Color(0xAAFF3B30))
+                            .clip(CircleShape)
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color(0xFFFF453A),
+                                        Color(0xFFD70015)
+                                    )
+                                )
+                            )
+                            .border(
+                                1.dp,
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color(0x90FFFFFF),
+                                        Color(0x30FFFFFF)
+                                    )
+                                ),
+                                CircleShape
+                            )
+                            .clickable(onClick = onHangUp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.CallEnd,
+                            contentDescription = "Decline Call",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
                         )
+                    }
+                }
+            }
+        }
+
+        // ColorOS 2x3 Grid of 56dp Circular In-Call Control Buttons & Massive Decline Button
+        // Smoothly collapses in Chat Focus Mode
+        AnimatedVisibility(
+            visible = !isFocusChatMode,
+            enter = fadeIn(tween(240)) + expandVertically(spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessMediumLow)),
+            exit = fadeOut(tween(180)) + shrinkVertically(spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessMediumLow))
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                // Row 1: Mute | Speaker | Record
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceAround,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Button 1: Mute
+                    OemInCallControlButton(
+                        icon = if (isMuted) Icons.Filled.MicOff else Icons.Filled.Mic,
+                        label = if (isMuted) "Unmute" else "Mute",
+                        isActive = isMuted,
+                        activeColor = Color.White,
+                        activeContentColor = Color.Black,
+                        onClick = onToggleMute
                     )
-                )
-                .border(
-                    1.5.dp,
-                    Brush.verticalGradient(
-                        listOf(
-                            Color(0x90FFFFFF),
-                            Color(0x28FFFFFF)
+
+                    // Button 2: Speaker
+                    OemInCallControlButton(
+                        icon = Icons.AutoMirrored.Filled.VolumeUp,
+                        label = "Speaker",
+                        isActive = isSpeakerOn,
+                        activeColor = Color.White,
+                        activeContentColor = Color.Black,
+                        onClick = onToggleSpeaker
+                    )
+
+                    // Button 3: Record
+                    OemInCallControlButton(
+                        icon = Icons.Rounded.GraphicEq,
+                        label = if (isRecording) "${state.recordingDurationSeconds}s" else "Record",
+                        isActive = isRecording,
+                        activeColor = AppleRed,
+                        activeContentColor = Color.White,
+                        onClick = onToggleRecording
+                    )
+                }
+
+                // Row 2: AI Voice Relay | Direct Mic
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(48.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Button 4: AI Voice Relay Mode
+                    val isAi = audioMode == AudioCallMode.AI_TYPE_SPEAK
+                    OemInCallControlButton(
+                        icon = Icons.Rounded.RecordVoiceOver,
+                        label = "AI Voice",
+                        isActive = isAi,
+                        activeColor = AppleGreen,
+                        activeContentColor = Color.Black,
+                        onClick = onSwitchToAiType
+                    )
+
+                    // Button 5: Direct Mic Mode
+                    val isDirect = audioMode == AudioCallMode.DIRECT_MIC
+                    OemInCallControlButton(
+                        icon = Icons.Filled.Call,
+                        label = "Direct Mic",
+                        isActive = isDirect,
+                        activeColor = Color.White,
+                        activeContentColor = Color.Black,
+                        onClick = onSwitchToDirectMic
+                    )
+                }
+
+                // Dedicated, Massive, Centered iOS Specular Liquid Glass Red End Call Button
+                Box(
+                    modifier = Modifier
+                        .padding(top = 8.dp, bottom = 4.dp)
+                        .size(72.dp)
+                        .shadow(elevation = 22.dp, shape = CircleShape, spotColor = Color(0xAAFF3B30))
+                        .clip(CircleShape)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color(0xFFFF453A),
+                                    Color(0xFFD70015)
+                                )
+                            )
                         )
-                    ),
-                    CircleShape
-                )
-                .clickable(onClick = onHangUp),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Filled.CallEnd,
-                contentDescription = "End Call",
-                tint = Color.White,
-                modifier = Modifier.size(32.dp)
-            )
+                        .border(
+                            1.5.dp,
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color(0x90FFFFFF),
+                                    Color(0x28FFFFFF)
+                                )
+                            ),
+                            CircleShape
+                        )
+                        .clickable(onClick = onHangUp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CallEnd,
+                        contentDescription = "End Call",
+                        tint = Color.White,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -2948,6 +3022,96 @@ fun InCallDtmfKey(
                     color = TextTertiary,
                     fontSize = 8.sp,
                     letterSpacing = 0.5.sp
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Apple iOS Liquid Glass Mode Toggle Pill:
+ * Fluid pill that allows the user to expand or collapse the quick replies, soundboard presets,
+ * and command tiles into a full-screen chat transcript view with voice relay mic & inline decline button.
+ */
+@Composable
+fun LiquidGlassModeTogglePill(
+    isFocusChatMode: Boolean,
+    onToggle: () -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (isFocusChatMode) 180f else 0f,
+        animationSpec = spring(dampingRatio = 0.76f, stiffness = Spring.StiffnessMediumLow),
+        label = "chevronRotation"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .shadow(
+                    elevation = 12.dp,
+                    shape = RoundedCornerShape(22.dp),
+                    spotColor = Color(0x40000000),
+                    ambientColor = Color(0x20000000)
+                )
+                .clip(RoundedCornerShape(22.dp))
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0x28FFFFFF),
+                            Color(0x12FFFFFF)
+                        )
+                    )
+                )
+                .border(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        listOf(
+                            Color(0x60FFFFFF),
+                            Color(0x18FFFFFF)
+                        )
+                    ),
+                    shape = RoundedCornerShape(22.dp)
+                )
+                .clickable {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onToggle()
+                }
+                .padding(horizontal = 16.dp, vertical = 7.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Subtle Mode Indicator Icon
+                Icon(
+                    imageVector = if (isFocusChatMode) Icons.Rounded.GridView else Icons.Rounded.ChatBubbleOutline,
+                    contentDescription = null,
+                    tint = if (isFocusChatMode) AppleGreen else Color(0xDDFFFFFF),
+                    modifier = Modifier.size(14.dp)
+                )
+
+                Text(
+                    text = if (isFocusChatMode) "Expand Controls & Sounds" else "Focus Chat Screen",
+                    color = Color.White,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.3.sp
+                )
+
+                // Smoothly Rotating Animated Chevron
+                Icon(
+                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = "Toggle Expand/Collapse",
+                    tint = Color(0xCCFFFFFF),
+                    modifier = Modifier
+                        .size(16.dp)
+                        .rotate(chevronRotation)
                 )
             }
         }
