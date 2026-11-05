@@ -3,6 +3,7 @@ package com.callscreener.app.engine
 import android.annotation.SuppressLint
 import android.content.Context
 import android.media.AudioAttributes
+import android.media.AudioDeviceInfo
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioRecord
@@ -150,7 +151,7 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
         val recordSource = if (forTestLab) {
             MediaRecorder.AudioSource.VOICE_COMMUNICATION
         } else {
-            MediaRecorder.AudioSource.VOICE_CALL // Dual-side / Downlink
+            MediaRecorder.AudioSource.VOICE_DOWNLINK // Source 3: strictly caller's incoming voice!
         }
 
         val record = tryCreateAudioRecord(recordSource, recordBufSize)
@@ -206,6 +207,21 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
             return false
         }
         audioTrack = track
+
+        // Route AudioTrack directly to TELEPHONY uplink so the CALLER receives the feedback!
+        if (!forTestLab) {
+            try {
+                val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                val outputs = audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                val telephonyDevice = outputs?.firstOrNull { it.type == AudioDeviceInfo.TYPE_TELEPHONY }
+                if (telephonyDevice != null) {
+                    track.setPreferredDevice(telephonyDevice)
+                    Log.i(TAG, "Speech Jammer AudioTrack routed to TYPE_TELEPHONY (Uplink to caller)")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not set telephony device route", e)
+            }
+        }
 
         try {
             track.setVolume(AudioTrack.getMaxVolume())
@@ -279,6 +295,10 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
             echoCanceler?.release()
         } catch (_: Exception) {}
         echoCanceler = null
+
+        if (!isTestMode) {
+            restoreInCallHardwareMixers()
+        }
     }
 
     /**
@@ -369,16 +389,44 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
                 val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
                 audioManager?.setParameters("incall_music_enable=true")
                 audioManager?.setParameters("audio_capability=call_recording=1")
+                audioManager?.setParameters("voice_tx_mute=0")
+                audioManager?.setParameters("voice_tx_mute=false")
 
                 RootPrivilegeManager.executeSuCommand("""
+                    # 1. Route MultiMedia1 directly to Voice_Tx so the CALLER receives the delayed feedback!
+                    tinymix 'Voice_Tx Mixer MultiMedia1' 1 2>/dev/null || true
+                    tinymix 'Voice_Tx Mixer MultiMedia2' 1 2>/dev/null || true
                     tinymix 'Incall_Music Audio Mixer MultiMedia1' 1 2>/dev/null || true
-                    tinymix 'Voice_Rx Audio Mixer MultiMedia1' 1 2>/dev/null || true
-                    tinymix 'Voice Rx Mute' 0 2>/dev/null || true
+                    tinymix 'Incall_Music Audio Mixer MultiMedia2' 1 2>/dev/null || true
+                    tinymix 'Incall_Music_2 Audio Mixer MultiMedia1' 1 2>/dev/null || true
+
+                    # 2. Block MultiMedia1 from Voice_Rx so the USER does not hear the echo in their ear!
+                    tinymix 'Voice_Rx Audio Mixer MultiMedia1' 0 2>/dev/null || true
+                    tinymix 'Voice_Rx Audio Mixer MultiMedia2' 0 2>/dev/null || true
+
+                    # 3. Ensure Voice_Tx is completely unmuted
                     tinymix 'Voice Tx Mute' 0 2>/dev/null || true
+                    tinymix 'Voice Tx Device Mute' 0 2>/dev/null || true
                 """.trimIndent())
+                Log.i(TAG, "Unmasked Voice_Tx ALSA mixers for Speech Jammer uplink")
             } catch (e: Exception) {
                 Log.w(TAG, "Root hardware mixer unmask notice: ${e.message}")
             }
+        }
+    }
+
+    private fun restoreInCallHardwareMixers() {
+        if (!RootPrivilegeManager.isRootAvailable()) return
+        scope.launch {
+            try {
+                RootPrivilegeManager.executeSuCommand("""
+                    tinymix 'Voice_Tx Mixer MultiMedia1' 0 2>/dev/null || true
+                    tinymix 'Voice_Tx Mixer MultiMedia2' 0 2>/dev/null || true
+                    tinymix 'Incall_Music Audio Mixer MultiMedia1' 0 2>/dev/null || true
+                    tinymix 'Incall_Music Audio Mixer MultiMedia2' 0 2>/dev/null || true
+                """.trimIndent())
+                Log.i(TAG, "Restored normal in-call ALSA mixers")
+            } catch (_: Exception) {}
         }
     }
 }
