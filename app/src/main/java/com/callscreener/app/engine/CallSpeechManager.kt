@@ -555,13 +555,6 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
                     audioManager.isSpeakerphoneOn = false
                 }
 
-                // Ensure media volume is audible for earbuds
-                val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-                val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-                if (currentVol < maxVol / 3) {
-                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, (maxVol * 0.75f).toInt(), 0)
-                }
-
                 // Request transient audio focus for speech playback
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
@@ -581,15 +574,6 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to prepare media audio routing for Bluetooth earbuds", e)
             }
-        } else {
-            try {
-                // Ensure in-call volume is sufficiently high for crystal clear caller projection
-                val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_VOICE_CALL)
-                val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
-                if (currentVol < (maxVol * 0.85f).toInt()) {
-                    audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, (maxVol * 0.95f).toInt(), 0)
-                }
-            } catch (_: Exception) {}
         }
 
         try {
