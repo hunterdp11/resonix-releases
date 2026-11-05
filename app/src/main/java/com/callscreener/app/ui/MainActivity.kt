@@ -448,64 +448,72 @@ fun MainDashboard(
     var isSettingsOpen by remember { mutableStateOf(false) }
     var isPresetManagerOpen by remember { mutableStateOf(false) }
     val hazeState = remember { HazeState() }
+    val presets by sessionManager.presetManager.presets.collectAsState()
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(GlassBackground)
+            .background(Color(0xFF000000))
     ) {
-        // Pure Apple Liquid Glass Canvas Backdrop
-        AppleLiquidBackdrop()
-
-        val presets by sessionManager.presetManager.presets.collectAsState()
-
-        // Tab Content extending full edge-to-edge behind floating glass dock with Real-Time Haze Backdrop Blur
+        // Container captured by Haze: Both the flowing caustics backdrop and the tab content
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .haze(state = hazeState)
         ) {
-            when (currentTab) {
-                DialerTab.RECENTS -> RecentsScreen(
-                    callLogs = callLogs,
-                    isLoading = isLoadingLogs,
-                    presets = presets,
-                    onPlayPreset = { sessionManager.playAudioPreset(it) },
-                    onCall = { number -> DialerRepository.placeCall(context, number) },
-                    onScreen = { log ->
-                        sessionManager.startSimulatedCall(
-                            simulatedNumber = log.number,
-                            simulatedName = log.name ?: "Unknown Caller"
-                        )
-                        context.startActivity(Intent(context, ScreeningCallActivity::class.java))
-                    },
-                    onOpenDetails = { contact -> selectedContactForDetails = contact }
-                )
-                DialerTab.CONTACTS -> ContactsScreen(
-                    contacts = contacts,
-                    isLoading = isLoadingContacts,
-                    onCall = { number -> DialerRepository.placeCall(context, number) },
-                    onOpenDetails = { contact -> selectedContactForDetails = contact }
-                )
-                DialerTab.KEYPAD -> KeypadScreen(
-                    contacts = contacts,
-                    callLogs = callLogs,
-                    onCall = { number -> DialerRepository.placeCall(context, number) },
-                    onOpenDetails = { contact -> selectedContactForDetails = contact },
-                    onOpenSettings = { isSettingsOpen = true }
-                )
-                DialerTab.ASSISTANT -> AssistantTabScreen(
-                    onStartSimulation = onStartSimulation,
-                    selectedPersona = selectedPersona,
-                    onSelectPersona = { selectedPersona = it },
-                    isLiveMicActive = isLiveMicActive,
-                    onToggleLiveMic = { isLiveMicActive = !isLiveMicActive },
-                    isGreetingEnabled = sessionState.isGreetingEnabled,
-                    onToggleGreeting = { sessionManager.setGreetingEnabled(it) },
-                    presetManager = sessionManager.presetManager,
-                    onOpenPresetManager = { isPresetManagerOpen = true }
-                )
+            // Pure Apple Liquid Glass Canvas Backdrop with chromatic caustics flowing directly behind dock
+            AppleLiquidBackdrop()
+
+            // Tab Content extending full edge-to-edge behind floating glass dock
+            Box(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                when (currentTab) {
+                    DialerTab.RECENTS -> RecentsScreen(
+                        callLogs = callLogs,
+                        isLoading = isLoadingLogs,
+                        presets = presets,
+                        onPlayPreset = { sessionManager.playAudioPreset(it) },
+                        onCall = { number -> DialerRepository.placeCall(context, number) },
+                        onScreen = { log ->
+                            sessionManager.startSimulatedCall(
+                                simulatedNumber = log.number,
+                                simulatedName = log.name ?: "Unknown Caller"
+                            )
+                            context.startActivity(Intent(context, ScreeningCallActivity::class.java))
+                        },
+                        onOpenDetails = { contact -> selectedContactForDetails = contact }
+                    )
+                    DialerTab.CONTACTS -> ContactsScreen(
+                        contacts = contacts,
+                        isLoading = isLoadingContacts,
+                        onCall = { number -> DialerRepository.placeCall(context, number) },
+                        onOpenDetails = { contact -> selectedContactForDetails = contact }
+                    )
+                    DialerTab.KEYPAD -> KeypadScreen(
+                        contacts = contacts,
+                        callLogs = callLogs,
+                        onCall = { number -> DialerRepository.placeCall(context, number) },
+                        onOpenDetails = { contact -> selectedContactForDetails = contact },
+                        onOpenSettings = { isSettingsOpen = true }
+                    )
+                    DialerTab.ASSISTANT -> AssistantTabScreen(
+                        onStartSimulation = onStartSimulation,
+                        selectedPersona = selectedPersona,
+                        onSelectPersona = { selectedPersona = it },
+                        isLiveMicActive = isLiveMicActive,
+                        onToggleLiveMic = { isLiveMicActive = !isLiveMicActive },
+                        isGreetingEnabled = sessionState.isGreetingEnabled,
+                        onToggleGreeting = { sessionManager.setGreetingEnabled(it) },
+                        presetManager = sessionManager.presetManager,
+                        onOpenPresetManager = { isPresetManagerOpen = true }
+                    )
+                }
             }
+        }
+
+        val missedCallCount = remember(callLogs) {
+            callLogs.count { it.type == CallLog.Calls.MISSED_TYPE || it.type == CallLog.Calls.REJECTED_TYPE }
         }
 
         // Docked Liquid Glass Floating Bottom Navigation Bar with Hardware GPU Backdrop Blur
@@ -513,6 +521,7 @@ fun MainDashboard(
             currentTab = currentTab,
             onTabSelected = { currentTab = it },
             hazeState = hazeState,
+            missedCallCount = missedCallCount,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
@@ -583,350 +592,405 @@ fun MainDashboard(
 }
 
 /**
- * Authentic Apple Pure Liquid Backdrop:
- * Seamless, silky smooth monochromatic titanium radial gradient on pure deep OLED black.
- * Zero boxy artifacts, zero rainbow saturation — pure minimalist luxury.
+ * Authentic Apple Liquid Chromatic Backdrop:
+ * Deep obsidian OLED black space with fluid metallic caustics sweeping directly across
+ * the bottom dock region (matching Apple iOS liquid glass demo & media_1793884295260_260d4339.jpg).
+ * When LiquidGlassBottomBar sits above this, the real-time Haze GPU blur and refraction
+ * layers bend and refract the rich molten bronze, platinum, and sapphire light into a physical liquid lens.
  */
 @Composable
 fun AppleLiquidBackdrop() {
+    val infiniteTransition = rememberInfiniteTransition(label = "liquidCaustic")
+    val waveOffset by infiniteTransition.animateFloat(
+        initialValue = -15f,
+        targetValue = 15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 7000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "causticShift"
+    )
+
     Canvas(modifier = Modifier.fillMaxSize()) {
-        // Pure Obsidian OLED Black with Top Status Bar Liquid Titanium Sheen
+        val width = size.width
+        val height = size.height
+
+        // 1. Pure Obsidian OLED Black Base
         drawRect(color = Color(0xFF000000))
 
+        // 2. Subtle Top Status Bar Titanium Sheen
         drawRect(
             brush = Brush.verticalGradient(
                 listOf(
-                    Color(0xFF181F2C),
-                    Color(0xFF0F141E),
+                    Color(0xFF161C26),
+                    Color(0xFF0B0E14),
                     Color(0xFF000000)
                 ),
                 startY = 0f,
-                endY = size.height * 0.35f
+                endY = height * 0.32f
             )
         )
 
-        // Ethereal, whisper-soft top ambient radiance (monochromatic titanium glow)
+        // 3. Ethereal Top Radial Titanium Radiance
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    Color(0x18202E42), // Subtle celestial titanium
-                    Color(0x08121C2A),
+                    Color(0x18202E42),
+                    Color(0x06121C2A),
                     Color.Transparent
                 ),
-                center = center.copy(y = size.height * 0.12f),
-                radius = size.width * 0.95f
+                center = Offset(width * 0.5f, height * 0.10f),
+                radius = width * 0.90f
             )
         )
 
-        // Subtle bottom ambient refraction for floating dock
+        // 4. Flowing Apple Liquid Chromatic Caustics across the bottom dock zone
+        // Left Ribbon: Molten Bronze / Amber Caustic (sweeping behind Recents & Contacts)
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    Color(0x12162232),
+                    Color(0x959A4E12), // Rich molten bronze
+                    Color(0x55B45309), // Amber gold
+                    Color(0x1878350F),
                     Color.Transparent
                 ),
-                center = center.copy(y = size.height * 0.96f),
-                radius = size.width * 0.75f
+                center = Offset(width * 0.22f + waveOffset, height * 0.93f),
+                radius = width * 0.52f
             )
         )
 
-        // Hairline specular top rim reflection
-        drawRect(
-            brush = Brush.verticalGradient(
+        // Center Ribbon: Pearlescent Titanium / Platinum Specular Glow (sweeping behind center dock)
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color(0x50CBD5E1), // Platinum
+                    Color(0x2294A3B8), // Metallic silver
+                    Color.Transparent
+                ),
+                center = Offset(width * 0.52f, height * 0.92f - (waveOffset * 0.5f)),
+                radius = width * 0.40f
+            )
+        )
+
+        // Right Ribbon: Deep Liquid Sapphire / Electric Azure (sweeping behind Keypad & Assistant)
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color(0x901D4ED8), // Royal sapphire
+                    Color(0x500284C7), // Electric azure
+                    Color(0x120F172A),
+                    Color.Transparent
+                ),
+                center = Offset(width * 0.82f - waveOffset, height * 0.94f),
+                radius = width * 0.52f
+            )
+        )
+
+        // Hairline specular light ribbon curving across the dock line
+        drawLine(
+            brush = Brush.horizontalGradient(
                 listOf(
-                    Color(0x12FFFFFF),
-                    Color(0x04FFFFFF),
+                    Color.Transparent,
+                    Color(0x20B45309),
+                    Color(0x35E2E8F0),
+                    Color(0x2538BDF8),
                     Color.Transparent
-                ),
-                startY = 0f,
-                endY = size.height * 0.20f
-            )
+                )
+            ),
+            start = Offset(0f, height * 0.91f),
+            end = Offset(width, height * 0.92f),
+            strokeWidth = 2f
         )
     }
 }
 
 /**
- * Authentic Liquid Glass Dock (Inspired by archisvaze/liquid-glass):
+ * Authentic Liquid Glass Dock (Inspired by archisvaze/liquid-glass & media_1793884295260_260d4339.jpg):
  * Physics-based optical glass container featuring:
+ * - Real-time GPU backdrop blur (Haze) capturing the flowing fluid chromatic backdrop
  * - Physics-based refraction bezel (inset caustic shadow contour simulating glass thickness & Snell's law refraction)
  * - Razor-sharp specular top highlight line reflecting off curved crown
+ * - Lateral cylinder refraction shadows on the curved ends
  * - Dual-layer crystalline perimeter borders (outer specular prism + inner caustic return contour)
- * - Ultra-clear optical transmission with high-radius hardware backdrop blur (Haze)
- * - Floating liquid glass sliding droplet indicator with spring physics and lens specular sheen
- * - Minimalist monochromatic elegance (no rainbow tinting or boxy artifacts)
+ * - Authentic 4 iOS glass squircle tiles matching media_1793884295260_260d4339.jpg with top specular domes,
+ *   notification badges, and smooth spring physics.
  */
 @Composable
 fun LiquidGlassBottomBar(
     currentTab: DialerTab,
     onTabSelected: (DialerTab) -> Unit,
     hazeState: HazeState,
+    missedCallCount: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
 
     val tabs = remember {
         listOf(
-            Triple(DialerTab.RECENTS, Icons.Rounded.Schedule, "Recents"),
+            Triple(DialerTab.RECENTS, Icons.Filled.Call, "Recents"),
             Triple(DialerTab.CONTACTS, Icons.Rounded.Person, "Contacts"),
             Triple(DialerTab.KEYPAD, Icons.Rounded.Dialpad, "Keypad"),
             Triple(DialerTab.ASSISTANT, Icons.Rounded.GraphicEq, "Assistant")
         )
     }
 
-    val selectedIndex = when (currentTab) {
-        DialerTab.RECENTS -> 0
-        DialerTab.CONTACTS -> 1
-        DialerTab.KEYPAD -> 2
-        DialerTab.ASSISTANT -> 3
-    }
-
+    // Outer Dock Capsule Container (Archis Vaze Liquid Glass Lens)
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 18.dp)
+            .padding(horizontal = 14.dp)
             .shadow(
                 elevation = 28.dp,
-                shape = RoundedCornerShape(36.dp),
-                spotColor = Color(0x80000000),
-                ambientColor = Color(0x45000000)
+                shape = RoundedCornerShape(38.dp),
+                spotColor = Color(0x99000000),
+                ambientColor = Color(0x50000000)
             )
             .hazeChild(
                 state = hazeState,
-                shape = RoundedCornerShape(36.dp),
+                shape = RoundedCornerShape(38.dp),
                 style = HazeStyle(
-                    tint = Color(0x10FFFFFF), // Ultra-clear optical transmission
-                    blurRadius = 32.dp,
+                    tint = Color(0x12FFFFFF), // Ultra-clear optical transmission
+                    blurRadius = 28.dp,
                     noiseFactor = 0f
                 )
             )
-            .clip(RoundedCornerShape(36.dp))
+            .clip(RoundedCornerShape(38.dp))
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        Color(0x28FFFFFF), // Top specular transmission
-                        Color(0x0CFFFFFF), // Ultra-clear optical body
-                        Color(0x1CFFFFFF)  // Base caustic return
+                        Color(0x32FFFFFF), // Top specular transmission
+                        Color(0x0EFFFFFF), // Crystal clear optical body
+                        Color(0x20FFFFFF)  // Base caustic return
                     )
                 )
             )
             .border(
-                1.4.dp,
-                Brush.verticalGradient(
+                width = 1.4.dp,
+                brush = Brush.verticalGradient(
                     listOf(
                         Color(0xF5FFFFFF), // Razor-sharp top specular catch
-                        Color(0x45FFFFFF), // Translucent sides
-                        Color(0x18FFFFFF),
-                        Color(0x55FFFFFF)  // Bottom caustic return rim
+                        Color(0x50FFFFFF), // Translucent sides
+                        Color(0x20FFFFFF),
+                        Color(0x70FFFFFF)  // Bottom caustic return rim
                     )
                 ),
-                RoundedCornerShape(36.dp)
+                shape = RoundedCornerShape(38.dp)
             )
     ) {
-        // Layer 1: Inset Refraction Bezel (Simulating archisvaze/liquid-glass displacement & thickness shadow)
-        // Dark optical refraction contour along the curved perimeter where light rays bend inward
+        // Layer 1: Inset Snell's Law Refraction Bezel (archisvaze/liquid-glass SDF glass thickness shadow)
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .padding(1.dp)
+                .padding(1.2.dp)
                 .border(
                     width = 4.dp,
                     brush = Brush.verticalGradient(
                         listOf(
                             Color(0x35000000),
-                            Color(0x55000000),
-                            Color(0x30000000)
+                            Color(0x60000000),
+                            Color(0x38000000)
                         )
                     ),
-                    shape = RoundedCornerShape(35.dp)
+                    shape = RoundedCornerShape(36.8.dp)
                 )
         )
 
-        // Layer 2: Lateral Cylinder Refraction Shadows on the curved pill ends
+        // Layer 2: Lateral Cylinder Lens Refraction Shadows on the curved semi-circular ends
         Box(
             modifier = Modifier
                 .matchParentSize()
                 .background(
                     Brush.horizontalGradient(
                         listOf(
-                            Color(0x40000000),
+                            Color(0x45000000),
                             Color.Transparent,
                             Color.Transparent,
-                            Color(0x40000000)
+                            Color(0x45000000)
                         )
                     )
                 )
         )
 
-        // Layer 3: Razor-Sharp Specular Top Rim Reflection (Direct light source reflection on curved glass crown)
+        // Layer 3: Razor-Sharp Specular Top Rim Reflection (Reflecting overhead light off curved crown)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(28.dp)
-                .clip(RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp))
+                .clip(RoundedCornerShape(topStart = 38.dp, topEnd = 38.dp))
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            Color(0x65FFFFFF),
-                            Color(0x18FFFFFF),
+                            Color(0x75FFFFFF),
+                            Color(0x20FFFFFF),
                             Color.Transparent
                         )
                     )
                 )
         )
 
-        // Layer 4: Inner Caustic Refraction Contour Line (Inner crystal bevel)
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .padding(1.5.dp)
-                .border(
-                    0.8.dp,
-                    Brush.verticalGradient(
-                        listOf(
-                            Color(0x80FFFFFF),
-                            Color(0x18FFFFFF),
-                            Color(0x35FFFFFF)
-                        )
-                    ),
-                    RoundedCornerShape(34.5.dp)
-                )
-        )
-
-        // Layer 5: Bottom Caustic Reflection Return Rim
+        // Layer 4: Bottom Caustic Reflection Return Rim
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(1.dp)
                 .align(Alignment.BottomCenter)
-                .clip(RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp))
-                .background(Color(0x35FFFFFF))
+                .clip(RoundedCornerShape(bottomStart = 38.dp, bottomEnd = 38.dp))
+                .background(Color(0x40FFFFFF))
         )
 
-        // Interactive Layer: Sliding Liquid Droplet + Symmetrical Tabs
-        BoxWithConstraints(
+        // Symmetrical 4-Tab Glass Squircle Row matching media_1793884295260_260d4339.jpg
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(70.dp)
-                .padding(horizontal = 4.dp, vertical = 6.dp)
+                .height(78.dp)
+                .padding(horizontal = 6.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            val totalWidth = maxWidth
-            val tabWidth = totalWidth / 4
+            tabs.forEach { (tab, icon, label) ->
+                val isSelected = currentTab == tab
 
-            val indicatorOffset by animateDpAsState(
-                targetValue = tabWidth * selectedIndex,
-                animationSpec = spring(
-                    dampingRatio = 0.82f,
-                    stiffness = Spring.StiffnessMediumLow
-                ),
-                label = "dockIndicatorOffset"
-            )
+                val scale by animateFloatAsState(
+                    targetValue = if (isSelected) 1.05f else 0.95f,
+                    animationSpec = spring(
+                        dampingRatio = 0.76f,
+                        stiffness = Spring.StiffnessMediumLow
+                    ),
+                    label = "squircleScale"
+                )
 
-            // Ultra-Clear Liquid Glass Sliding Active Droplet Lens
-            Box(
-                modifier = Modifier
-                    .offset(x = indicatorOffset)
-                    .width(tabWidth)
-                    .fillMaxHeight()
-                    .padding(horizontal = 4.dp, vertical = 2.dp)
-                    .shadow(
-                        elevation = 12.dp,
-                        shape = RoundedCornerShape(26.dp),
-                        spotColor = Color(0x60000000),
-                        ambientColor = Color(0x25000000)
+                val opacity by animateFloatAsState(
+                    targetValue = if (isSelected) 1.0f else 0.82f,
+                    animationSpec = tween(durationMillis = 200),
+                    label = "squircleOpacity"
+                )
+
+                // Distinct Luxury Glass Theme for each tab matching the screenshot
+                val squircleBackground = when (tab) {
+                    DialerTab.RECENTS -> Brush.verticalGradient(
+                        listOf(Color(0xEE2A2E38), Color(0xDD121418))
                     )
-                    .clip(RoundedCornerShape(26.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0x40FFFFFF), // Specular crown
-                                Color(0x12FFFFFF), // Crystalline body
-                                Color(0x24FFFFFF)  // Base caustic return
-                            )
-                        )
+                    DialerTab.CONTACTS -> Brush.verticalGradient(
+                        listOf(Color(0xEEC47824), Color(0xDD824005))
                     )
-                    .border(
-                        1.2.dp,
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0xB5FFFFFF), // Razor top catch
-                                Color(0x35FFFFFF),
-                                Color(0x18FFFFFF)
-                            )
-                        ),
-                        RoundedCornerShape(26.dp)
+                    DialerTab.KEYPAD -> Brush.verticalGradient(
+                        listOf(Color(0xEE525F72), Color(0xDD28323E))
                     )
-            ) {
-                // Specular Light Dome on the Sliding Droplet
+                    DialerTab.ASSISTANT -> Brush.verticalGradient(
+                        listOf(Color(0xEE1E40AF), Color(0xDD172554))
+                    )
+                }
+
+                val squircleBorderBrush = when (tab) {
+                    DialerTab.RECENTS -> Brush.verticalGradient(
+                        listOf(Color(0x95FFFFFF), Color(0x25FFFFFF))
+                    )
+                    DialerTab.CONTACTS -> Brush.verticalGradient(
+                        listOf(Color(0xA5FFDFBA), Color(0x35D97706))
+                    )
+                    DialerTab.KEYPAD -> Brush.verticalGradient(
+                        listOf(Color(0xA0FFFFFF), Color(0x30FFFFFF))
+                    )
+                    DialerTab.ASSISTANT -> Brush.verticalGradient(
+                        listOf(Color(0x9593C5FD), Color(0x301D4ED8))
+                    )
+                }
+
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(18.dp)
-                        .clip(RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp))
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color(0x50FFFFFF),
-                                    Color.Transparent
-                                )
-                            )
-                        )
-                )
-            }
-
-            // Tab Icons & Text centered in equal 4ths with perfect fitting
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                tabs.forEach { (tab, icon, label) ->
-                    val isSelected = currentTab == tab
-                    val iconScale by animateFloatAsState(
-                        targetValue = if (isSelected) 1.05f else 0.94f,
-                        animationSpec = spring(dampingRatio = 0.72f),
-                        label = "tabIconScale"
-                    )
-                    val contentColor by animateColorAsState(
-                        targetValue = if (isSelected) Color.White else Color(0x80FFFFFF),
-                        animationSpec = tween(durationMillis = 180),
-                        label = "tabContentColor"
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(20.dp))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onTabSelected(tab)
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
                         ) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onTabSelected(tab)
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        // The iOS Liquid Glass Squircle Tile (Matching Screenshot)
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .scale(scale)
+                                .shadow(
+                                    elevation = if (isSelected) 10.dp else 4.dp,
+                                    shape = RoundedCornerShape(16.dp),
+                                    spotColor = Color(0x70000000),
+                                    ambientColor = Color(0x30000000)
+                                )
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(squircleBackground)
+                                .border(
+                                    width = 1.2.dp,
+                                    brush = squircleBorderBrush,
+                                    shape = RoundedCornerShape(16.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // Top Specular Sheen Dome on the Squircle
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(18.dp)
+                                    .align(Alignment.TopCenter)
+                                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                                    .background(
+                                        Brush.verticalGradient(
+                                            listOf(
+                                                Color(0x55FFFFFF),
+                                                Color.Transparent
+                                            )
+                                        )
+                                    )
+                            )
+
+                            // Clean, crisp white icon
                             Icon(
                                 imageVector = icon,
                                 contentDescription = label,
-                                tint = contentColor,
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .scale(iconScale)
+                                tint = Color.White.copy(alpha = opacity),
+                                modifier = Modifier.size(24.dp)
                             )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = label,
-                                color = contentColor,
-                                fontSize = 10.sp,
-                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                letterSpacing = (-0.1).sp,
-                                maxLines = 1
-                            )
+
+                            // Notification Pill Badge on Recents (Matching "91" badge in media_1793884295260_260d4339.jpg)
+                            if (tab == DialerTab.RECENTS && missedCallCount > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .offset(x = 6.dp, y = (-5).dp)
+                                        .shadow(4.dp, RoundedCornerShape(12.dp), spotColor = Color(0x60000000))
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color.White)
+                                        .padding(horizontal = 5.dp, vertical = 1.dp)
+                                ) {
+                                    Text(
+                                        text = if (missedCallCount > 99) "99+" else missedCallCount.toString(),
+                                        color = Color(0xFF1E293B),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = (-0.2).sp
+                                    )
+                                }
+                            }
                         }
+
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        // Micro-label under squircle
+                        Text(
+                            text = label,
+                            color = if (isSelected) Color.White else Color(0x85FFFFFF),
+                            fontSize = 10.sp,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                            letterSpacing = (-0.1).sp,
+                            maxLines = 1
+                        )
                     }
                 }
             }
