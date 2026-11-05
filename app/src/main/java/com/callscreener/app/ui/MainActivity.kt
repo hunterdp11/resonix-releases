@@ -590,136 +590,70 @@ fun MainDashboard(
 @Composable
 fun AppleLiquidBackdrop() {
     Canvas(modifier = Modifier.fillMaxSize()) {
-        val w = size.width
-        val h = size.height
+        // Pure Obsidian OLED Black with Top Status Bar Liquid Titanium Sheen
+        drawRect(color = Color(0xFF000000))
 
-        // === BASE: Deep Obsidian OLED Black ===
-        drawRect(color = Color(0xFF020408))
-
-        // === TOP TITANIUM SHEEN: Status-bar area subtle metallic gradient ===
         drawRect(
             brush = Brush.verticalGradient(
                 listOf(
-                    Color(0xFF16202E),
-                    Color(0xFF0C1420),
+                    Color(0xFF181F2C),
+                    Color(0xFF0F141E),
                     Color(0xFF000000)
                 ),
                 startY = 0f,
-                endY = h * 0.30f
+                endY = size.height * 0.35f
             )
         )
 
-        // ============================================================
-        // CHROMATIC CAUSTIC WAVES — these give the haze blur VIVID
-        // liquid color to refract, matching the iOS 26 dock reference
-        // ============================================================
-
-        // Wave 1: Molten Amber / Copper — bottom-left caustic pool
+        // Ethereal, whisper-soft top ambient radiance (monochromatic titanium glow)
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    Color(0x70C97408), // Deep amber core
-                    Color(0x50A85E05), // Warm copper mid
-                    Color(0x2878400A), // Bronze fade
-                    Color(0x0F4A2A06),
+                    Color(0x18202E42), // Subtle celestial titanium
+                    Color(0x08121C2A),
                     Color.Transparent
                 ),
-                center = Offset(w * 0.18f, h * 0.90f),
-                radius = w * 0.72f
+                center = center.copy(y = size.height * 0.12f),
+                radius = size.width * 0.95f
             )
         )
 
-        // Wave 2: Electric Sapphire / Azure — bottom-right caustic pool
+        // Subtle bottom ambient refraction for floating dock
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    Color(0x581060E0), // Electric azure core
-                    Color(0x400880D0), // Sapphire mid
-                    Color(0x20056090),
-                    Color(0x0A023050),
+                    Color(0x12162232),
                     Color.Transparent
                 ),
-                center = Offset(w * 0.82f, h * 0.91f),
-                radius = w * 0.75f
+                center = center.copy(y = size.height * 0.96f),
+                radius = size.width * 0.75f
             )
         )
 
-        // Wave 3: Violet / Indigo — center-bottom depth caustic
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    Color(0x30701AB8), // Royal violet
-                    Color(0x18501090),
-                    Color(0x08280860),
-                    Color.Transparent
-                ),
-                center = Offset(w * 0.50f, h * 0.93f),
-                radius = w * 0.55f
-            )
-        )
-
-        // Wave 4: Copper sweep — sweeping diagonal ridge across dock zone
-        drawRect(
-            brush = Brush.linearGradient(
-                colors = listOf(
-                    Color.Transparent,
-                    Color(0x14D97408),
-                    Color(0x20A05010),
-                    Color(0x0E805020),
-                    Color.Transparent
-                ),
-                start = Offset(0f, h * 0.75f),
-                end = Offset(w, h * 0.98f)
-            )
-        )
-
-        // Wave 5: Azure sweep — sweeping diagonal across right side
-        drawRect(
-            brush = Brush.linearGradient(
-                colors = listOf(
-                    Color.Transparent,
-                    Color(0x0C1060E0),
-                    Color(0x180870C0),
-                    Color(0x0A0050A0),
-                    Color.Transparent
-                ),
-                start = Offset(w * 0.40f, h * 0.80f),
-                end = Offset(w, h * 0.70f)
-            )
-        )
-
-        // Top center: Subtle cold titanium ambient glow
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    Color(0x14203040),
-                    Color(0x08101820),
-                    Color.Transparent
-                ),
-                center = Offset(w * 0.50f, h * 0.08f),
-                radius = w * 0.90f
-            )
-        )
-
-        // === TOP SPECULAR HAIRLINE CREST ===
+        // Hairline specular top rim reflection
         drawRect(
             brush = Brush.verticalGradient(
                 listOf(
-                    Color(0x18FFFFFF),
-                    Color(0x06FFFFFF),
+                    Color(0x12FFFFFF),
+                    Color(0x04FFFFFF),
                     Color.Transparent
                 ),
                 startY = 0f,
-                endY = h * 0.18f
+                endY = size.height * 0.20f
             )
         )
     }
 }
 
 /**
- * iOS 26 Authentic Liquid Glass Bottom Navigation Bar
- * — Transparent stadium-pill capsule with deep GPU blur, vivid caustic wallpaper refraction,
- *   dark optical crescent ends, razor top specular crest, floating squircle icon tiles
+ * Authentic Liquid Glass Dock (Inspired by archisvaze/liquid-glass):
+ * Physics-based optical glass container featuring:
+ * - Physics-based refraction bezel (inset caustic shadow contour simulating glass thickness & Snell's law refraction)
+ * - Razor-sharp specular top highlight line reflecting off curved crown
+ * - Dual-layer crystalline perimeter borders (outer specular prism + inner caustic return contour)
+ * - Ultra-clear optical transmission with high-radius hardware backdrop blur (Haze)
+ * - Floating liquid glass sliding droplet indicator with spring physics and lens specular sheen
+ * - Minimalist monochromatic elegance (no rainbow tinting or boxy artifacts)
  */
 @Composable
 fun LiquidGlassBottomBar(
@@ -739,283 +673,259 @@ fun LiquidGlassBottomBar(
         )
     }
 
-    // === OUTER SHADOW GLOW — refractive depth beneath pill ===
+    val selectedIndex = when (currentTab) {
+        DialerTab.RECENTS -> 0
+        DialerTab.CONTACTS -> 1
+        DialerTab.KEYPAD -> 2
+        DialerTab.ASSISTANT -> 3
+    }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp)
+            .padding(horizontal = 18.dp)
+            .shadow(
+                elevation = 28.dp,
+                shape = RoundedCornerShape(36.dp),
+                spotColor = Color(0x80000000),
+                ambientColor = Color(0x45000000)
+            )
+            .hazeChild(
+                state = hazeState,
+                shape = RoundedCornerShape(36.dp),
+                style = HazeStyle(
+                    tint = Color(0x10FFFFFF), // Ultra-clear optical transmission
+                    blurRadius = 32.dp,
+                    noiseFactor = 0f
+                )
+            )
+            .clip(RoundedCornerShape(36.dp))
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0x28FFFFFF), // Top specular transmission
+                        Color(0x0CFFFFFF), // Ultra-clear optical body
+                        Color(0x1CFFFFFF)  // Base caustic return
+                    )
+                )
+            )
+            .border(
+                1.4.dp,
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xF5FFFFFF), // Razor-sharp top specular catch
+                        Color(0x45FFFFFF), // Translucent sides
+                        Color(0x18FFFFFF),
+                        Color(0x55FFFFFF)  // Bottom caustic return rim
+                    )
+                ),
+                RoundedCornerShape(36.dp)
+            )
     ) {
-        // ================================================================
-        //  LIQUID GLASS CAPSULE — the full stadium pill
-        // ================================================================
+        // Layer 1: Inset Refraction Bezel (Simulating archisvaze/liquid-glass displacement & thickness shadow)
+        // Dark optical refraction contour along the curved perimeter where light rays bend inward
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .padding(1.dp)
+                .border(
+                    width = 4.dp,
+                    brush = Brush.verticalGradient(
+                        listOf(
+                            Color(0x35000000),
+                            Color(0x55000000),
+                            Color(0x30000000)
+                        )
+                    ),
+                    shape = RoundedCornerShape(35.dp)
+                )
+        )
+
+        // Layer 2: Lateral Cylinder Refraction Shadows on the curved pill ends
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            Color(0x40000000),
+                            Color.Transparent,
+                            Color.Transparent,
+                            Color(0x40000000)
+                        )
+                    )
+                )
+        )
+
+        // Layer 3: Razor-Sharp Specular Top Rim Reflection (Direct light source reflection on curved glass crown)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                // Deep shadow beneath the floating capsule
-                .shadow(
-                    elevation = 32.dp,
-                    shape = CircleShape,
-                    spotColor = Color(0x90000000),
-                    ambientColor = Color(0x50000000)
-                )
-                // GPU haze blur — blurs the vivid chromatic caustics behind it
-                .hazeChild(
-                    state = hazeState,
-                    shape = CircleShape,
-                    style = HazeStyle(
-                        tint = Color(0x08FFFFFF), // Near-zero tint — wallpaper bleeds through vividly
-                        blurRadius = 44.dp,        // Deep iOS-grade blur
-                        noiseFactor = 0f
-                    )
-                )
-                .clip(CircleShape)
-                // Ultra-transparent capsule body — just a whisper of white
+                .height(28.dp)
+                .clip(RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp))
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            Color(0x18FFFFFF), // Top — slight specular pickup
-                            Color(0x06FFFFFF), // Middle — nearly invisible, pure lens
-                            Color(0x10FFFFFF)  // Bottom — faint caustic return
+                            Color(0x65FFFFFF),
+                            Color(0x18FFFFFF),
+                            Color.Transparent
                         )
                     )
                 )
-                // Outer capsule border: top razor crest + subtle sides
+        )
+
+        // Layer 4: Inner Caustic Refraction Contour Line (Inner crystal bevel)
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .padding(1.5.dp)
                 .border(
-                    width = 1.2.dp,
-                    brush = Brush.verticalGradient(
+                    0.8.dp,
+                    Brush.verticalGradient(
                         listOf(
-                            Color(0xD8FFFFFF), // Razor-sharp brilliant top specular crest
-                            Color(0x28FFFFFF), // Soft translucent sides
-                            Color(0x14FFFFFF), // Near-invisible lower side
-                            Color(0x50FFFFFF)  // Bottom caustic return rim
+                            Color(0x80FFFFFF),
+                            Color(0x18FFFFFF),
+                            Color(0x35FFFFFF)
                         )
                     ),
-                    shape = CircleShape
+                    RoundedCornerShape(34.5.dp)
                 )
+        )
+
+        // Layer 5: Bottom Caustic Reflection Return Rim
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .align(Alignment.BottomCenter)
+                .clip(RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp))
+                .background(Color(0x35FFFFFF))
+        )
+
+        // Interactive Layer: Sliding Liquid Droplet + Symmetrical Tabs
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(70.dp)
+                .padding(horizontal = 4.dp, vertical = 6.dp)
         ) {
-            // ============================================================
-            //  LAYER 1: TOP RAZOR SPECULAR CREST
-            //  — The brilliant white line you see at the very top of the pill
-            // ============================================================
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(2.dp)
-                    .align(Alignment.TopCenter)
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                Color.Transparent,
-                                Color(0x60FFFFFF),
-                                Color(0xC0FFFFFF),
-                                Color(0xE8FFFFFF), // Brilliant center peak
-                                Color(0xC0FFFFFF),
-                                Color(0x60FFFFFF),
-                                Color.Transparent
-                            )
-                        )
-                    )
+            val totalWidth = maxWidth
+            val tabWidth = totalWidth / 4
+
+            val indicatorOffset by animateDpAsState(
+                targetValue = tabWidth * selectedIndex,
+                animationSpec = spring(
+                    dampingRatio = 0.82f,
+                    stiffness = Spring.StiffnessMediumLow
+                ),
+                label = "dockIndicatorOffset"
             )
 
-            // ============================================================
-            //  LAYER 2: INNER TOP SHEEN
-            //  — Soft gradient just inside the top of the glass dome
-            // ============================================================
+            // Ultra-Clear Liquid Glass Sliding Active Droplet Lens
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(22.dp)
+                    .offset(x = indicatorOffset)
+                    .width(tabWidth)
+                    .fillMaxHeight()
+                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                    .shadow(
+                        elevation = 12.dp,
+                        shape = RoundedCornerShape(26.dp),
+                        spotColor = Color(0x60000000),
+                        ambientColor = Color(0x25000000)
+                    )
+                    .clip(RoundedCornerShape(26.dp))
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                Color(0x30FFFFFF),
-                                Color(0x10FFFFFF),
-                                Color.Transparent
+                                Color(0x40FFFFFF), // Specular crown
+                                Color(0x12FFFFFF), // Crystalline body
+                                Color(0x24FFFFFF)  // Base caustic return
                             )
                         )
                     )
-            )
-
-            // ============================================================
-            //  LAYER 3: LATERAL OPTICAL REFRACTION CRESCENTS
-            //  — Dark compression shadows on the curved left & right ends
-            //  — This is the defining iOS liquid glass cylinder optical effect
-            // ============================================================
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(
-                                Color(0x90000000), // Dark left crescent (cylinder compression)
-                                Color(0x50000000),
-                                Color(0x20000000),
-                                Color.Transparent,
-                                Color.Transparent,
-                                Color.Transparent,
-                                Color.Transparent,
-                                Color(0x20000000),
-                                Color(0x50000000),
-                                Color(0x90000000)  // Dark right crescent (cylinder compression)
-                            )
-                        )
-                    )
-            )
-
-            // ============================================================
-            //  LAYER 4: BOTTOM CAUSTIC RETURN RIM
-            // ============================================================
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.5.dp)
-                    .align(Alignment.BottomCenter)
-                    .background(
-                        Brush.horizontalGradient(
+                    .border(
+                        1.2.dp,
+                        Brush.verticalGradient(
                             listOf(
-                                Color.Transparent,
-                                Color(0x40FFFFFF),
-                                Color(0x60FFFFFF),
-                                Color(0x40FFFFFF),
-                                Color.Transparent
+                                Color(0xB5FFFFFF), // Razor top catch
+                                Color(0x35FFFFFF),
+                                Color(0x18FFFFFF)
+                            )
+                        ),
+                        RoundedCornerShape(26.dp)
+                    )
+            ) {
+                // Specular Light Dome on the Sliding Droplet
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(18.dp)
+                        .clip(RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp))
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color(0x50FFFFFF),
+                                    Color.Transparent
+                                )
                             )
                         )
-                    )
-            )
+                )
+            }
 
-            // ============================================================
-            //  LAYER 5: ICON SQUIRCLE TILES + TAB INTERACTION
-            // ============================================================
+            // Tab Icons & Text centered in equal 4ths with perfect fitting
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(76.dp)
-                    .padding(horizontal = 6.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceEvenly
+                modifier = Modifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 tabs.forEach { (tab, icon, label) ->
                     val isSelected = currentTab == tab
-
-                    val tileScale by animateFloatAsState(
-                        targetValue = if (isSelected) 1.06f else 0.96f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMedium
-                        ),
-                        label = "tileScale_$label"
+                    val iconScale by animateFloatAsState(
+                        targetValue = if (isSelected) 1.05f else 0.94f,
+                        animationSpec = spring(dampingRatio = 0.72f),
+                        label = "tabIconScale"
                     )
-
-                    val iconAlpha by animateFloatAsState(
-                        targetValue = if (isSelected) 1.0f else 0.55f,
-                        animationSpec = tween(durationMillis = 200),
-                        label = "iconAlpha_$label"
+                    val contentColor by animateColorAsState(
+                        targetValue = if (isSelected) Color.White else Color(0x80FFFFFF),
+                        animationSpec = tween(durationMillis = 180),
+                        label = "tabContentColor"
                     )
 
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxHeight(),
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(20.dp))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onTabSelected(tab)
+                            },
                         contentAlignment = Alignment.Center
                     ) {
-                        // --- Squircle tile (floating glass tile per icon) ---
-                        Box(
-                            modifier = Modifier
-                                .size(width = 54.dp, height = 52.dp)
-                                .scale(tileScale)
-                                .shadow(
-                                    elevation = if (isSelected) 16.dp else 4.dp,
-                                    shape = RoundedCornerShape(18.dp),
-                                    spotColor = Color(0x60000000),
-                                    ambientColor = Color(0x20000000)
-                                )
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(
-                                    if (isSelected) {
-                                        // Active tile: slightly more visible glass
-                                        Brush.verticalGradient(
-                                            listOf(
-                                                Color(0x50FFFFFF),
-                                                Color(0x20FFFFFF),
-                                                Color(0x30FFFFFF)
-                                            )
-                                        )
-                                    } else {
-                                        // Inactive tile: near-invisible
-                                        Brush.verticalGradient(
-                                            listOf(
-                                                Color(0x22FFFFFF),
-                                                Color(0x08FFFFFF),
-                                                Color(0x14FFFFFF)
-                                            )
-                                        )
-                                    }
-                                )
-                                .border(
-                                    width = if (isSelected) 1.2.dp else 0.8.dp,
-                                    brush = Brush.verticalGradient(
-                                        if (isSelected) {
-                                            listOf(
-                                                Color(0xD0FFFFFF), // Brilliant active top crest
-                                                Color(0x50FFFFFF),
-                                                Color(0x30FFFFFF)
-                                            )
-                                        } else {
-                                            listOf(
-                                                Color(0x60FFFFFF),
-                                                Color(0x20FFFFFF),
-                                                Color(0x10FFFFFF)
-                                            )
-                                        }
-                                    ),
-                                    shape = RoundedCornerShape(18.dp)
-                                )
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null
-                                ) {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    onTabSelected(tab)
-                                },
-                            contentAlignment = Alignment.Center
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
                         ) {
-                            // Tile glass dome reflection (top half shimmer)
-                            Box(
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = label,
+                                tint = contentColor,
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .fillMaxHeight(0.45f)
-                                    .align(Alignment.TopCenter)
-                                    .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
-                                    .background(
-                                        Brush.verticalGradient(
-                                            listOf(
-                                                Color(0x30FFFFFF),
-                                                Color.Transparent
-                                            )
-                                        )
-                                    )
+                                    .size(20.dp)
+                                    .scale(iconScale)
                             )
-
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Icon(
-                                    imageVector = icon,
-                                    contentDescription = label,
-                                    tint = Color.White.copy(alpha = iconAlpha),
-                                    modifier = Modifier.size(22.dp)
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = label,
-                                    color = Color.White.copy(alpha = iconAlpha * 0.90f),
-                                    fontSize = 9.sp,
-                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                    letterSpacing = (-0.2).sp,
-                                    maxLines = 1
-                                )
-                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = label,
+                                color = contentColor,
+                                fontSize = 10.sp,
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                letterSpacing = (-0.1).sp,
+                                maxLines = 1
+                            )
                         }
                     }
                 }
