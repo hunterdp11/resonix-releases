@@ -55,10 +55,7 @@ class RootCallAudioInjector(private val context: Context) {
         val ttsDir = File(baseDir, "tts_cache").apply { mkdirs() }
         val tempWavFile = File(ttsDir, "inject_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}.wav")
 
-        var success = false
-
         try {
-            // Ensure destination directory is accessible
             tempWavFile.createNewFile()
             tempWavFile.setReadable(true, false)
             tempWavFile.setWritable(true, false)
@@ -83,15 +80,14 @@ class RootCallAudioInjector(private val context: Context) {
             var lastSize = -1L
             var stableCount = 0
             while (waitMs < 2500) {
-                kotlinx.coroutines.delay(60L)
-                waitMs += 60
+                kotlinx.coroutines.delay(50L)
+                waitMs += 50
 
                 if (tempWavFile.exists() && tempWavFile.length() > 44) {
                     val currentSize = tempWavFile.length()
                     if (currentSize == lastSize) {
                         stableCount++
                         if (stableCount >= 2) {
-                            // File has finished writing!
                             break
                         }
                     } else {
@@ -107,121 +103,15 @@ class RootCallAudioInjector(private val context: Context) {
                 return@withContext
             }
 
-            // Parse WAV header to get precise hardware audio parameters
-            val wavInfo = parseWavHeader(tempWavFile)
-            if (wavInfo == null) {
-                Log.w(TAG, "Could not parse WAV header from synthesized file.")
-                onComplete(false)
-                return@withContext
-            }
-
-            Log.i(TAG, "WAV parsed: rate=${wavInfo.sampleRate}Hz, ch=${wavInfo.channels}, bits=${wavInfo.bitsPerSample}, offset=${wavInfo.dataOffset}")
-
-            // Attempt to enable Qualcomm / ALSA hardware in-call mixer controls via root
-            enableHardwareInCallMixers()
-
-            // Hardware mute microphone during speech synthesis playback so room acoustics don't bleed into call
-            try {
-                audioManager.isMicrophoneMute = true
-                audioManager.setParameters("voice_tx_mute=1")
-                audioManager.setParameters("voice_tx_mute=true")
-                CallScreeningInCallService.setCallMute(true)
-            } catch (_: Exception) {}
-
-            RootPrivilegeManager.executeSuCommand("""
-                tinymix 'Voice Tx Mute' 1 2>/dev/null || true
-                tinymix 'Voice Tx Device Mute' 1 2>/dev/null || true
-            """.trimIndent())
-
-            val channelConfig = if (wavInfo.channels == 1) AudioFormat.CHANNEL_OUT_MONO else AudioFormat.CHANNEL_OUT_STEREO
-            val audioFormat = if (wavInfo.bitsPerSample == 16) AudioFormat.ENCODING_PCM_16BIT else AudioFormat.ENCODING_PCM_8BIT
-
-            val minBufferSize = AudioTrack.getMinBufferSize(wavInfo.sampleRate, channelConfig, audioFormat)
-            val bufferSize = maxOf(minBufferSize * 4, 16384)
-
-            val audioAttributes = AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                .setFlags(AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
-                .build()
-
-            val format = AudioFormat.Builder()
-                .setSampleRate(wavInfo.sampleRate)
-                .setChannelMask(channelConfig)
-                .setEncoding(audioFormat)
-                .build()
-
-            val track = AudioTrack.Builder()
-                .setAudioAttributes(audioAttributes)
-                .setAudioFormat(format)
-                .setBufferSizeInBytes(bufferSize)
-                .setTransferMode(AudioTrack.MODE_STREAM)
-                .build()
-
-            if (track.state == AudioTrack.STATE_INITIALIZED) {
-                try {
-                    track.setVolume(AudioTrack.getMaxVolume())
-                } catch (_: Exception) {}
-
-                // Find telephony TX device (direct in-call audio transmission)
-                try {
-                    val outputs = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-                    val telephonyDevice = outputs.firstOrNull { it.type == AudioDeviceInfo.TYPE_TELEPHONY }
-                    if (telephonyDevice != null) {
-                        val routed = track.setPreferredDevice(telephonyDevice)
-                        Log.i(TAG, "AudioTrack preferred device set to TYPE_TELEPHONY: $routed")
-                    } else {
-                        Log.d(TAG, "No TYPE_TELEPHONY output device reported; using standard voice communication route")
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Could not inspect/set preferred telephony device", e)
-                }
-
-                track.play()
-                audioTrack = track
-
-                val buffer = ByteArray(2048)
-                FileInputStream(tempWavFile).use { fis ->
-                    if (wavInfo.dataOffset > 0) {
-                        fis.skip(wavInfo.dataOffset)
-                    }
-                    var readCount: Int
-                    while (fis.read(buffer).also { readCount = it } > 0) {
-                        track.write(buffer, 0, readCount)
-                    }
-                }
-
-                // Ensure all buffered audio is played
-                kotlinx.coroutines.delay(100L)
-                track.stop()
-                track.release()
-                audioTrack = null
-                success = true
-                Log.i(TAG, "Direct digital injection into call uplink complete for: '$text'")
-            } else {
-                Log.w(TAG, "AudioTrack state not INITIALIZED, falling back")
-                track.release()
+            // Inject synthesized speech directly into active telephony call uplink with 48kHz HD quality
+            injectAudioFile(tempWavFile) { success ->
+                try { tempWavFile.delete() } catch (_: Exception) {}
+                onComplete(success)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Direct audio injection error", e)
-        } finally {
-            try {
-                if (tempWavFile.exists()) tempWavFile.delete()
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to delete temp file", e)
-            }
-            if (!CallScreeningInCallService.isTelecomMuted) {
-                try {
-                    audioManager.isMicrophoneMute = false
-                    audioManager.setParameters("voice_tx_mute=0")
-                    audioManager.setParameters("voice_tx_mute=false")
-                } catch (_: Exception) {}
-                RootPrivilegeManager.executeSuCommand("""
-                    tinymix 'Voice Tx Mute' 0 2>/dev/null || true
-                    tinymix 'Voice Tx Device Mute' 0 2>/dev/null || true
-                """.trimIndent())
-            }
-            onComplete(success)
+            try { tempWavFile.delete() } catch (_: Exception) {}
+            onComplete(false)
         }
     }
 

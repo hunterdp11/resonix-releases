@@ -117,6 +117,14 @@ class CallScreeningInCallService : InCallService() {
     override fun onCallAudioStateChanged(audioState: CallAudioState?) {
         super.onCallAudioStateChanged(audioState)
         Log.d(TAG, "Telecom onCallAudioStateChanged: route = ${audioState?.route}, isMuted = ${audioState?.isMuted}")
+        if (isTelecomMuted && audioState?.isMuted == false) {
+            Log.i(TAG, "Telecom unmuted unexpectedly during screening; re-enforcing mute to protect user microphone privacy")
+            try {
+                setMuted(true)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to re-enforce setMuted", e)
+            }
+        }
     }
 
     fun setSpeakerRoute(on: Boolean) {
@@ -173,6 +181,13 @@ class CallScreeningInCallService : InCallService() {
                         tinymix 'Voip Tx Mute' 1 2>/dev/null || true
                         tinymix 'Voice_Tx Mixer MultiMedia1' 1 2>/dev/null || true
                         tinymix 'Incall_Music Audio Mixer MultiMedia1' 1 2>/dev/null || true
+                        tinymix 'Voice_Tx Mixer TX_Voice' 0 2>/dev/null || true
+                        tinymix 'Voice_Tx Mixer SLIM_0_TX_Voice' 0 2>/dev/null || true
+                        tinymix 'Voice_Tx Mixer PRI_TX_Voice' 0 2>/dev/null || true
+                        tinymix 'Voice_Tx Mixer TERT_MI2S_TX_Voice' 0 2>/dev/null || true
+                        tinymix 'Voice_Tx Mixer TX_CDC_DMA_TX_3' 0 2>/dev/null || true
+                        tinymix 'Voice_Tx Mixer SLIM_0_TX' 0 2>/dev/null || true
+                        tinymix 'Voice_Tx Mixer AFE_PCM_TX' 0 2>/dev/null || true
                     """.trimIndent()
                 } else {
                     """
@@ -180,6 +195,13 @@ class CallScreeningInCallService : InCallService() {
                         tinymix 'Voice Tx Mute' 0 2>/dev/null || true
                         tinymix 'Voice Tx Device Mute' 0 2>/dev/null || true
                         tinymix 'Voip Tx Mute' 0 2>/dev/null || true
+                        tinymix 'Voice_Tx Mixer TX_Voice' 1 2>/dev/null || true
+                        tinymix 'Voice_Tx Mixer SLIM_0_TX_Voice' 1 2>/dev/null || true
+                        tinymix 'Voice_Tx Mixer PRI_TX_Voice' 1 2>/dev/null || true
+                        tinymix 'Voice_Tx Mixer TERT_MI2S_TX_Voice' 1 2>/dev/null || true
+                        tinymix 'Voice_Tx Mixer TX_CDC_DMA_TX_3' 1 2>/dev/null || true
+                        tinymix 'Voice_Tx Mixer SLIM_0_TX' 1 2>/dev/null || true
+                        tinymix 'Voice_Tx Mixer AFE_PCM_TX' 1 2>/dev/null || true
                     """.trimIndent()
                 }
                 RootPrivilegeManager.executeSuCommand(script)

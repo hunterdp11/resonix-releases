@@ -13,15 +13,20 @@ import android.util.Log
 import com.callscreener.app.model.VoiceGender
 import com.callscreener.app.model.VoicePersona
 import com.callscreener.app.service.CallScreeningInCallService
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import java.io.File
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListener {
 
@@ -40,6 +45,10 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
     val isSpeaking: StateFlow<Boolean> = _isSpeaking.asStateFlow()
 
     var onSpeechFinished: (() -> Unit)? = null
+    var onAudioFileReadyForMonitor: ((File) -> Unit)? = null
+    var onAudioFileMonitorStop: (() -> Unit)? = null
+
+    private val utteranceListeners = ConcurrentHashMap<String, (Boolean) -> Unit>()
 
     private val _activePersona = MutableStateFlow(VoicePersona.DEFAULT)
     val activePersona: StateFlow<VoicePersona> = _activePersona.asStateFlow()
@@ -237,6 +246,10 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
 
                 tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {
+                        if (utteranceId != null && utteranceListeners.containsKey(utteranceId)) {
+                            // Synthesizing to audio file for injection
+                            return
+                        }
                         _isSpeaking.value = true
                         if (!isSimulatorMode) {
                             try {
@@ -246,6 +259,13 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
                     }
 
                     override fun onDone(utteranceId: String?) {
+                        if (utteranceId != null) {
+                            val listener = utteranceListeners.remove(utteranceId)
+                            if (listener != null) {
+                                listener(true)
+                                return
+                            }
+                        }
                         _isSpeaking.value = false
                         abandonFocus()
                         onSpeechFinished?.invoke()
@@ -253,12 +273,26 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
 
                     @Deprecated("Deprecated in Java")
                     override fun onError(utteranceId: String?) {
+                        if (utteranceId != null) {
+                            val listener = utteranceListeners.remove(utteranceId)
+                            if (listener != null) {
+                                listener(false)
+                                return
+                            }
+                        }
                         _isSpeaking.value = false
                         abandonFocus()
                         onSpeechFinished?.invoke()
                     }
 
                     override fun onError(utteranceId: String?, errorCode: Int) {
+                        if (utteranceId != null) {
+                            val listener = utteranceListeners.remove(utteranceId)
+                            if (listener != null) {
+                                listener(false)
+                                return
+                            }
+                        }
                         _isSpeaking.value = false
                         abandonFocus()
                         Log.e(TAG, "TTS Error: $errorCode on utterance: $utteranceId")
@@ -291,7 +325,103 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
             return
         }
 
-        speakInternal(processedText, localSim)
+        if (localSim) {
+            speakInternal(processedText, true)
+            return
+        }
+
+        // Active Carrier Call: Synthesize speech and inject directly into call uplink!
+        _isSpeaking.value = true
+        scope.launch {
+            try {
+                applyVoiceForPersona(_activePersona.value)
+
+                val tts = textToSpeech
+                if (tts == null) {
+                    _isSpeaking.value = false
+                    speakInternal(processedText, false)
+                    return@launch
+                }
+
+                val baseDir = context.getExternalFilesDir(null) ?: context.cacheDir
+                val ttsDir = File(baseDir, "tts_cache").apply { mkdirs() }
+                val tempWavFile = File(ttsDir, "tts_syn_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}.wav")
+
+                val utteranceId = "inject_${UUID.randomUUID()}"
+                val synthLatch = CompletableDeferred<Boolean>()
+
+                utteranceListeners[utteranceId] = { success ->
+                    synthLatch.complete(success)
+                }
+
+                val params = Bundle().apply {
+                    putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_VOICE_CALL)
+                    putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
+                    putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
+                }
+
+                val synthResult = tts.synthesizeToFile(processedText, params, tempWavFile, utteranceId)
+                Log.i(TAG, "synthesizeToFile queued result: $synthResult for: '$processedText' -> ${tempWavFile.absolutePath}")
+
+                var synthSuccess = false
+                if (synthResult == TextToSpeech.SUCCESS) {
+                    synthSuccess = try {
+                        withTimeoutOrNull(3500L) {
+                            synthLatch.await()
+                        } ?: false
+                    } catch (_: Exception) {
+                        false
+                    }
+                }
+                utteranceListeners.remove(utteranceId)
+
+                // Safety polling if engine completed writing file without firing onDone
+                if (!synthSuccess) {
+                    var waitMs = 0
+                    var lastSize = -1L
+                    var stableCount = 0
+                    while (waitMs < 1500) {
+                        delay(50L)
+                        waitMs += 50
+                        if (tempWavFile.exists() && tempWavFile.length() > 44) {
+                            val currentSize = tempWavFile.length()
+                            if (currentSize == lastSize) {
+                                stableCount++
+                                if (stableCount >= 2) {
+                                    synthSuccess = true
+                                    break
+                                }
+                            } else {
+                                lastSize = currentSize
+                                stableCount = 0
+                            }
+                        }
+                    }
+                }
+
+                if (synthSuccess && tempWavFile.exists() && tempWavFile.length() > 44) {
+                    Log.i(TAG, "Speech synthesized successfully (${tempWavFile.length()} bytes). Injecting into call uplink...")
+                    // Play comfortable local monitor preview so user hears it softly on their phone (~22% vol)
+                    onAudioFileReadyForMonitor?.invoke(tempWavFile)
+
+                    injector.injectAudioFile(tempWavFile) { injected ->
+                        onAudioFileMonitorStop?.invoke()
+                        try { tempWavFile.delete() } catch (_: Exception) {}
+                        Log.i(TAG, "In-call speech injection finished. Success = $injected")
+                        _isSpeaking.value = false
+                        onSpeechFinished?.invoke()
+                    }
+                } else {
+                    Log.w(TAG, "synthesizeToFile failed to produce valid audio file; falling back to speakInternal()")
+                    try { tempWavFile.delete() } catch (_: Exception) {}
+                    speakInternal(processedText, false)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in in-call speech synthesis injection", e)
+                _isSpeaking.value = false
+                speakInternal(processedText, false)
+            }
+        }
     }
 
     /**
@@ -520,6 +650,7 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
 
     fun stop() {
         textToSpeech?.stop()
+        onAudioFileMonitorStop?.invoke()
         abandonFocus()
         _isSpeaking.value = false
     }
