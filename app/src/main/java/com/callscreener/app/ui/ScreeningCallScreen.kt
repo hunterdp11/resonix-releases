@@ -2111,49 +2111,58 @@ fun OemIncomingCallScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Modern Minimalist Ruby Glass Decline Button (Left)
+                // Ultra-Saturated Liquid Ruby Glass Decline Button (Left)
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(84.dp)
+                    modifier = Modifier.size(88.dp)
                 ) {
-                    // Soft Ambient Ruby Aura
+                    // Deep Luminous Saturated Ruby Glow Aura
                     Box(
                         modifier = Modifier
-                            .size(80.dp)
+                            .size(86.dp)
                             .scale(declineGlowScale)
                             .clip(CircleShape)
                             .background(
                                 Brush.radialGradient(
                                     listOf(
-                                        Color(0xFFFF3B30).copy(alpha = declineGlowAlpha * 0.7f),
+                                        Color(0xFFFF3B30).copy(alpha = declineGlowAlpha * 0.90f),
+                                        Color(0xFFFF2D55).copy(alpha = declineGlowAlpha * 0.45f),
                                         Color.Transparent
                                     )
                                 )
                             )
                     )
 
-                    // Frosted Liquid Glass Button
+                    // Pure Saturated Liquid Ruby Glass Disc
                     Box(
                         modifier = Modifier
-                            .size(74.dp)
+                            .size(76.dp)
                             .scale(declineScale)
+                            .shadow(
+                                elevation = 16.dp,
+                                shape = CircleShape,
+                                spotColor = Color(0x90FF3B30),
+                                ambientColor = Color(0x50FF2D55)
+                            )
                             .clip(CircleShape)
                             .background(
                                 Brush.verticalGradient(
                                     listOf(
-                                        Color(0x40FF453A),
-                                        Color(0x22D70015),
-                                        Color(0x28180608)
+                                        Color(0xFFFF453A), // Brilliant luminous ruby crown
+                                        Color(0xFFFF3B30), // Saturated vivid Apple red core
+                                        Color(0xFFD70015), // Deep jewel-toned crimson
+                                        Color(0xFFA50011)  // Rich optical base
                                     )
                                 )
                             )
                             .border(
-                                1.4.dp,
+                                1.6.dp,
                                 Brush.verticalGradient(
                                     listOf(
-                                        Color(0x80FFFFFF),
-                                        Color(0x30FF453A),
-                                        Color(0x18FFFFFF)
+                                        Color(0xF5FFFFFF), // Razor-sharp crystalline specular top
+                                        Color(0x90FFB4AE), // Luminous rose refraction
+                                        Color(0x40FFFFFF), // Mid transmission
+                                        Color(0x80FF3B30)  // Bottom caustic return rim
                                     )
                                 ),
                                 CircleShape
@@ -2167,17 +2176,53 @@ fun OemIncomingCallScreen(
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        // Subtle specular top glass sheen
+                        // Inner Caustic Lens Contour Bevel
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .padding(1.5.dp)
+                                .border(
+                                    0.8.dp,
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            Color(0x95FFFFFF),
+                                            Color(0x20FFFFFF),
+                                            Color(0x50FFA39E)
+                                        )
+                                    ),
+                                    CircleShape
+                                )
+                        )
+
+                        // Top Optical Glass Specular Dome Sheen
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(37.dp)
+                                .height(38.dp)
                                 .align(Alignment.TopCenter)
+                                .clip(RoundedCornerShape(topStart = 38.dp, topEnd = 38.dp))
                                 .background(
                                     Brush.verticalGradient(
                                         listOf(
-                                            Color(0x35FFFFFF),
+                                            Color(0x75FFFFFF),
+                                            Color(0x24FFFFFF),
                                             Color.Transparent
+                                        )
+                                    )
+                                )
+                        )
+
+                        // Bottom Caustic Reflection Bounce
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(16.dp)
+                                .align(Alignment.BottomCenter)
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            Color.Transparent,
+                                            Color(0x35FFFFFF)
                                         )
                                     )
                                 )
@@ -2187,54 +2232,63 @@ fun OemIncomingCallScreen(
                             imageVector = Icons.Filled.CallEnd,
                             contentDescription = "Decline",
                             tint = Color.White,
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(34.dp)
                         )
                     }
                 }
 
-                // Modern Minimalist Emerald Glass Answer Button (Right)
+                // Ultra-Saturated Liquid Emerald Glass Answer Button (Right)
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(84.dp)
+                    modifier = Modifier.size(88.dp)
                 ) {
-                    // Soft Ambient Emerald Aura
+                    // Deep Luminous Saturated Emerald Glow Aura
                     Box(
                         modifier = Modifier
-                            .size(84.dp)
+                            .size(86.dp)
                             .scale(answerAuraScale)
                             .clip(CircleShape)
                             .background(
                                 Brush.radialGradient(
                                     listOf(
-                                        Color(0x5030D158),
+                                        Color(0xFF34C759).copy(alpha = answerPulse * 0.85f),
+                                        Color(0xFF30D158).copy(alpha = answerPulse * 0.40f),
                                         Color.Transparent
                                     )
                                 )
                             )
                     )
 
-                    // Frosted Liquid Glass Button
+                    // Pure Saturated Liquid Emerald Glass Disc
                     Box(
                         modifier = Modifier
-                            .size(74.dp)
+                            .size(76.dp)
                             .scale(answerScale)
+                            .shadow(
+                                elevation = 16.dp,
+                                shape = CircleShape,
+                                spotColor = Color(0x9034C759),
+                                ambientColor = Color(0x5030D158)
+                            )
                             .clip(CircleShape)
                             .background(
                                 Brush.verticalGradient(
                                     listOf(
-                                        Color(0x4834C759),
-                                        Color(0x2828A745),
-                                        Color(0x280B2B15)
+                                        Color(0xFF38E568), // Brilliant luminous emerald crown
+                                        Color(0xFF34C759), // Saturated vivid Apple green core
+                                        Color(0xFF28A745), // Deep jewel-toned emerald
+                                        Color(0xFF13732B)  // Rich optical base
                                     )
                                 )
                             )
                             .border(
-                                1.4.dp,
+                                1.6.dp,
                                 Brush.verticalGradient(
                                     listOf(
-                                        Color(0x95FFFFFF),
-                                        Color(0x4034C759),
-                                        Color(0x20FFFFFF)
+                                        Color(0xF5FFFFFF), // Razor-sharp crystalline specular top
+                                        Color(0x95A8FFC2), // Luminous mint refraction
+                                        Color(0x40FFFFFF), // Mid transmission
+                                        Color(0x8034C759)  // Bottom caustic return rim
                                     )
                                 ),
                                 CircleShape
@@ -2248,17 +2302,53 @@ fun OemIncomingCallScreen(
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        // Subtle specular top glass sheen
+                        // Inner Caustic Lens Contour Bevel
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .padding(1.5.dp)
+                                .border(
+                                    0.8.dp,
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            Color(0x95FFFFFF),
+                                            Color(0x20FFFFFF),
+                                            Color(0x509EFFA8)
+                                        )
+                                    ),
+                                    CircleShape
+                                )
+                        )
+
+                        // Top Optical Glass Specular Dome Sheen
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(37.dp)
+                                .height(38.dp)
                                 .align(Alignment.TopCenter)
+                                .clip(RoundedCornerShape(topStart = 38.dp, topEnd = 38.dp))
                                 .background(
                                     Brush.verticalGradient(
                                         listOf(
-                                            Color(0x40FFFFFF),
+                                            Color(0x75FFFFFF),
+                                            Color(0x24FFFFFF),
                                             Color.Transparent
+                                        )
+                                    )
+                                )
+                        )
+
+                        // Bottom Caustic Reflection Bounce
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(16.dp)
+                                .align(Alignment.BottomCenter)
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            Color.Transparent,
+                                            Color(0x35FFFFFF)
                                         )
                                     )
                                 )
@@ -2269,7 +2359,7 @@ fun OemIncomingCallScreen(
                             contentDescription = "Answer",
                             tint = Color.White,
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(34.dp)
                                 .rotate(phoneWiggleAngle)
                         )
                     }

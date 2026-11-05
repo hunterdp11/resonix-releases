@@ -671,44 +671,62 @@ fun LiquidGlassBottomBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp)
+            .padding(horizontal = 18.dp)
             .shadow(
-                elevation = 20.dp,
-                shape = RoundedCornerShape(32.dp),
-                spotColor = Color(0x60000000),
-                ambientColor = Color(0x30000000)
+                elevation = 28.dp,
+                shape = RoundedCornerShape(36.dp),
+                spotColor = Color(0x75000000),
+                ambientColor = Color(0x40000000)
             )
             .hazeChild(
                 state = hazeState,
-                shape = RoundedCornerShape(32.dp),
+                shape = RoundedCornerShape(36.dp),
                 style = HazeStyle(
-                    tint = Color(0x28FFFFFF),
-                    blurRadius = 26.dp,
+                    tint = Color(0x18FFFFFF),
+                    blurRadius = 38.dp,
                     noiseFactor = 0f
                 )
             )
-            .clip(RoundedCornerShape(32.dp))
+            .clip(RoundedCornerShape(36.dp))
             .background(LiquidGlassDockFill)
             .border(
-                1.2.dp,
+                1.4.dp,
                 LiquidGlassDockBorder,
-                RoundedCornerShape(32.dp)
+                RoundedCornerShape(36.dp)
             )
     ) {
-        // Apple Signature Specular Top Sheen (refraction crest reflecting across curved frosted glass)
+        // Apple Signature Specular Top Sheen (refraction crest reflecting across curved crystal glass)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(26.dp)
-                .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                .height(30.dp)
+                .clip(RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp))
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            Color(0x38FFFFFF),
-                            Color(0x0EFFFFFF),
+                            Color(0x48FFFFFF),
+                            Color(0x14FFFFFF),
                             Color.Transparent
                         )
                     )
+                )
+        )
+
+        // Inner Caustic Refraction Contour Lens (distinct inner glassy bevel rim)
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .padding(1.5.dp)
+                .border(
+                    0.8.dp,
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0x70FFFFFF),
+                            Color(0x18FFFFFF),
+                            Color(0x35FFFFFF)
+                        )
+                    ),
+                    RoundedCornerShape(34.5.dp)
                 )
         )
 
@@ -718,14 +736,14 @@ fun LiquidGlassBottomBar(
                 .fillMaxWidth()
                 .height(1.dp)
                 .align(Alignment.BottomCenter)
-                .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
-                .background(Color(0x25FFFFFF))
+                .clip(RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp))
+                .background(Color(0x30FFFFFF))
         )
 
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp)
+                .height(68.dp)
                 .padding(horizontal = 4.dp, vertical = 6.dp)
         ) {
             val totalWidth = maxWidth
@@ -740,39 +758,39 @@ fun LiquidGlassBottomBar(
                 label = "dockIndicatorOffset"
             )
 
-            // Enhanced Frosted Glass Sliding Active Highlight Box - Fitted with generous margins
+            // Ultra-Clear Liquid Glass Sliding Active Droplet
             Box(
                 modifier = Modifier
                     .offset(x = indicatorOffset)
                     .width(tabWidth)
                     .fillMaxHeight()
-                    .padding(horizontal = 3.dp, vertical = 2.dp)
+                    .padding(horizontal = 4.dp, vertical = 2.dp)
                     .shadow(
-                        elevation = 8.dp,
-                        shape = RoundedCornerShape(20.dp),
-                        spotColor = Color(0x50000000),
+                        elevation = 12.dp,
+                        shape = RoundedCornerShape(26.dp),
+                        spotColor = Color(0x55000000),
                         ambientColor = Color(0x25000000)
                     )
-                    .clip(RoundedCornerShape(20.dp))
+                    .clip(RoundedCornerShape(26.dp))
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                Color(0x3EFFFFFF), // Luminous frosted highlight
-                                Color(0x1EFFFFFF), // Translucent glass body
-                                Color(0x26FFFFFF)  // Frosted bottom depth
+                                Color(0x48FFFFFF), // Luminous liquid glass top sheen
+                                Color(0x16FFFFFF), // High-transparency crystal body
+                                Color(0x28FFFFFF)  // Curved base caustic return
                             )
                         )
                     )
                     .border(
-                        1.dp,
+                        1.2.dp,
                         Brush.verticalGradient(
                             listOf(
-                                Color(0x80FFFFFF), // Crisp light-catching top bevel
-                                Color(0x30FFFFFF),
-                                Color(0x12FFFFFF)
+                                Color(0xA5FFFFFF), // Razor-sharp top light catch
+                                Color(0x40FFFFFF),
+                                Color(0x1AFFFFFF)
                             )
                         ),
-                        RoundedCornerShape(20.dp)
+                        RoundedCornerShape(26.dp)
                     )
             )
 

@@ -75,19 +75,19 @@ val LiquidGlassFillSubtle = Brush.linearGradient(
     )
 )
 
-val LiquidGlassDockFill = Brush.linearGradient(
+val LiquidGlassDockFill = Brush.verticalGradient(
     listOf(
-        Color(0x35FFFFFF), // Signature iOS specular dispersion top-left
-        Color(0x1E142032), // Translucent liquid crystal body
-        Color(0x160C1420)  // Deep OLED translucent base
+        Color(0x32FFFFFF), // Crystalline top refraction
+        Color(0x10FFFFFF), // Ultra-clear optical transmission body (wallpaper shines through vividly)
+        Color(0x1CFFFFFF)  // Curved base caustic return
     )
 )
 
 val LiquidGlassBorder = Brush.verticalGradient(
     listOf(
-        Color(0x75FFFFFF), // Razor-sharp specular light catching top beveled rim
-        Color(0x24FFFFFF), // Translucent light refraction on sides
-        Color(0x0AFFFFFF)  // Subtle bottom edge
+        Color(0x85FFFFFF), // Razor-sharp specular light catching top beveled rim
+        Color(0x30FFFFFF), // Translucent light refraction on sides
+        Color(0x12FFFFFF)  // Subtle bottom edge
     )
 )
 
@@ -101,10 +101,10 @@ val LiquidGlassBorderSubtle = Brush.verticalGradient(
 
 val LiquidGlassDockBorder = Brush.verticalGradient(
     listOf(
-        Color(0x99FFFFFF), // Signature Apple edge-lighting: brilliant specular top rim
-        Color(0x38FFFFFF), // Prismatic light refraction on curved sides
-        Color(0x12FFFFFF), // Ambient subtle mid transition
-        Color(0x28FFFFFF)  // Bottom refraction return
+        Color(0xE5FFFFFF), // Razor-sharp brilliant specular top highlight
+        Color(0x50FFFFFF), // Translucent prismatic refraction on sides
+        Color(0x20FFFFFF), // Mid transmission
+        Color(0x65FFFFFF)  // Bottom caustic refraction return rim
     )
 )
 
