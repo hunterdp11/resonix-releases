@@ -50,7 +50,6 @@ class CallSessionManager private constructor(private val appContext: Context) {
     val presetManager = AudioPresetManager(appContext)
     val quickReplyManager = QuickReplyManager(appContext)
     val voiceChangerEngine = com.callscreener.app.engine.RealtimeVoiceChangerEngine()
-    private val privacyPrefs = appContext.getSharedPreferences("call_screener_privacy_prefs", Context.MODE_PRIVATE)
     private var recordingTimerJob: Job? = null
     private val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
@@ -67,15 +66,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
 
         // Initialize operating mode (Standard vs Root-Enhanced)
         val initialMode = RootPrivilegeManager.getOperationMode(appContext)
-        val savedClir = privacyPrefs.getBoolean("clir_masking_enabled", false)
-        val savedClirSavedContacts = privacyPrefs.getBoolean("clir_mask_saved_contacts_enabled", false)
-        _sessionState.update {
-            it.copy(
-                operationMode = initialMode,
-                isClirMaskingEnabled = savedClir,
-                isClirMaskSavedContactsEnabled = savedClirSavedContacts
-            )
-        }
+        _sessionState.update { it.copy(operationMode = initialMode) }
 
         // Observe TTS speaking state
         scope.launch {
@@ -186,9 +177,6 @@ class CallSessionManager private constructor(private val appContext: Context) {
                 isGreetingEnabled = prev.isGreetingEnabled,
                 isAutoRelayEnabled = prev.isAutoRelayEnabled,
                 isHideNumberOnCallerId = prev.isHideNumberOnCallerId,
-                isClirMaskingEnabled = prev.isClirMaskingEnabled,
-                isClirMaskSavedContactsEnabled = prev.isClirMaskSavedContactsEnabled,
-                isIncognitoDialActive = prev.isIncognitoDialActive,
                 isAutoRecordEnabled = prev.isAutoRecordEnabled,
                 operationMode = prev.operationMode,
                 currentPersona = prev.currentPersona
@@ -336,29 +324,6 @@ class CallSessionManager private constructor(private val appContext: Context) {
     fun setHideNumberEnabled(enabled: Boolean) {
         _sessionState.update { it.copy(isHideNumberOnCallerId = enabled) }
         Log.i(TAG, "Hide caller phone number on caller ID: $enabled")
-    }
-
-    fun setClirMaskingEnabled(enabled: Boolean) {
-        privacyPrefs.edit().putBoolean("clir_masking_enabled", enabled).apply()
-        _sessionState.update { it.copy(isClirMaskingEnabled = enabled) }
-        Log.i(TAG, "CLIR (#31#) caller ID masking set to: $enabled")
-    }
-
-    fun setClirMaskSavedContactsEnabled(enabled: Boolean) {
-        privacyPrefs.edit().putBoolean("clir_mask_saved_contacts_enabled", enabled).apply()
-        _sessionState.update { it.copy(isClirMaskSavedContactsEnabled = enabled) }
-        Log.i(TAG, "CLIR mask on saved contacts set to: $enabled")
-    }
-
-    fun setIncognitoDialActive(active: Boolean) {
-        _sessionState.update { it.copy(isIncognitoDialActive = active) }
-        Log.i(TAG, "Transient Incognito Dial active: $active")
-    }
-
-    fun toggleIncognitoDial(): Boolean {
-        val newState = !_sessionState.value.isIncognitoDialActive
-        setIncognitoDialActive(newState)
-        return newState
     }
 
     fun setAutoRecordEnabled(enabled: Boolean) {
@@ -1025,9 +990,6 @@ class CallSessionManager private constructor(private val appContext: Context) {
                 isGreetingEnabled = prev.isGreetingEnabled,
                 isAutoRelayEnabled = prev.isAutoRelayEnabled,
                 isHideNumberOnCallerId = prev.isHideNumberOnCallerId,
-                isClirMaskingEnabled = prev.isClirMaskingEnabled,
-                isClirMaskSavedContactsEnabled = prev.isClirMaskSavedContactsEnabled,
-                isIncognitoDialActive = prev.isIncognitoDialActive,
                 isAutoRecordEnabled = prev.isAutoRecordEnabled,
                 currentPersona = prev.currentPersona,
                 operationMode = prev.operationMode

@@ -235,95 +235,10 @@ object DialerRepository {
         list
     }
 
-    fun placeCall(
-        context: Context,
-        rawNumber: String,
-        isSavedContact: Boolean = false,
-        forceIncognito: Boolean? = null
-    ) {
-        var cleanNumber = rawNumber.filter { it.isDigit() || it == '+' || it == '*' || it == '#' || it == ',' || it == ';' }
+    fun placeCall(context: Context, rawNumber: String) {
+        val cleanNumber = rawNumber.filter { it.isDigit() || it == '+' || it == '*' || it == '#' || it == ',' || it == ';' }
         if (cleanNumber.isBlank()) return
-
-        // Resolve CLIR (#31#) Caller ID Masking
-        val sessionManager = com.callscreener.app.session.CallSessionManager.getInstance(context)
-        val sessionState = sessionManager.sessionState.value
-
-        val bareDigits = cleanNumber.removePrefix("+").removePrefix("#31#")
-        val isEmergency = setOf("100", "101", "102", "108", "112", "911", "999", "000").contains(bareDigits)
-
-        val shouldInjectClir = !isEmergency && (
-            forceIncognito == true ||
-            (forceIncognito == null && sessionState.isIncognitoDialActive) ||
-            (sessionState.isClirMaskingEnabled && (!isSavedContact || sessionState.isClirMaskSavedContactsEnabled))
-        )
-
-        if (shouldInjectClir) {
-            val trunkEngine = com.callscreener.app.engine.PrivateTrunkEngine.getInstance(context)
-            if (trunkEngine.isConfigured()) {
-                if (sessionState.isIncognitoDialActive) {
-                    sessionManager.setIncognitoDialActive(false)
-                }
-                val destNumber = cleanNumber.removePrefix("#31#")
-                val callerId = trunkEngine.trunkConfig.value.callerIdDisplay
-                Toast.makeText(context, "🔒 Private Trunk: Caller ID masked as '$callerId' (Airtel bypassed)", Toast.LENGTH_SHORT).show()
-                Log.i(TAG, "Routing call to $destNumber through Private Trunk (bypassing carrier SIM)")
-
-                trunkEngine.placePrivateCall(
-                    targetNumber = destNumber,
-                    onSuccess = { _ ->
-                        sessionManager.startSimulatedCall(
-                            simulatedNumber = destNumber,
-                            simulatedName = "Private Trunk ($callerId)"
-                        )
-                        val callIntent = Intent(context, com.callscreener.app.ui.ScreeningCallActivity::class.java).apply {
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                        }
-                        context.startActivity(callIntent)
-                    },
-                    onError = { err ->
-                        Toast.makeText(context, "Private Trunk error: $err", Toast.LENGTH_LONG).show()
-                    }
-                )
-                return
-            }
-
-            if (!cleanNumber.startsWith("#31#")) {
-                cleanNumber = "#31#$cleanNumber"
-            }
-            if (sessionState.isIncognitoDialActive) {
-                sessionManager.setIncognitoDialActive(false)
-            }
-            Toast.makeText(context, "🕵️ Private Call: Caller ID masked (#31#)", Toast.LENGTH_SHORT).show()
-            Log.i(TAG, "Placed call with CLIR #31# mask: $cleanNumber (isSavedContact: $isSavedContact)")
-        }
-
-        // 1. If CLIR #31# is present and Root is available, execute via CALL_PRIVILEGED
-        // Root (UID 0) has CALL_PRIVILEGED authority which prevents Android framework from stripping #31#
-        if (cleanNumber.contains("#")) {
-            try {
-                val encodedForShell = Uri.encode(cleanNumber)
-                val cmd = "am start -a android.intent.action.CALL_PRIVILEGED -d 'tel:$encodedForShell' 2>/dev/null || am start -a android.intent.action.CALL -d 'tel:$encodedForShell' 2>/dev/null"
-                val p = Runtime.getRuntime().exec(arrayOf("su", "-c", cmd))
-                val exitCode = p.waitFor()
-                if (exitCode == 0) {
-                    Log.i(TAG, "Privileged root call command executed successfully with code: $cleanNumber")
-                    return
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Root privileged call invocation failed, falling back to standard intent", e)
-            }
-        }
-
         val uri = Uri.fromParts("tel", cleanNumber, null)
-
-        // 2. Try privileged intent directly (works when mounted in /system/priv-app)
-        try {
-            val privIntent = Intent("android.intent.action.CALL_PRIVILEGED", uri).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-            context.startActivity(privIntent)
-            return
-        } catch (_: Exception) {}
 
         val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
         val hasCallPermission = ActivityCompat.checkSelfPermission(
@@ -331,7 +246,7 @@ object DialerRepository {
             Manifest.permission.CALL_PHONE
         ) == PackageManager.PERMISSION_GRANTED
 
-        // 3. If this app is Default Dialer (ROLE_DIALER), place call directly via TelecomManager
+        // 1. If this app is Default Dialer (ROLE_DIALER), place call directly via TelecomManager
         if (hasCallPermission && telecomManager != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val isDefault = telecomManager.defaultDialerPackage == context.packageName
             if (isDefault) {
@@ -344,7 +259,7 @@ object DialerRepository {
             }
         }
 
-        // 4. Direct cellular call via Intent.ACTION_CALL
+        // 2. Direct cellular call via Intent.ACTION_CALL
         if (hasCallPermission) {
             try {
                 val callIntent = Intent(Intent.ACTION_CALL, uri).apply {
@@ -357,7 +272,7 @@ object DialerRepository {
             }
         }
 
-        // 5. Fallback to ACTION_DIAL
+        // 3. Fallback to ACTION_DIAL
         try {
             val dialIntent = Intent(Intent.ACTION_DIAL, uri).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK

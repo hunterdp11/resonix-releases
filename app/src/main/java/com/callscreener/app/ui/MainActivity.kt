@@ -124,7 +124,6 @@ import androidx.compose.material.icons.rounded.Chat
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Dialpad
 import androidx.compose.material.icons.rounded.DragIndicator
@@ -564,14 +563,7 @@ fun MainDashboard(
                         isLoading = isLoadingLogs,
                         presets = presets,
                         onPlayPreset = { sessionManager.playAudioPreset(it) },
-                        onCall = { number ->
-                            val cleanN = number.replace(Regex("[^0-9]"), "")
-                            val isSaved = contacts.any {
-                                val cleanC = it.number.replace(Regex("[^0-9]"), "")
-                                cleanC.isNotEmpty() && cleanN.isNotEmpty() && (cleanC.endsWith(cleanN.takeLast(7)) || cleanN.endsWith(cleanC.takeLast(7)))
-                            }
-                            DialerRepository.placeCall(context, number, isSavedContact = isSaved)
-                        },
+                        onCall = { number -> DialerRepository.placeCall(context, number) },
                         onScreen = { log ->
                             sessionManager.startSimulatedCall(
                                 simulatedNumber = log.number,
@@ -587,7 +579,7 @@ fun MainDashboard(
                     DialerTab.CONTACTS -> ContactsScreen(
                         contacts = contacts,
                         isLoading = isLoadingContacts,
-                        onCall = { number -> DialerRepository.placeCall(context, number, isSavedContact = true) },
+                        onCall = { number -> DialerRepository.placeCall(context, number) },
                         onOpenDetails = { contact -> selectedContactForDetails = contact },
                         onOpenSettings = { isSettingsOpen = true },
                         onOpenPresetManager = { isPresetManagerOpen = true },
@@ -596,14 +588,7 @@ fun MainDashboard(
                     DialerTab.KEYPAD -> KeypadScreen(
                         contacts = contacts,
                         callLogs = callLogs,
-                        onCall = { number ->
-                            val cleanN = number.replace(Regex("[^0-9]"), "")
-                            val isSaved = contacts.any {
-                                val cleanC = it.number.replace(Regex("[^0-9]"), "")
-                                cleanC.isNotEmpty() && cleanN.isNotEmpty() && (cleanC.endsWith(cleanN.takeLast(7)) || cleanN.endsWith(cleanC.takeLast(7)))
-                            }
-                            DialerRepository.placeCall(context, number, isSavedContact = isSaved)
-                        },
+                        onCall = { number -> DialerRepository.placeCall(context, number) },
                         onOpenDetails = { contact -> selectedContactForDetails = contact },
                         onOpenSettings = { isSettingsOpen = true },
                         onOpenPresetManager = { isPresetManagerOpen = true },
@@ -657,7 +642,7 @@ fun MainDashboard(
                 onPlayPreset = { sessionManager.playAudioPreset(it) },
                 onDismiss = { selectedContactForDetails = null },
                 onCall = { num ->
-                    DialerRepository.placeCall(context, num, isSavedContact = true)
+                    DialerRepository.placeCall(context, num)
                     selectedContactForDetails = null
                 },
                 onScreen = { num, name ->
@@ -682,10 +667,6 @@ fun MainDashboard(
                 onToggleAutoScreen = { autoScreenUnknown = it },
                 isHideNumberOnCallerId = sessionState.isHideNumberOnCallerId,
                 onToggleHideNumber = { sessionManager.setHideNumberEnabled(it) },
-                isClirMaskingEnabled = sessionState.isClirMaskingEnabled,
-                onToggleClirMasking = { sessionManager.setClirMaskingEnabled(it) },
-                isClirMaskSavedContactsEnabled = sessionState.isClirMaskSavedContactsEnabled,
-                onToggleClirMaskSavedContacts = { sessionManager.setClirMaskSavedContactsEnabled(it) },
                 isAutoRecordEnabled = sessionState.isAutoRecordEnabled,
                 onToggleAutoRecord = { sessionManager.setAutoRecordEnabled(it) },
                 onDismiss = { isSettingsOpen = false }
@@ -2504,11 +2485,9 @@ fun OemDialerKeyButton(
 
 /**
  * OEM Floating Liquid Call Button with Apple Green Fill & Tactile Press (75dp Pro Size)
- * Dynamically adapts with stealth halo when CLIR (#31#) Incognito mode is active.
  */
 @Composable
 fun OemCallButton(
-    isIncognito: Boolean = false,
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -2524,23 +2503,9 @@ fun OemCallButton(
         modifier = Modifier
             .size(75.dp)
             .scale(scale)
-            .shadow(
-                elevation = if (isIncognito) 18.dp else 10.dp,
-                shape = CircleShape,
-                spotColor = if (isIncognito) Color(0xFF8E2DE2) else AppleGreen
-            )
             .clip(CircleShape)
-            .background(
-                if (isIncognito)
-                    Brush.verticalGradient(listOf(Color(0xFF8E2DE2), AppleGreen))
-                else
-                    SolidColor(AppleGreen)
-            )
-            .border(
-                1.5.dp,
-                if (isIncognito) Color(0xFFD4B0FF) else Color(0x50FFFFFF),
-                CircleShape
-            )
+            .background(AppleGreen)
+            .border(1.dp, Color(0x50FFFFFF), CircleShape)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -2548,27 +2513,12 @@ fun OemCallButton(
             ),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Call,
-                contentDescription = "Call",
-                tint = if (isIncognito) Color.White else Color.Black,
-                modifier = Modifier.size(if (isIncognito) 26.dp else 30.dp)
-            )
-            if (isIncognito) {
-                Text(
-                    text = "PRIVATE",
-                    color = Color.White,
-                    fontSize = 8.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 0.5.sp
-                )
-            }
-        }
+        Icon(
+            imageVector = Icons.Filled.Call,
+            contentDescription = "Call",
+            tint = Color.Black,
+            modifier = Modifier.size(30.dp)
+        )
     }
 }
 
@@ -2589,22 +2539,8 @@ fun KeypadScreen(
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
-    val sessionManager = remember { CallSessionManager.getInstance(context) }
-    val sessionState by sessionManager.sessionState.collectAsState()
-
     var typedNumber by remember { mutableStateOf("") }
     var keypadSearchQuery by remember { mutableStateOf("") }
-
-    val cleanTyped = remember(typedNumber) { typedNumber.replace(Regex("[^0-9]"), "") }
-    val isTargetSaved = remember(cleanTyped, contacts) {
-        cleanTyped.isNotEmpty() && contacts.any {
-            val cleanC = it.number.replace(Regex("[^0-9]"), "")
-            cleanC.isNotEmpty() && (cleanC.endsWith(cleanTyped.takeLast(7)) || cleanTyped.endsWith(cleanC.takeLast(7)))
-        }
-    }
-    val isIncognitoActive = sessionState.isIncognitoDialActive || (
-        sessionState.isClirMaskingEnabled && (!isTargetSaved || sessionState.isClirMaskSavedContactsEnabled)
-    )
 
     val toneGenerator = remember {
         try { ToneGenerator(AudioManager.STREAM_DTMF, 70) } catch (_: Exception) { null }
@@ -3060,41 +2996,6 @@ fun KeypadScreen(
                         Spacer(modifier = Modifier.height(4.dp))
                     }
 
-                    // Dynamic CLIR #31# Status Pill
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = isIncognitoActive,
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .padding(bottom = 6.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0x358E2DE2))
-                                .border(0.8.dp, Color(0x808E2DE2), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 10.dp, vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Security,
-                                contentDescription = null,
-                                tint = Color(0xFFD4B0FF),
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Text(
-                                text = if (isTargetSaved && sessionState.isClirMaskSavedContactsEnabled)
-                                    "CLIR #31# Active: Saved Contact Masked as Private Caller"
-                                else
-                                    "CLIR #31# Active: Recipient Sees Private Number",
-                                color = Color(0xFFEBD8FF),
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
-                    }
-
                     // Dialed Number Display (Auto-scaling clean ColorOS typography)
                     val textSize = when {
                         typedNumber.length > 15 -> 22.sp
@@ -3191,79 +3092,11 @@ fun KeypadScreen(
                 horizontalArrangement = Arrangement.spacedBy(22.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Column 1: 1-Tap Real-Time Dynamic Caller ID Masking (#31# CLIR) Toggle
-                Box(
-                    modifier = Modifier.size(75.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    val incognitoInteraction = remember { MutableInteractionSource() }
-                    val isIncognitoPressed by incognitoInteraction.collectIsPressedAsState()
-                    val incognitoScale by animateFloatAsState(
-                        targetValue = if (isIncognitoPressed) 0.88f else 1.0f,
-                        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
-                        label = "incognitoScale"
-                    )
+                // Column 1: Invisible 75dp placeholder for perfect geometric centering
+                Box(modifier = Modifier.size(75.dp))
 
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .scale(incognitoScale)
-                            .clip(CircleShape)
-                            .background(
-                                if (isIncognitoActive)
-                                    Brush.radialGradient(
-                                        listOf(Color(0xFF8E2DE2), Color(0xFF4A00E0))
-                                    )
-                                else
-                                    SolidColor(Color(0x18FFFFFF))
-                            )
-                            .border(
-                                1.2.dp,
-                                if (isIncognitoActive)
-                                    Brush.verticalGradient(listOf(Color(0xFFD4B0FF), Color(0xFF8E2DE2)))
-                                else
-                                    SolidColor(Color(0x28FFFFFF)),
-                                CircleShape
-                            )
-                            .clickable(
-                                interactionSource = incognitoInteraction,
-                                indication = null,
-                                onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    val willBeActive = sessionManager.toggleIncognitoDial()
-                                    val toastMsg = if (willBeActive)
-                                        "🕵️ Incognito ON: Next call will inject #31# (Private Number)"
-                                    else
-                                        "Incognito OFF: Caller ID restored"
-                                    Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
-                                }
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                imageVector = if (isIncognitoActive) Icons.Rounded.Security else Icons.Rounded.VisibilityOff,
-                                contentDescription = "Toggle Incognito Caller ID",
-                                tint = if (isIncognitoActive) Color.White else Color(0xCCFFFFFF),
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Text(
-                                text = if (isIncognitoActive) "#31#" else "Private",
-                                color = if (isIncognitoActive) Color.White else Color(0x99FFFFFF),
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
-                    }
-                }
-
-                // Column 2: Green Call Button with Incognito Stealth Halo
+                // Column 2: Green Call Button (Rock-solid directly under '0' key)
                 OemCallButton(
-                    isIncognito = isIncognitoActive,
                     onClick = {
                         if (typedNumber.isNotBlank()) {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -5511,10 +5344,6 @@ fun DialerSettingsSheet(
     onToggleAutoScreen: (Boolean) -> Unit,
     isHideNumberOnCallerId: Boolean,
     onToggleHideNumber: (Boolean) -> Unit,
-    isClirMaskingEnabled: Boolean = false,
-    onToggleClirMasking: (Boolean) -> Unit = {},
-    isClirMaskSavedContactsEnabled: Boolean = false,
-    onToggleClirMaskSavedContacts: (Boolean) -> Unit = {},
     isAutoRecordEnabled: Boolean,
     onToggleAutoRecord: (Boolean) -> Unit,
     onDismiss: () -> Unit
@@ -5524,7 +5353,6 @@ fun DialerSettingsSheet(
     val haptic = LocalHapticFeedback.current
 
     var showRecordingsDialog by remember { mutableStateOf(false) }
-    var showPrivateTrunkDialog by remember { mutableStateOf(false) }
     var rootAvailable by remember { mutableStateOf(RootPrivilegeManager.isRootAvailable()) }
     var isPrivileged by remember { mutableStateOf(RootPrivilegeManager.isPrivilegedApp(context)) }
     var isModuleInstalled by remember { mutableStateOf(RootPrivilegeManager.isMagiskModuleInstalled()) }
@@ -5763,12 +5591,12 @@ fun DialerSettingsSheet(
 
                         SettingsDivider()
 
-                        // Row 3: Stealth On-Screen Display
+                        // Row 3: Stealth Caller ID
                         SettingsItemRow(
                             icon = Icons.Rounded.VisibilityOff,
                             iconTint = Color.White,
                             iconBgColor = Color(0x18FFFFFF),
-                            title = "Stealth On-Screen Display",
+                            title = "Stealth Caller ID",
                             subtitle = if (isHideNumberOnCallerId)
                                 "Private Caller: raw numbers masked on in-call screens"
                             else
@@ -5789,131 +5617,6 @@ fun DialerSettingsSheet(
                                 )
                             }
                         )
-                    }
-
-                    // ==========================================
-                    // GROUP 2: CALLER ID MASKING (CLIR #31#)
-                    // ==========================================
-                    SettingsSectionHeader(title = "CALLER ID MASKING (CLIR #31#)")
-                    SettingsGroupCard {
-                        // Row 1: Always Mask Outgoing Caller ID
-                        SettingsItemRow(
-                            icon = Icons.Rounded.Security,
-                            iconTint = if (isClirMaskingEnabled) ApplePurple else Color.White,
-                            iconBgColor = if (isClirMaskingEnabled) ApplePurple.copy(alpha = 0.25f) else Color(0x18FFFFFF),
-                            title = "Always Mask Caller ID (#31#)",
-                            subtitle = if (isClirMaskingEnabled)
-                                "CLIR Active: outgoing calls inject #31# (recipient sees Private Number)"
-                            else
-                                "Standard: your cellular number is transmitted to recipient",
-                            trailingContent = {
-                                Switch(
-                                    checked = isClirMaskingEnabled,
-                                    onCheckedChange = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        onToggleClirMasking(it)
-                                    },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = Color.White,
-                                        checkedTrackColor = ApplePurple,
-                                        uncheckedThumbColor = TextMuted,
-                                        uncheckedTrackColor = Color(0x22FFFFFF)
-                                    )
-                                )
-                            }
-                        )
-
-                        SettingsDivider()
-
-                        // Row 2: Mask Even On Saved Contacts
-                        SettingsItemRow(
-                            icon = Icons.Rounded.Person,
-                            iconTint = if (isClirMaskSavedContactsEnabled) ApplePurple else Color.White,
-                            iconBgColor = if (isClirMaskSavedContactsEnabled) ApplePurple.copy(alpha = 0.25f) else Color(0x18FFFFFF),
-                            title = "Mask On Saved Contacts",
-                            subtitle = if (isClirMaskSavedContactsEnabled)
-                                "High Privacy: saved phonebook contacts will ALSO see 'Private Number'"
-                            else
-                                "Saved contacts see real number; unsaved & 1-tap calls are masked",
-                            trailingContent = {
-                                Switch(
-                                    checked = isClirMaskSavedContactsEnabled,
-                                    onCheckedChange = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        onToggleClirMaskSavedContacts(it)
-                                    },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = Color.White,
-                                        checkedTrackColor = ApplePurple,
-                                        uncheckedThumbColor = TextMuted,
-                                        uncheckedTrackColor = Color(0x22FFFFFF)
-                                    )
-                                )
-                            }
-                        )
-
-                        SettingsDivider()
-
-                        // Row 3: Private VoIP Trunk Gateway (Bypasses Airtel / SIM restrictions)
-                        val trunkEngine = remember { com.callscreener.app.engine.PrivateTrunkEngine.getInstance(context) }
-                        val trunkCfg by trunkEngine.trunkConfig.collectAsState()
-                        SettingsItemRow(
-                            icon = Icons.Rounded.Cloud,
-                            iconTint = if (trunkCfg.isEnabled) AppleBlue else Color.White,
-                            iconBgColor = if (trunkCfg.isEnabled) AppleBlue.copy(alpha = 0.25f) else Color(0x18FFFFFF),
-                            title = "Private Trunk Gateway",
-                            subtitle = if (trunkCfg.isEnabled)
-                                "Active (${trunkCfg.providerType.name.replace("_", " ")}): routes over encrypted VoIP, bypassing Airtel cellular SIM completely"
-                            else
-                                "Disabled: standard cellular voice line will be used",
-                            trailingContent = {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(AppleBlue.copy(alpha = 0.2f))
-                                        .clickable {
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            showPrivateTrunkDialog = true
-                                        }
-                                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                                ) {
-                                    Text(
-                                        text = "Configure",
-                                        color = AppleBlue,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-                            }
-                        )
-                    }
-
-                    // Emergency safety note
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0x14FFFFFF))
-                            .border(0.8.dp, Color(0x24FFFFFF), RoundedCornerShape(12.dp))
-                            .padding(12.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Security,
-                                contentDescription = null,
-                                tint = AppleGreen,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "Emergency services (100, 112, 911, 108) automatically bypass #31# masking for personal safety.",
-                                color = TextSecondary,
-                                fontSize = 11.sp,
-                                lineHeight = 15.sp
-                            )
-                        }
                     }
 
                     // ==========================================
@@ -6291,14 +5994,6 @@ fun DialerSettingsSheet(
         }
     }
 }
-
-    if (showPrivateTrunkDialog) {
-        val trunkEngine = remember { com.callscreener.app.engine.PrivateTrunkEngine.getInstance(context) }
-        PrivateTrunkSetupDialog(
-            engine = trunkEngine,
-            onDismiss = { showPrivateTrunkDialog = false }
-        )
-    }
 
     if (showRecordingsDialog) {
         SavedRecordingsDialog(onDismiss = { showRecordingsDialog = false })
