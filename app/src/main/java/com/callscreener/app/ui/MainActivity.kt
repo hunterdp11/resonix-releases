@@ -866,14 +866,14 @@ fun LiquidGlassBottomBar(
                                 contentDescription = label,
                                 tint = contentColor,
                                 modifier = Modifier
-                                    .size(20.dp)
+                                    .size(16.5.dp)
                                     .scale(iconScale)
                             )
-                            Spacer(modifier = Modifier.height(2.dp))
+                            Spacer(modifier = Modifier.height(1.5.dp))
                             Text(
                                 text = label,
                                 color = contentColor,
-                                fontSize = 10.sp,
+                                fontSize = 8.5.sp,
                                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                                 letterSpacing = (-0.1).sp,
                                 maxLines = 1
@@ -1283,8 +1283,7 @@ fun Ios26LiquidContactDetailsSheet(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = scrimAlpha))
-                .clickable { animateDismiss() }
-                .navigationBarsPadding(),
+                .clickable { animateDismiss() },
             contentAlignment = Alignment.BottomCenter
         ) {
             AnimatedVisibility(
@@ -1310,11 +1309,11 @@ fun Ios26LiquidContactDetailsSheet(
                         ) {}
                         .shadow(
                             elevation = 40.dp,
-                            shape = RoundedCornerShape(topStart = 44.dp, topEnd = 44.dp),
+                            shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp),
                             spotColor = Color(0xD0000000),
                             ambientColor = Color(0x99000000)
                         )
-                        .clip(RoundedCornerShape(topStart = 44.dp, topEnd = 44.dp))
+                        .clip(RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp))
                         .background(
                             Brush.verticalGradient(
                                 listOf(
@@ -1333,9 +1332,12 @@ fun Ios26LiquidContactDetailsSheet(
                                     Color(0x06FFFFFF)
                                 )
                             ),
-                            RoundedCornerShape(topStart = 44.dp, topEnd = 44.dp)
+                            RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp)
                         )
-                        .padding(horizontal = 22.dp, vertical = 14.dp)
+                        .padding(horizontal = 22.dp)
+                        .padding(top = 14.dp)
+                        .navigationBarsPadding()
+                        .padding(bottom = 16.dp)
                 ) {
                     Column(
                         modifier = Modifier

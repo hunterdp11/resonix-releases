@@ -764,7 +764,7 @@ fun LiquidWavyActionRibbon(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
@@ -785,7 +785,7 @@ fun LiquidWavyActionRibbon(
                         .clip(RoundedCornerShape(10.dp))
                         .background(if (isReplies) AppleBlueGlassFill else SolidColor(Color.Transparent))
                         .clickable { onSelectTab(RibbonTab.QUICK_REPLIES) }
-                        .padding(horizontal = 9.dp),
+                        .padding(horizontal = 11.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -804,7 +804,7 @@ fun LiquidWavyActionRibbon(
                         .clip(RoundedCornerShape(10.dp))
                         .background(if (isSoundboard) AppleAmberGlassFill else SolidColor(Color.Transparent))
                         .clickable { onSelectTab(RibbonTab.SOUNDBOARD) }
-                        .padding(horizontal = 9.dp),
+                        .padding(horizontal = 11.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -823,7 +823,7 @@ fun LiquidWavyActionRibbon(
                         .clip(RoundedCornerShape(10.dp))
                         .background(if (isPersonas) AppleBlueGlassFill else SolidColor(Color.Transparent))
                         .clickable { onSelectTab(RibbonTab.VOICE_PERSONAS) }
-                        .padding(horizontal = 9.dp),
+                        .padding(horizontal = 11.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -831,36 +831,6 @@ fun LiquidWavyActionRibbon(
                         color = if (isPersonas) TextPrimary else TextSecondary,
                         fontSize = 11.sp,
                         fontWeight = if (isPersonas) FontWeight.Bold else FontWeight.Medium
-                    )
-                }
-            }
-
-            // Sleek "Manage" Shortcut Pill
-            Box(
-                modifier = Modifier
-                    .height(30.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0x18FFFFFF))
-                    .border(0.8.dp, Color(0x30FFFFFF), RoundedCornerShape(12.dp))
-                    .clickable { onOpenPresetManager() }
-                    .padding(horizontal = 10.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Tune,
-                        contentDescription = "Manage",
-                        tint = Color(0xDDFFFFFF),
-                        modifier = Modifier.size(13.dp)
-                    )
-                    Text(
-                        text = "Manage",
-                        color = Color(0xDDFFFFFF),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
@@ -1101,9 +1071,7 @@ fun UnifiedLiquidCommandIsland(
 
         // Type-to-Speak Input Bar (Fluid Apple Liquid Glass with Coordinated Horizontal Expansion)
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .animateContentSize(spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             OutlinedTextField(
@@ -1231,16 +1199,16 @@ fun UnifiedLiquidCommandIsland(
         }
 
         // ColorOS 2x3 Grid of 56dp Circular In-Call Control Buttons & Massive Decline Button + Action Ribbon
-        // Smoothly collapses downwards/upwards in ONE synchronized fluid motion in Chat Focus Mode
+        // Smoothly collapses downwards/upwards in ONE synchronized fluid motion in Chat Focus Mode (Zero Bottom Jitter)
         AnimatedVisibility(
             visible = !isFocusChatMode,
-            enter = fadeIn(animationSpec = tween(240)) + expandVertically(
-                animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow),
-                expandFrom = Alignment.Top
+            enter = fadeIn(animationSpec = tween(220)) + expandVertically(
+                animationSpec = tween(260, easing = FastOutSlowInEasing),
+                expandFrom = Alignment.Bottom
             ),
-            exit = fadeOut(animationSpec = tween(180)) + shrinkVertically(
-                animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow),
-                shrinkTowards = Alignment.Top
+            exit = fadeOut(animationSpec = tween(160)) + shrinkVertically(
+                animationSpec = tween(220, easing = FastOutSlowInEasing),
+                shrinkTowards = Alignment.Bottom
             )
         ) {
             Column(

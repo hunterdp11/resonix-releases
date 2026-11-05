@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -390,22 +391,22 @@ fun PresetManagementScreen(
 
                     // Content Section based on Tab
                     if (activeTab == PresetManagerTab.SOUNDBOARD_AUDIO) {
-                        // Action Bar: Import Audio & Add Text
+                        // Action Bar: Import Audio & Add Speech
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 20.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             // Button 1: Import Audio File
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(38.dp)
+                                    .height(40.dp)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0xFF2855A4).copy(alpha = 0.35f))
-                                    .border(1.dp, Color(0xFF3872E0).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                                    .background(Color(0x18FFFFFF))
+                                    .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(12.dp))
                                     .clickable {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         audioPickerLauncher.launch("audio/*")
@@ -414,16 +415,16 @@ fun PresetManagementScreen(
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Add,
                                         contentDescription = null,
-                                        tint = Color(0xFF64B5F6),
-                                        modifier = Modifier.size(16.dp)
+                                        tint = Color.White,
+                                        modifier = Modifier.size(15.dp)
                                     )
                                     Text(
-                                        text = "Import Audio (WAV/MP3)",
+                                        text = "Import Audio",
                                         color = Color.White,
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.SemiBold
@@ -434,27 +435,38 @@ fun PresetManagementScreen(
                             // Button 2: Add Speech Preset
                             Box(
                                 modifier = Modifier
-                                    .height(38.dp)
+                                    .weight(1f)
+                                    .height(40.dp)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0x18FFFFFF))
-                                    .border(0.8.dp, Color(0x30FFFFFF), RoundedCornerShape(12.dp))
+                                    .background(Color(0x10FFFFFF))
+                                    .border(0.8.dp, Color(0x1EFFFFFF), RoundedCornerShape(12.dp))
                                     .clickable {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         isAddingTextPreset = true
-                                    }
-                                    .padding(horizontal = 12.dp),
+                                    },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = "+ Add Speech",
-                                    color = Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Add,
+                                        contentDescription = null,
+                                        tint = Color(0xB0FFFFFF),
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Text(
+                                        text = "Add Speech",
+                                        color = Color(0xE0FFFFFF),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
                             }
                         }
 
-                        // Reorder & Arrangement Tip Banner
+                        // Subtle Drag Hint
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -465,13 +477,13 @@ fun PresetManagementScreen(
                             Icon(
                                 imageVector = Icons.Rounded.DragIndicator,
                                 contentDescription = null,
-                                tint = Color(0xFF64B5F6),
-                                modifier = Modifier.size(14.dp)
+                                tint = Color(0x60FFFFFF),
+                                modifier = Modifier.size(13.dp)
                             )
                             Text(
-                                text = "Hold & drag ⠿ or tap ⏫ to jump any item straight to the top",
-                                color = Color(0x99FFFFFF),
-                                fontSize = 11.5.sp,
+                                text = "Drag ⠿ to reorder presets",
+                                color = Color(0x60FFFFFF),
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Normal
                             )
                         }
@@ -568,11 +580,11 @@ fun PresetManagementScreen(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .height(38.dp)
+                                    .fillMaxWidth()
+                                    .height(40.dp)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0xFF2E7D32).copy(alpha = 0.35f))
-                                    .border(1.dp, Color(0xFF4CAF50).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                                    .background(Color(0x18FFFFFF))
+                                    .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(12.dp))
                                     .clickable {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         isAddingQuickReply = true
@@ -581,25 +593,25 @@ fun PresetManagementScreen(
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Add,
                                         contentDescription = null,
-                                        tint = Color(0xFF81C784),
-                                        modifier = Modifier.size(16.dp)
+                                        tint = Color.White,
+                                        modifier = Modifier.size(15.dp)
                                     )
                                     Text(
                                         text = "Add Custom Quick Reply",
                                         color = Color.White,
-                                        fontSize = 12.sp,
+                                        fontSize = 12.5.sp,
                                         fontWeight = FontWeight.SemiBold
                                     )
                                 }
                             }
                         }
 
-                        // Reorder & Arrangement Tip Banner
+                        // Subtle Drag Hint
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -610,13 +622,13 @@ fun PresetManagementScreen(
                             Icon(
                                 imageVector = Icons.Rounded.DragIndicator,
                                 contentDescription = null,
-                                tint = Color(0xFF81C784),
-                                modifier = Modifier.size(14.dp)
+                                tint = Color(0x60FFFFFF),
+                                modifier = Modifier.size(13.dp)
                             )
                             Text(
-                                text = "Hold & drag ⠿ or tap ⏫ to jump any item straight to the top",
-                                color = Color(0x99FFFFFF),
-                                fontSize = 11.5.sp,
+                                text = "Drag ⠿ to reorder presets",
+                                color = Color(0x60FFFFFF),
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Normal
                             )
                         }
@@ -1178,7 +1190,7 @@ fun PresetManagementScreen(
 }
 
 /**
- * Soundboard Preset Row: With Tactile Drag Handle, Long-Press Drag, Instant Move-to-Top, Up/Down controls, Type badge, Preview Play & Edit/Delete
+ * Soundboard Preset Row: Sleek Minimal Obsidian Glass Design with Tactile Drag Handle, Category Badges & Clean Actions
  */
 @Composable
 fun SoundboardPresetItemRow(
@@ -1192,9 +1204,9 @@ fun SoundboardPresetItemRow(
     onDrag: (Float) -> Unit,
     onDragEnd: () -> Unit,
     onDragCancel: () -> Unit,
-    onMoveToTop: () -> Unit,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit,
+    onMoveToTop: () -> Unit = {},
+    onMoveUp: () -> Unit = {},
+    onMoveDown: () -> Unit = {},
     onPlayPreview: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -1207,20 +1219,20 @@ fun SoundboardPresetItemRow(
             .zIndex(if (isDragging) 15f else 1f)
             .graphicsLayer {
                 translationY = if (isDragging) dragOffset else 0f
-                scaleX = if (isDragging) 1.03f else 1.0f
-                scaleY = if (isDragging) 1.03f else 1.0f
+                scaleX = if (isDragging) 1.02f else 1.0f
+                scaleY = if (isDragging) 1.02f else 1.0f
             }
             .fillMaxWidth()
             .shadow(
-                elevation = if (isDragging) 16.dp else 0.dp,
+                elevation = if (isDragging) 12.dp else 0.dp,
                 shape = RoundedCornerShape(16.dp),
-                spotColor = Color(0xFF64B5F6)
+                spotColor = Color(0x80FFFFFF)
             )
             .clip(RoundedCornerShape(16.dp))
-            .background(if (isDragging) Color(0x38FFFFFF) else Color(0x1AFFFFFF))
+            .background(if (isDragging) Color(0x30FFFFFF) else Color(0x12FFFFFF))
             .border(
-                width = if (isDragging) 1.5.dp else 1.dp,
-                color = if (isDragging) Color(0xFF64B5F6) else if (preset.isAudioFile) Color(0x40FFA726) else Color(0x22FFFFFF),
+                width = 0.8.dp,
+                color = if (isDragging) Color(0x80FFFFFF) else Color(0x1CFFFFFF),
                 shape = RoundedCornerShape(16.dp)
             )
             .pointerInput(preset.id) {
@@ -1237,18 +1249,23 @@ fun SoundboardPresetItemRow(
                     onDragCancel = onDragCancel
                 )
             }
-            .padding(horizontal = 10.dp, vertical = 9.dp)
+            .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Tactile Drag Indicator Grip Handle (Instant Drag on Touch)
+            // Tactile Drag Indicator Grip Handle
             Box(
                 modifier = Modifier
-                    .size(34.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(if (isDragging) Color(0xFF64B5F6).copy(alpha = 0.35f) else Color(0x12FFFFFF))
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (isDragging) Color(0x35FFFFFF) else Color(0x10FFFFFF))
+                    .border(
+                        0.8.dp,
+                        if (isDragging) Color(0x60FFFFFF) else Color(0x18FFFFFF),
+                        RoundedCornerShape(10.dp)
+                    )
                     .pointerInput(preset.id) {
                         detectDragGestures(
                             onDragStart = {
@@ -1268,73 +1285,35 @@ fun SoundboardPresetItemRow(
                 Icon(
                     imageVector = Icons.Rounded.DragIndicator,
                     contentDescription = "Hold and drag to reorder",
-                    tint = if (isDragging) Color(0xFF64B5F6) else Color(0xB0FFFFFF),
-                    modifier = Modifier.size(20.dp)
+                    tint = if (isDragging) Color.White else Color(0x90FFFFFF),
+                    modifier = Modifier.size(19.dp)
                 )
-            }
-
-            Spacer(modifier = Modifier.width(6.dp))
-
-            // Reorder Controls: Instant Move-To-Top + Micro Up/Down + Position Index
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                // Instant Jump to Top Button
-                IconButton(
-                    onClick = onMoveToTop,
-                    enabled = index > 0,
-                    modifier = Modifier.size(20.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.KeyboardDoubleArrowUp,
-                        contentDescription = "Move Directly to Top",
-                        tint = if (index > 0) Color(0xFF64B5F6) else Color(0x20FFFFFF),
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = onMoveUp,
-                        enabled = index > 0,
-                        modifier = Modifier.size(18.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.KeyboardArrowUp,
-                            contentDescription = "Move Up",
-                            tint = if (index > 0) Color.White else Color(0x20FFFFFF),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-
-                    Text(
-                        text = "#${index + 1}",
-                        color = if (preset.isAudioFile) Color(0xFFFFA726) else Color(0x70FFFFFF),
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 2.dp)
-                    )
-
-                    IconButton(
-                        onClick = onMoveDown,
-                        enabled = index < totalCount - 1,
-                        modifier = Modifier.size(18.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.KeyboardArrowDown,
-                            contentDescription = "Move Down",
-                            tint = if (index < totalCount - 1) Color.White else Color(0x20FFFFFF),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
             }
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Main Info
+            // Minimal Index Badge
+            Box(
+                modifier = Modifier
+                    .widthIn(min = 22.dp)
+                    .height(22.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0x0EFFFFFF)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "${index + 1}",
+                    color = Color(0x75FFFFFF),
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            // Main Info: Title, Type/Category & Preview Text
             Column(modifier = Modifier.weight(1f)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -1343,27 +1322,29 @@ fun SoundboardPresetItemRow(
                     // Type Badge
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
+                            .clip(RoundedCornerShape(4.dp))
                             .background(
-                                if (preset.isAudioFile) Color(0xFFFFA726).copy(alpha = 0.25f)
-                                else Color(0xFF29B6F6).copy(alpha = 0.20f)
+                                if (preset.isAudioFile) Color(0x28FFA726)
+                                else Color(0x2229B6F6)
                             )
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = if (preset.isAudioFile) "CUSTOM AUDIO" else "SPEECH TTS",
-                            color = if (preset.isAudioFile) Color(0xFFFFA726) else Color(0xFF81D4FA),
-                            fontSize = 9.sp,
+                            text = if (preset.isAudioFile) "AUDIO" else "SPEECH",
+                            color = if (preset.isAudioFile) Color(0xFFFFB74D) else Color(0xFF81D4FA),
+                            fontSize = 8.5.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 0.4.sp
                         )
                     }
 
                     if (preset.category.isNotBlank() && preset.category != "Custom") {
                         Text(
                             text = preset.category,
-                            color = Color(0x60FFFFFF),
-                            fontSize = 10.sp
+                            color = Color(0x50FFFFFF),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
@@ -1373,16 +1354,17 @@ fun SoundboardPresetItemRow(
                 Text(
                     text = preset.title,
                     color = Color.White,
-                    fontSize = 14.sp,
+                    fontSize = 13.5.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
 
                 if (!preset.isAudioFile && preset.textOrPath.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(1.dp))
                     Text(
                         text = preset.textOrPath,
-                        color = Color(0x80FFFFFF),
+                        color = Color(0x70FFFFFF),
                         fontSize = 11.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -1390,49 +1372,69 @@ fun SoundboardPresetItemRow(
                 }
             }
 
+            Spacer(modifier = Modifier.width(6.dp))
+
             // Right Actions: Preview Play (if audio file), Edit & Delete
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 if (preset.isAudioFile) {
-                    IconButton(
-                        onClick = onPlayPreview,
+                    Box(
                         modifier = Modifier
-                            .size(34.dp)
+                            .size(32.dp)
                             .clip(CircleShape)
-                            .background(if (isPlaying) Color(0xFFFF9500) else Color(0x22FFFFFF))
+                            .background(if (isPlaying) Color(0xFFFF9500) else Color(0x18FFFFFF))
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onPlayPreview()
+                            },
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = if (isPlaying) Icons.Filled.Stop else Icons.Filled.PlayArrow,
                             contentDescription = if (isPlaying) "Stop" else "Play",
                             tint = if (isPlaying) Color.Black else Color.White,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }
 
-                IconButton(
-                    onClick = onEdit,
-                    modifier = Modifier.size(32.dp)
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x12FFFFFF))
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onEdit()
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Edit,
                         contentDescription = "Edit",
-                        tint = Color(0x90FFFFFF),
-                        modifier = Modifier.size(16.dp)
+                        tint = Color(0xB5FFFFFF),
+                        modifier = Modifier.size(15.dp)
                     )
                 }
 
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.size(32.dp)
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x14FF453A))
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onDelete()
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Delete,
                         contentDescription = "Delete",
-                        tint = Color(0xDDFF453A),
-                        modifier = Modifier.size(16.dp)
+                        tint = Color(0xFFFF5252),
+                        modifier = Modifier.size(15.dp)
                     )
                 }
             }
@@ -1441,7 +1443,7 @@ fun SoundboardPresetItemRow(
 }
 
 /**
- * Quick Reply Row: With Tactile Drag Handle, Long-Press Drag, Instant Move-to-Top, Up/Down controls, Language tag, Edit & Delete
+ * Quick Reply Row: Sleek Minimal Obsidian Glass Design with Tactile Drag Handle, Language Badges & Clean Actions
  */
 @Composable
 fun QuickReplyItemRow(
@@ -1454,9 +1456,9 @@ fun QuickReplyItemRow(
     onDrag: (Float) -> Unit,
     onDragEnd: () -> Unit,
     onDragCancel: () -> Unit,
-    onMoveToTop: () -> Unit,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit,
+    onMoveToTop: () -> Unit = {},
+    onMoveUp: () -> Unit = {},
+    onMoveDown: () -> Unit = {},
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
@@ -1468,20 +1470,20 @@ fun QuickReplyItemRow(
             .zIndex(if (isDragging) 15f else 1f)
             .graphicsLayer {
                 translationY = if (isDragging) dragOffset else 0f
-                scaleX = if (isDragging) 1.03f else 1.0f
-                scaleY = if (isDragging) 1.03f else 1.0f
+                scaleX = if (isDragging) 1.02f else 1.0f
+                scaleY = if (isDragging) 1.02f else 1.0f
             }
             .fillMaxWidth()
             .shadow(
-                elevation = if (isDragging) 16.dp else 0.dp,
+                elevation = if (isDragging) 12.dp else 0.dp,
                 shape = RoundedCornerShape(16.dp),
-                spotColor = Color(0xFF81C784)
+                spotColor = Color(0x80FFFFFF)
             )
             .clip(RoundedCornerShape(16.dp))
-            .background(if (isDragging) Color(0x38FFFFFF) else Color(0x1AFFFFFF))
+            .background(if (isDragging) Color(0x30FFFFFF) else Color(0x12FFFFFF))
             .border(
-                width = if (isDragging) 1.5.dp else 1.dp,
-                color = if (isDragging) Color(0xFF81C784) else if (reply.isHindi) Color(0x3566BB6A) else Color(0x22FFFFFF),
+                width = 0.8.dp,
+                color = if (isDragging) Color(0x80FFFFFF) else Color(0x1CFFFFFF),
                 shape = RoundedCornerShape(16.dp)
             )
             .pointerInput(reply.id) {
@@ -1498,18 +1500,23 @@ fun QuickReplyItemRow(
                     onDragCancel = onDragCancel
                 )
             }
-            .padding(horizontal = 10.dp, vertical = 9.dp)
+            .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Tactile Drag Indicator Grip Handle (Instant Drag on Touch)
+            // Tactile Drag Indicator Grip Handle
             Box(
                 modifier = Modifier
-                    .size(34.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(if (isDragging) Color(0xFF81C784).copy(alpha = 0.35f) else Color(0x12FFFFFF))
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (isDragging) Color(0x35FFFFFF) else Color(0x10FFFFFF))
+                    .border(
+                        0.8.dp,
+                        if (isDragging) Color(0x60FFFFFF) else Color(0x18FFFFFF),
+                        RoundedCornerShape(10.dp)
+                    )
                     .pointerInput(reply.id) {
                         detectDragGestures(
                             onDragStart = {
@@ -1529,73 +1536,35 @@ fun QuickReplyItemRow(
                 Icon(
                     imageVector = Icons.Rounded.DragIndicator,
                     contentDescription = "Hold and drag to reorder",
-                    tint = if (isDragging) Color(0xFF81C784) else Color(0xB0FFFFFF),
-                    modifier = Modifier.size(20.dp)
+                    tint = if (isDragging) Color.White else Color(0x90FFFFFF),
+                    modifier = Modifier.size(19.dp)
                 )
-            }
-
-            Spacer(modifier = Modifier.width(6.dp))
-
-            // Reorder Controls: Instant Move-To-Top + Micro Up/Down + Position Index
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                // Instant Jump to Top Button
-                IconButton(
-                    onClick = onMoveToTop,
-                    enabled = index > 0,
-                    modifier = Modifier.size(20.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.KeyboardDoubleArrowUp,
-                        contentDescription = "Move Directly to Top",
-                        tint = if (index > 0) Color(0xFF81C784) else Color(0x20FFFFFF),
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = onMoveUp,
-                        enabled = index > 0,
-                        modifier = Modifier.size(18.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.KeyboardArrowUp,
-                            contentDescription = "Move Up",
-                            tint = if (index > 0) Color.White else Color(0x20FFFFFF),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-
-                    Text(
-                        text = "#${index + 1}",
-                        color = if (reply.isHindi) Color(0xFF81C784) else Color(0x70FFFFFF),
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 2.dp)
-                    )
-
-                    IconButton(
-                        onClick = onMoveDown,
-                        enabled = index < totalCount - 1,
-                        modifier = Modifier.size(18.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.KeyboardArrowDown,
-                            contentDescription = "Move Down",
-                            tint = if (index < totalCount - 1) Color.White else Color(0x20FFFFFF),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
             }
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Main Info
+            // Minimal Index Badge
+            Box(
+                modifier = Modifier
+                    .widthIn(min = 22.dp)
+                    .height(22.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0x0EFFFFFF)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "${index + 1}",
+                    color = Color(0x75FFFFFF),
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            // Main Info: Title, Language Badge & Spoken Text
             Column(modifier = Modifier.weight(1f)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -1603,19 +1572,20 @@ fun QuickReplyItemRow(
                 ) {
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
+                            .clip(RoundedCornerShape(4.dp))
                             .background(
-                                if (reply.isHindi) Color(0xFF4CAF50).copy(alpha = 0.25f)
-                                else Color(0xFF29B6F6).copy(alpha = 0.20f)
+                                if (reply.isHindi) Color(0x2566BB6A)
+                                else Color(0x2229B6F6)
                             )
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = if (reply.isHindi) "HINDI / HINGLISH" else "ENGLISH",
+                            text = if (reply.isHindi) "HINDI" else "ENGLISH",
                             color = if (reply.isHindi) Color(0xFF81C784) else Color(0xFF81D4FA),
-                            fontSize = 9.sp,
+                            fontSize = 8.5.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 0.4.sp
                         )
                     }
                 }
@@ -1625,47 +1595,66 @@ fun QuickReplyItemRow(
                 Text(
                     text = reply.title,
                     color = Color.White,
-                    fontSize = 14.sp,
+                    fontSize = 13.5.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
 
-                Text(
-                    text = reply.spokenText,
-                    color = Color(0x80FFFFFF),
-                    fontSize = 11.5.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                if (reply.spokenText.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(1.dp))
+                    Text(
+                        text = reply.spokenText,
+                        color = Color(0x70FFFFFF),
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
+
+            Spacer(modifier = Modifier.width(6.dp))
 
             // Right Actions: Edit & Delete
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                IconButton(
-                    onClick = onEdit,
-                    modifier = Modifier.size(32.dp)
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x12FFFFFF))
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onEdit()
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Edit,
                         contentDescription = "Edit",
-                        tint = Color(0x90FFFFFF),
-                        modifier = Modifier.size(16.dp)
+                        tint = Color(0xB5FFFFFF),
+                        modifier = Modifier.size(15.dp)
                     )
                 }
 
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.size(32.dp)
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x14FF453A))
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onDelete()
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Delete,
                         contentDescription = "Delete",
-                        tint = Color(0xDDFF453A),
-                        modifier = Modifier.size(16.dp)
+                        tint = Color(0xFFFF5252),
+                        modifier = Modifier.size(15.dp)
                     )
                 }
             }
