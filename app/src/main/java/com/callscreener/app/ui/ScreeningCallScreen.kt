@@ -32,7 +32,9 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import com.callscreener.app.data.DialerRepository
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -196,6 +198,18 @@ fun ScreeningCallScreen(
             state.status == CallStatus.DIALING ||
             state.status == CallStatus.USER_TALKING
 
+    val context = LocalContext.current
+
+    // Prioritize contact name saved in phone's contacts; only show network owner name for unsaved contacts
+    val effectiveCallerName = remember(state.callerNumber, state.callerName) {
+        val savedName = DialerRepository.lookupContactName(context, state.callerNumber)
+        if (!savedName.isNullOrBlank()) {
+            savedName
+        } else {
+            state.callerName
+        }
+    }
+
     val currentDisplayMode = remember(state.status, state.isIncoming) {
         if (state.status == CallStatus.RINGING && state.isIncoming) {
             CallDisplayMode.INCOMING_RINGING
@@ -229,7 +243,7 @@ fun ScreeningCallScreen(
                 CallDisplayMode.INCOMING_RINGING -> {
                     // Full-Screen OEM Incoming Call Interface
                     OemIncomingCallScreen(
-                        callerName = state.callerName,
+                        callerName = effectiveCallerName,
                         callerNumber = state.callerNumber,
                         isNumberHidden = state.isHideNumberOnCallerId,
                         onDecline = onHangUp,
@@ -240,7 +254,7 @@ fun ScreeningCallScreen(
                 CallDisplayMode.STANDARD_IN_CALL -> {
                     // Standard In-Call Dialer (ColorOS / MIUI / iOS style)
                     StandardInCallScreen(
-                        callerName = state.callerName,
+                        callerName = effectiveCallerName,
                         callerNumber = state.callerNumber,
                         isNumberHidden = state.isHideNumberOnCallerId,
                         durationSeconds = state.durationSeconds,
@@ -268,7 +282,7 @@ fun ScreeningCallScreen(
                     ) {
                 // Super-Premium Redesigned Caller ID Card on Top (VisionOS / iOS 18 style)
                 SuperPremiumCallerCard(
-                    callerName = state.callerName,
+                    callerName = effectiveCallerName,
                     callerNumber = state.callerNumber,
                     isNumberHidden = state.isHideNumberOnCallerId,
                     durationSeconds = state.durationSeconds,

@@ -131,6 +131,36 @@ object DialerRepository {
         list
     }
 
+    /**
+     * Fast, indexed contact lookup by phone number using Android's native ContactsContract.PhoneLookup index.
+     * Returns the user's saved contact name from the device phonebook, or null if unsaved.
+     */
+    fun lookupContactName(context: Context, rawNumber: String?): String? {
+        if (rawNumber.isNullOrBlank()) return null
+        val cleanNumber = rawNumber.trim()
+        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            return null
+        }
+        return try {
+            val uri = Uri.withAppendedPath(
+                ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                Uri.encode(cleanNumber)
+            )
+            val projection = arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME)
+            context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val idx = cursor.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
+                    if (idx >= 0) cursor.getString(idx) else null
+                } else {
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error looking up contact for $rawNumber", e)
+            null
+        }
+    }
+
     suspend fun loadCallLogs(context: Context, contacts: List<ContactItem> = emptyList()): List<CallLogItem> = withContext(Dispatchers.IO) {
         val list = mutableListOf<CallLogItem>()
         if (ActivityCompat.checkSelfPermission(context, Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED) {
@@ -177,12 +207,22 @@ object DialerRepository {
                     val date = if (dateIdx >= 0) it.getLong(dateIdx) else 0L
                     val duration = if (durIdx >= 0) it.getLong(durIdx) else 0L
 
-                    // If cached name is missing, reverse lookup from device contacts
-                    val resolvedName = if (!rawName.isNullOrBlank()) {
+                    // Prioritize phonebook saved contact name; fall back to carrier CACHED_NAME ONLY for unsaved contacts
+                    val norm = number.replace(Regex("[^0-9]"), "")
+                    val savedContactName = contactsMap[norm] ?: if (norm.length >= 7) {
+                        val tail7 = norm.takeLast(7)
+                        contacts.firstOrNull { c ->
+                            val cNorm = c.number.replace(Regex("[^0-9]"), "")
+                            cNorm.length >= 7 && (cNorm.endsWith(tail7) || norm.endsWith(cNorm.takeLast(7)))
+                        }?.name
+                    } else null
+
+                    val resolvedName = if (!savedContactName.isNullOrBlank()) {
+                        savedContactName
+                    } else if (!rawName.isNullOrBlank()) {
                         rawName
                     } else {
-                        val norm = number.replace(Regex("[^0-9]"), "")
-                        contactsMap[norm]
+                        null
                     }
 
                     list.add(CallLogItem(id, resolvedName, number, type, date, duration))

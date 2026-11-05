@@ -9,6 +9,7 @@ import android.os.Build
 import android.telecom.Call
 import android.telecom.VideoProfile
 import android.util.Log
+import com.callscreener.app.data.DialerRepository
 import com.callscreener.app.engine.AiVoiceRelayManager
 import com.callscreener.app.engine.AudioPresetManager
 import com.callscreener.app.engine.QuickReplyManager
@@ -153,12 +154,23 @@ class CallSessionManager private constructor(private val appContext: Context) {
         val prev = _sessionState.value
         val initialAudioMode = prev.audioCallMode
         aiVoiceRelayManager.isAutoRelayActive = prev.isAutoRelayEnabled
+
+        // Ensure phonebook saved contact name always takes precedence over network owner name
+        val savedContactName = DialerRepository.lookupContactName(appContext, callerNumber)
+        val resolvedCallerName = if (!savedContactName.isNullOrBlank()) {
+            savedContactName
+        } else if (!callerName.isNullOrBlank()) {
+            callerName
+        } else {
+            null
+        }
+
         _sessionState.update {
             CallSessionState(
                 status = initialStatus,
                 audioCallMode = initialAudioMode,
                 callerNumber = callerNumber,
-                callerName = callerName,
+                callerName = resolvedCallerName,
                 isIncoming = isIncoming,
                 isSimulated = false,
                 isGreetingEnabled = prev.isGreetingEnabled,
@@ -863,12 +875,14 @@ class CallSessionManager private constructor(private val appContext: Context) {
             audioManager.clearCommunicationDevice()
         }
         val prev = _sessionState.value
+        val savedName = DialerRepository.lookupContactName(appContext, simulatedNumber)
+        val resolvedName = if (!savedName.isNullOrBlank()) savedName else simulatedName
         _sessionState.update {
             CallSessionState(
                 status = CallStatus.RINGING,
                 audioCallMode = prev.audioCallMode,
                 callerNumber = simulatedNumber,
-                callerName = simulatedName,
+                callerName = resolvedName,
                 isIncoming = true,
                 isSimulated = true,
                 isGreetingEnabled = prev.isGreetingEnabled,

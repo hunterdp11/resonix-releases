@@ -1,16 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#1E1E2E"
-        android:pathData="M0,0h108v108h-108z"/>
-    <path
-        android:fillColor="#6366F1"
-        android:pathData="M54,20A34,34 0 0,0 20,54A34,34 0 0,0 54,88A34,34 0 0,0 88,54A34,34 0 0,0 54,20Z"/>
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M66.5,58.8C64.6,58.8 62.7,58.5 60.9,57.9C60.3,57.7 59.7,57.8 59.2,58.3L56.1,61.4C51.6,59.1 47.9,45.4 45.6,40.9L48.7,37.8C49.2,37.3 49.3,36.7 49.1,36.1C48.5,34.3 48.2,32.4 48.2,30.5C48.2,29.7 47.5,29 46.7,29L40.2,29C39.4,29 38.7,29.7 38.7,30.5C38.7,46.5 50.5,58.3 66.5,58.3C67.3,58.3 68,57.6 68,56.8L68,50.3C68,49.5 67.3,48.8 66.5,48.8Z"/>
-</vector>
 
+    <!-- Base Canvas: Deep Space Obsidian -->
+    <path
+        android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="0"
+                android:startY="0"
+                android:endX="108"
+                android:endY="108"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#0F172A" />
+                <item android:offset="0.45" android:color="#090E17" />
+                <item android:offset="1.0" android:color="#030508" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Liquid Caustic Aura -->
+    <path
+        android:pathData="M30,30m-40,0a40,40 0,1 1,80 0a40,40 0,1 1,-80 0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="30"
+                android:centerY="30"
+                android:gradientRadius="45"
+                android:type="radial">
+                <item android:offset="0.0" android:color="#3530D158" />
+                <item android:offset="0.55" android:color="#150A84FF" />
+                <item android:offset="1.0" android:color="#00000000" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Apple Liquid Glass Squircle Tile -->
+    <path
+        android:pathData="M37,27 L71,27 C79,27 85,33 85,41 L85,67 C85,75 79,81 71,81 L37,81 C29,81 23,75 23,67 L23,41 C23,33 29,27 37,27 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="23"
+                android:startY="27"
+                android:endX="85"
+                android:endY="81"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#35FFFFFF" />
+                <item android:offset="0.4" android:color="#14FFFFFF" />
+                <item android:offset="0.8" android:color="#080D1A" />
+                <item android:offset="1.0" android:color="#1A2A4A" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Razor Specular Glass Rim Border -->
+    <path
+        android:pathData="M37,27 L71,27 C79,27 85,33 85,41 L85,67 C85,75 79,81 71,81 L37,81 C29,81 23,75 23,67 L23,41 C23,33 29,27 37,27 Z"
+        android:strokeWidth="1.2">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="54"
+                android:startY="27"
+                android:endX="54"
+                android:endY="81"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#E0FFFFFF" />
+                <item android:offset="0.35" android:color="#45FFFFFF" />
+                <item android:offset="0.75" android:color="#15FFFFFF" />
+                <item android:offset="1.0" android:color="#6030D158" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Apple Flagship Phone Receiver Handset -->
+    <path
+        android:pathData="M43.8,40.5 C42.8,39.5 41.2,39.5 40.2,40.5 L37.5,43.2 C36.2,44.5 35.8,46.5 36.5,48.2 C39.2,54.8 44.8,60.4 51.4,63.1 C53.1,63.8 55.1,63.4 56.4,62.1 L59.1,59.4 C60.1,58.4 60.1,56.8 59.1,55.8 L54.2,50.9 C53.2,49.9 51.6,49.9 50.6,50.9 L49.0,52.5 C48.6,52.9 48.0,53.0 47.5,52.7 C44.2,50.8 41.6,48.2 39.7,44.9 C39.4,44.4 39.5,43.8 39.9,43.4 L41.5,41.8 C42.5,40.8 42.5,39.2 41.5,38.2 Z"
+        android:strokeWidth="0.8"
+        android:strokeColor="#A0FFFFFF">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="36"
+                android:startY="63"
+                android:endX="60"
+                android:endY="39"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#34C759" />
+                <item android:offset="0.45" android:color="#30D158" />
+                <item android:offset="1.0" android:color="#0A84FF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Radiating AI Neural Soundwave Arcs -->
+    <path
+        android:pathData="M56.5,43.0 C59.2,45.7 59.2,50.1 56.5,52.8"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:strokeColor="#64D2FF" />
+
+    <path
+        android:pathData="M62.0,37.5 C67.8,43.3 67.8,52.7 62.0,58.5"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:strokeColor="#30D158" />
+
+    <path
+        android:pathData="M67.5,32.0 C76.3,40.8 76.3,55.2 67.5,64.0"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:strokeColor="#AF52DE" />
+
+    <!-- Pulse Node -->
+    <path
+        android:pathData="M70.5,31.0 m-1.8,0 a1.8,1.8 0 1,0 3.6,0 a1.8,1.8 0 1,0 -3.6,0"
+        android:fillColor="#FFD60A" />
+</vector>

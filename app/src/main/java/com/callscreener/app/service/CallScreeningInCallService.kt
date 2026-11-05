@@ -7,6 +7,7 @@ import android.telecom.Call
 import android.telecom.CallAudioState
 import android.telecom.InCallService
 import android.util.Log
+import com.callscreener.app.data.DialerRepository
 import com.callscreener.app.notification.NotificationHelper
 import com.callscreener.app.root.RootPrivilegeManager
 import com.callscreener.app.session.CallSessionManager
@@ -43,7 +44,7 @@ class CallScreeningInCallService : InCallService() {
                         Log.i(TAG, "Call DISCONNECTED")
                         if (isCurrentCallIncoming && !wasCallAnswered) {
                             val number = currentCallerNumber ?: extractPhoneNumber(call)
-                            val name = currentCallerName ?: call.details.callerDisplayName
+                            val name = currentCallerName ?: DialerRepository.lookupContactName(applicationContext, number) ?: call.details.callerDisplayName
                             if (!number.isNullOrBlank()) {
                                 NotificationHelper.postMissedCallNotification(applicationContext, number, name)
                             }
@@ -77,7 +78,17 @@ class CallScreeningInCallService : InCallService() {
             call.registerCallback(callback)
 
             val callerNumber = extractPhoneNumber(call)
-            val callerName = call.details.callerDisplayName
+            val networkCallerName = call.details.callerDisplayName
+
+            // Prioritize contact name saved on the phone; only use carrier network/owner name for unsaved contacts
+            val savedContactName = DialerRepository.lookupContactName(applicationContext, callerNumber)
+            val resolvedCallerName = if (!savedContactName.isNullOrBlank()) {
+                savedContactName
+            } else if (!networkCallerName.isNullOrBlank()) {
+                networkCallerName
+            } else {
+                null
+            }
 
             val isIncoming = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 call.details.callDirection == Call.Details.DIRECTION_INCOMING
@@ -87,11 +98,11 @@ class CallScreeningInCallService : InCallService() {
 
             isCurrentCallIncoming = isIncoming
             currentCallerNumber = callerNumber
-            currentCallerName = callerName
+            currentCallerName = resolvedCallerName
             wasCallAnswered = (call.state == Call.STATE_ACTIVE)
 
             val sessionManager = CallSessionManager.getInstance(applicationContext)
-            sessionManager.attachCall(call, callerNumber, callerName, isIncoming)
+            sessionManager.attachCall(call, callerNumber, resolvedCallerName, isIncoming)
 
             // Launch the interactive live screening screen
             val intent = Intent(this, ScreeningCallActivity::class.java).apply {

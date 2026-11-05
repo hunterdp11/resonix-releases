@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Phone Receiver Handset -->
+    <path
+        android:pathData="M43.8,40.5 C42.8,39.5 41.2,39.5 40.2,40.5 L37.5,43.2 C36.2,44.5 35.8,46.5 36.5,48.2 C39.2,54.8 44.8,60.4 51.4,63.1 C53.1,63.8 55.1,63.4 56.4,62.1 L59.1,59.4 C60.1,58.4 60.1,56.8 59.1,55.8 L54.2,50.9 C53.2,49.9 51.6,49.9 50.6,50.9 L49.0,52.5 C48.6,52.9 48.0,53.0 47.5,52.7 C44.2,50.8 41.6,48.2 39.7,44.9 C39.4,44.4 39.5,43.8 39.9,43.4 L41.5,41.8 C42.5,40.8 42.5,39.2 41.5,38.2 Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- AI Soundwave Arcs -->
+    <path
+        android:pathData="M56.5,43.0 C59.2,45.7 59.2,50.1 56.5,52.8"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:strokeColor="#FFFFFF" />
+
+    <path
+        android:pathData="M62.0,37.5 C67.8,43.3 67.8,52.7 62.0,58.5"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:strokeColor="#FFFFFF" />
+
+    <path
+        android:pathData="M67.5,32.0 C76.3,40.8 76.3,55.2 67.5,64.0"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:strokeColor="#FFFFFF" />
+
+    <!-- Pulse Node -->
+    <path
+        android:pathData="M70.5,31.0 m-1.8,0 a1.8,1.8 0 1,0 3.6,0 a1.8,1.8 0 1,0 -3.6,0"
+        android:fillColor="#FFFFFF" />
+</vector>
+

@@ -60,7 +60,10 @@ object NotificationHelper {
         initNotificationChannels(context)
 
         val cleanNumber = callerNumber.trim()
-        val displayName = if (!callerName.isNullOrBlank() && callerName != "Unknown Caller") {
+        val savedName = DialerRepository.lookupContactName(context, cleanNumber)
+        val displayName = if (!savedName.isNullOrBlank()) {
+            savedName
+        } else if (!callerName.isNullOrBlank() && callerName != "Unknown Caller") {
             callerName
         } else {
             DialerRepository.formatPhoneNumber(cleanNumber)
