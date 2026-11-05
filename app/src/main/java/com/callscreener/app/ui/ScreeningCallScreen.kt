@@ -77,6 +77,7 @@ import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.Psychology
 import androidx.compose.material.icons.rounded.RecordVoiceOver
 import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material.icons.rounded.Tune
@@ -178,6 +179,7 @@ fun ScreeningCallScreen(
     onToggleAutoRelay: (Boolean) -> Unit = {},
     onToggleRecording: () -> Unit = {},
     onToggleHold: () -> Unit = {},
+    onToggleSpeechJammer: () -> Unit = {},
     onDtmfDigit: (Char) -> Unit = {},
     presetManager: AudioPresetManager? = null,
     quickReplyManager: QuickReplyManager? = null
@@ -268,6 +270,8 @@ fun ScreeningCallScreen(
                         onToggleSpeaker = onToggleSpeaker,
                         onToggleRecording = onToggleRecording,
                         onToggleHold = onToggleHold,
+                        isSpeechJammerActive = state.isSpeechJammerActive,
+                        onToggleSpeechJammer = onToggleSpeechJammer,
                         onScreenWithAi = onStartScreening,
                         onDtmfDigit = onDtmfDigit,
                         onHangUp = onHangUp
@@ -292,7 +296,9 @@ fun ScreeningCallScreen(
                     isSpeaking = state.isTtsSpeaking,
                     isRecording = state.isRecording,
                     recordingDurationSeconds = state.recordingDurationSeconds,
-                    onToggleRecording = onToggleRecording
+                    onToggleRecording = onToggleRecording,
+                    isSpeechJammerActive = state.isSpeechJammerActive,
+                    onToggleSpeechJammer = onToggleSpeechJammer
                 )
 
             // Central Transcript & Message Timeline (Generous breathing room)
@@ -468,7 +474,9 @@ fun SuperPremiumCallerCard(
     isSpeaking: Boolean,
     isRecording: Boolean = false,
     recordingDurationSeconds: Long = 0L,
-    onToggleRecording: () -> Unit = {}
+    onToggleRecording: () -> Unit = {},
+    isSpeechJammerActive: Boolean = false,
+    onToggleSpeechJammer: () -> Unit = {}
 ) {
     val auraTransition = rememberInfiniteTransition(label = "callerAura")
     val rippleScale by auraTransition.animateFloat(
@@ -600,6 +608,36 @@ fun SuperPremiumCallerCard(
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold
                         )
+                    }
+
+                    if (isSpeechJammerActive) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0x359C27B0))
+                                .border(0.8.dp, Color(0xFFFF4081), RoundedCornerShape(8.dp))
+                                .clickable { onToggleSpeechJammer() }
+                                .padding(horizontal = 7.dp, vertical = 2.5.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFFF4081))
+                                )
+                                Text(
+                                    text = "JAMMER",
+                                    color = Color(0xFFFF80AB),
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -2540,10 +2578,13 @@ fun StandardInCallScreen(
     onToggleSpeaker: () -> Unit,
     onToggleRecording: () -> Unit,
     onToggleHold: () -> Unit,
+    isSpeechJammerActive: Boolean = false,
+    onToggleSpeechJammer: () -> Unit = {},
     onScreenWithAi: () -> Unit,
     onDtmfDigit: (Char) -> Unit,
     onHangUp: () -> Unit
 ) {
+    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     var showKeypad by remember { mutableStateOf(false) }
     var dtmfDigits by remember { mutableStateOf("") }
@@ -2724,6 +2765,87 @@ fun StandardInCallScreen(
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold
                             )
+                        }
+                    }
+                }
+            }
+
+            // Speech Jammer (DAF Disruption) Live Interactive Pill
+            if (status != CallStatus.ON_HOLD && status != CallStatus.DIALING) {
+                val jammerEngine = remember { com.callscreener.app.engine.SpeechJammerEngine.getInstance(context) }
+                if (jammerEngine.isEnabled) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.92f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (isSpeechJammerActive) Color(0x359C27B0) else Color(0x14FFFFFF))
+                            .border(
+                                width = if (isSpeechJammerActive) 1.5.dp else 0.8.dp,
+                                color = if (isSpeechJammerActive) Color(0xFFBA68C8) else Color(0x22FFFFFF),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onToggleSpeechJammer()
+                            }
+                            .padding(horizontal = 14.dp, vertical = 9.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(30.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isSpeechJammerActive) Color(0xFFFF4081) else Color(0x28BA68C8)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Psychology,
+                                        contentDescription = null,
+                                        tint = if (isSpeechJammerActive) Color.White else Color(0xFFE1BEE7),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                                Column {
+                                    Text(
+                                        text = if (isSpeechJammerActive) "JAMMING CALLER ACTIVE" else "Acoustic Speech Jammer (DAF)",
+                                        color = if (isSpeechJammerActive) Color(0xFFFF80AB) else Color.White,
+                                        fontSize = 12.5.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = if (isSpeechJammerActive)
+                                            "${jammerEngine.delayMs}ms delayed feedback • caller speech motor paralyzed"
+                                        else
+                                            "Tap to disrupt caller with 200ms delayed auditory feedback",
+                                        color = TextSecondary,
+                                        fontSize = 10.5.sp
+                                    )
+                                }
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSpeechJammerActive) Color(0xFFFF4081) else Color(0x25BA68C8))
+                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                            ) {
+                                Text(
+                                    text = if (isSpeechJammerActive) "STOP" else "ENGAGE",
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
                         }
                     }
                 }

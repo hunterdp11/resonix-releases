@@ -50,6 +50,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
     val presetManager = AudioPresetManager(appContext)
     val quickReplyManager = QuickReplyManager(appContext)
     val voiceChangerEngine = com.callscreener.app.engine.RealtimeVoiceChangerEngine()
+    val speechJammerEngine = com.callscreener.app.engine.SpeechJammerEngine.getInstance(appContext)
     private var recordingTimerJob: Job? = null
     private val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
@@ -57,6 +58,13 @@ class CallSessionManager private constructor(private val appContext: Context) {
     val sessionState: StateFlow<CallSessionState> = _sessionState.asStateFlow()
 
     init {
+        // Observe Speech Jammer active state
+        scope.launch {
+            speechJammerEngine.isJammerActive.collect { active ->
+                _sessionState.update { it.copy(isSpeechJammerActive = active) }
+            }
+        }
+
         // Observe customized quick replies
         scope.launch {
             quickReplyManager.quickReplies.collect { replies ->
@@ -926,8 +934,22 @@ class CallSessionManager private constructor(private val appContext: Context) {
         }
     }
 
+    /**
+     * Toggles Acoustic Speech Jammer (DAF Delayed Auditory Feedback).
+     */
+    fun toggleSpeechJammer() {
+        if (speechJammerEngine.isJammerActive.value) {
+            speechJammerEngine.stopJammer()
+        } else {
+            speechJammerEngine.startJammer(forTestLab = _sessionState.value.isSimulated)
+        }
+    }
+
     private fun resetAudioMode() {
         try {
+            if (speechJammerEngine.isJammerActive.value) {
+                speechJammerEngine.stopJammer()
+            }
             if (voiceChangerEngine.isVoiceChangerActive.value) {
                 voiceChangerEngine.stop()
             }

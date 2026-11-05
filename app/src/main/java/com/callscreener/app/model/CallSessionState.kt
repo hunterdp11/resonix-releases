@@ -40,5 +40,7 @@ data class CallSessionState(
     val operationMode: com.callscreener.app.root.AppOperationMode = com.callscreener.app.root.AppOperationMode.STANDARD,
     val messages: List<ChatMessage> = emptyList(),
     val quickReplies: List<QuickReply> = QuickReply.DEFAULT_REPLIES,
+    val isSpeechJammerActive: Boolean = false,
+    val isSpeechJammerEnabled: Boolean = true,
     val isSimulated: Boolean = false
 )

@@ -80,6 +80,7 @@ class ScreeningCallActivity : ComponentActivity() {
                     onToggleAutoRelay = { sessionManager.setAutoRelayEnabled(it) },
                     onToggleRecording = { sessionManager.toggleRecording() },
                     onToggleHold = { sessionManager.toggleHold() },
+                    onToggleSpeechJammer = { sessionManager.toggleSpeechJammer() },
                     onDtmfDigit = { digit -> sessionManager.playDtmf(digit) },
                     presetManager = sessionManager.presetManager,
                     quickReplyManager = sessionManager.quickReplyManager

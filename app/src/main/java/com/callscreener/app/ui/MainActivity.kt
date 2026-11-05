@@ -132,6 +132,7 @@ import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Psychology
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.material.icons.rounded.PhoneInTalk
@@ -5353,6 +5354,7 @@ fun DialerSettingsSheet(
     val haptic = LocalHapticFeedback.current
 
     var showRecordingsDialog by remember { mutableStateOf(false) }
+    var showSpeechJammerDialog by remember { mutableStateOf(false) }
     var rootAvailable by remember { mutableStateOf(RootPrivilegeManager.isRootAvailable()) }
     var isPrivileged by remember { mutableStateOf(RootPrivilegeManager.isPrivilegedApp(context)) }
     var isModuleInstalled by remember { mutableStateOf(RootPrivilegeManager.isMagiskModuleInstalled()) }
@@ -5695,7 +5697,84 @@ fun DialerSettingsSheet(
                     }
 
                     // ==========================================
-                    // GROUP 3: OPERATING PROFILE & PRIVILEGES
+                    // GROUP 3: SPEECH JAMMER (ACOUSTIC DAF ENGINE)
+                    // ==========================================
+                    SettingsSectionHeader(title = "SPEECH JAMMER (ACOUSTIC DAF ENGINE)")
+                    SettingsGroupCard {
+                        val jammerEngine = remember { com.callscreener.app.engine.SpeechJammerEngine.getInstance(context) }
+                        var isJammerEnabled by remember { mutableStateOf(jammerEngine.isEnabled) }
+
+                        SettingsItemRow(
+                            icon = Icons.Rounded.Psychology,
+                            iconTint = Color(0xFFBA68C8),
+                            iconBgColor = Color(0x259C27B0),
+                            title = "Speech Jammer (DAF)",
+                            subtitle = if (isJammerEnabled)
+                                "Acoustic DAF Active: disrupts caller with ${jammerEngine.delayMs}ms delayed feedback"
+                            else
+                                "Disabled: in-call Speech Jammer controls hidden",
+                            trailingContent = {
+                                Switch(
+                                    checked = isJammerEnabled,
+                                    onCheckedChange = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        isJammerEnabled = it
+                                        jammerEngine.isEnabled = it
+                                    },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color.White,
+                                        checkedTrackColor = Color(0xFF9C27B0),
+                                        uncheckedThumbColor = TextMuted,
+                                        uncheckedTrackColor = Color(0x22FFFFFF)
+                                    )
+                                )
+                            }
+                        )
+
+                        SettingsDivider()
+
+                        SettingsItemRow(
+                            icon = Icons.Rounded.Tune,
+                            iconTint = Color(0xFFE1BEE7),
+                            iconBgColor = Color(0x189C27B0),
+                            title = "Configure & Live Test Lab",
+                            subtitle = "Adjust 160-240ms delay, intensity gain, or test on your own voice",
+                            modifier = Modifier.clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                showSpeechJammerDialog = true
+                            },
+                            trailingContent = {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0x259C27B0))
+                                        .border(0.8.dp, Color(0x60BA68C8), RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 9.dp, vertical = 5.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Text(
+                                            text = "Tune / Test",
+                                            color = Color(0xFFE1BEE7),
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Icon(
+                                            imageVector = Icons.Rounded.ChevronRight,
+                                            contentDescription = null,
+                                            tint = Color(0xFFE1BEE7),
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        )
+                    }
+
+                    // ==========================================
+                    // GROUP 4: OPERATING PROFILE & PRIVILEGES
                     // ==========================================
                     SettingsSectionHeader(title = "OPERATING PROFILE & PRIVILEGES")
                     SettingsGroupCard {
@@ -5994,6 +6073,14 @@ fun DialerSettingsSheet(
         }
     }
 }
+
+    if (showSpeechJammerDialog) {
+        val jammerEngine = remember { com.callscreener.app.engine.SpeechJammerEngine.getInstance(context) }
+        SpeechJammerDialog(
+            engine = jammerEngine,
+            onDismiss = { showSpeechJammerDialog = false }
+        )
+    }
 
     if (showRecordingsDialog) {
         SavedRecordingsDialog(onDismiss = { showRecordingsDialog = false })
