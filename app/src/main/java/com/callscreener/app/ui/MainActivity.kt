@@ -588,19 +588,18 @@ fun MainDashboard(
 
 /**
  * Authentic Apple Liquid Chromatic Backdrop:
- * Deep obsidian OLED black space with fluid metallic caustics sweeping directly across
- * the bottom dock region (matching Apple iOS liquid glass demo & media_1793884295260_260d4339.jpg).
- * When LiquidGlassBottomBar sits above this, the real-time Haze GPU blur and refraction
- * layers bend and refract the rich molten bronze, platinum, and sapphire light into a physical liquid lens.
+ * Deep obsidian OLED black space with vibrant liquid metallic caustics sweeping directly across
+ * the bottom dock region (inspired by deepika-builds/liquid-glass & Apple iOS 26 liquid glass).
+ * Provides rich chromatic light for the dock's backdrop-filter blur (hazeChild) to refract.
  */
 @Composable
 fun AppleLiquidBackdrop() {
     val infiniteTransition = rememberInfiniteTransition(label = "liquidCaustic")
     val waveOffset by infiniteTransition.animateFloat(
-        initialValue = -15f,
-        targetValue = 15f,
+        initialValue = -18f,
+        targetValue = 18f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 7000, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = 6000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "causticShift"
@@ -622,7 +621,7 @@ fun AppleLiquidBackdrop() {
                     Color(0xFF000000)
                 ),
                 startY = 0f,
-                endY = height * 0.32f
+                endY = height * 0.30f
             )
         )
 
@@ -639,77 +638,79 @@ fun AppleLiquidBackdrop() {
             )
         )
 
-        // 4. Flowing Apple Liquid Chromatic Caustics across the bottom dock zone
-        // Left Ribbon: Molten Bronze / Amber Caustic (sweeping behind Recents & Contacts)
+        // 4. Vibrant Liquid Caustics directly behind dock zone (for liquid glass backdrop-filter blur)
+        // Left: Rich Molten Amber/Bronze Caustic
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    Color(0x959A4E12), // Rich molten bronze
-                    Color(0x55B45309), // Amber gold
-                    Color(0x1878350F),
+                    Color(0xCCE67E22), // Vibrant molten amber
+                    Color(0x88D35400),
+                    Color(0x25A04000),
                     Color.Transparent
                 ),
-                center = Offset(width * 0.22f + waveOffset, height * 0.93f),
-                radius = width * 0.52f
+                center = Offset(width * 0.20f + waveOffset, height * 0.94f),
+                radius = width * 0.55f
             )
         )
 
-        // Center Ribbon: Pearlescent Titanium / Platinum Specular Glow (sweeping behind center dock)
+        // Center: Luminous Electric Cyan / Platinum Specular Caustic
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    Color(0x50CBD5E1), // Platinum
-                    Color(0x2294A3B8), // Metallic silver
+                    Color(0xBB00E5FF), // Electric cyan
+                    Color(0x5500B0FF),
                     Color.Transparent
                 ),
-                center = Offset(width * 0.52f, height * 0.92f - (waveOffset * 0.5f)),
-                radius = width * 0.40f
+                center = Offset(width * 0.50f, height * 0.93f - (waveOffset * 0.4f)),
+                radius = width * 0.42f
             )
         )
 
-        // Right Ribbon: Deep Liquid Sapphire / Electric Azure (sweeping behind Keypad & Assistant)
+        // Right: Rich Royal Sapphire / Electric Violet Caustic
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    Color(0x901D4ED8), // Royal sapphire
-                    Color(0x500284C7), // Electric azure
-                    Color(0x120F172A),
+                    Color(0xCC3B82F6), // Royal sapphire
+                    Color(0x886366F1), // Electric indigo
+                    Color(0x221E1B4B),
                     Color.Transparent
                 ),
                 center = Offset(width * 0.82f - waveOffset, height * 0.94f),
-                radius = width * 0.52f
+                radius = width * 0.55f
             )
         )
 
-        // Hairline specular light ribbon curving across the dock line
+        // Luminous liquid caustics ribbon curving across the dock line
         drawLine(
             brush = Brush.horizontalGradient(
                 listOf(
                     Color.Transparent,
-                    Color(0x20B45309),
-                    Color(0x35E2E8F0),
-                    Color(0x2538BDF8),
+                    Color(0x50E67E22),
+                    Color(0x7000E5FF),
+                    Color(0x603B82F6),
                     Color.Transparent
                 )
             ),
             start = Offset(0f, height * 0.91f),
             end = Offset(width, height * 0.92f),
-            strokeWidth = 2f
+            strokeWidth = 3f
         )
     }
 }
 
 /**
- * Authentic Liquid Glass Dock (Inspired by archisvaze/liquid-glass):
- * Physics-based optical glass container featuring:
- * - Real-time GPU backdrop blur (Haze) capturing the flowing fluid chromatic backdrop
- * - Physics-based refraction bezel (inset caustic shadow contour simulating glass thickness & Snell's law refraction)
- * - Razor-sharp specular top highlight line reflecting off curved crown
- * - Lateral cylinder refraction shadows on the curved ends
- * - Dual-layer crystalline perimeter borders (outer specular prism + inner caustic return contour)
- * - Flowing liquid caustics inside the glass substrate itself
- * - Floating ultra-clear liquid glass sliding droplet indicator with spring physics and lens specular sheen
- * - Clean, minimalist luxury icons & typography
+ * Authentic Apple Liquid Glass Dock (Engineered after deepika-builds/liquid-glass):
+ * Uses the proven Apple liquid glass formula:
+ * - Real-time GPU backdrop blur (hazeChild blur = 24.dp, ultra-clear optical transmission)
+ * - CSS Dressing recipe:
+ *     background: linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.03) 100%)
+ *     box-shadow: 0 24px 60px rgba(0,0,0,0.45)
+ *     inset 0 1.5px 1px rgba(255,255,255,0.65) (specular top highlight)
+ *     inset 0 -1px 1px rgba(255,255,255,0.25) (bottom reflection)
+ *     inset 0 0 24px rgba(255,255,255,0.08) (ambient inner luminescence)
+ *     border: 1px solid rgba(255,255,255,0.22)
+ * - Refraction bulge rim with subtle chromatic fringe (chroma dispersion)
+ * - Clean, minimalist luxury tabs & sliding liquid droplet indicator
  */
 @Composable
 fun LiquidGlassBottomBar(
@@ -736,174 +737,113 @@ fun LiquidGlassBottomBar(
         DialerTab.ASSISTANT -> 3
     }
 
-    // Dynamic liquid caustics drift inside the glass dock background
-    val infiniteTransition = rememberInfiniteTransition(label = "dockLiquidCaustic")
-    val causticShift by infiniteTransition.animateFloat(
-        initialValue = -12f,
-        targetValue = 12f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 5000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "dockCausticDrift"
-    )
-
-    // Outer Liquid Glass Dock Hull (archisvaze/liquid-glass physical lens model)
+    // Outer Liquid Glass Capsule (deepika-builds/liquid-glass specification)
     Box(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
+            // 1. Deep Drop Shadow: box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45)
             .shadow(
-                elevation = 28.dp,
-                shape = RoundedCornerShape(36.dp),
-                spotColor = Color(0x95000000),
-                ambientColor = Color(0x45000000)
+                elevation = 24.dp,
+                shape = RoundedCornerShape(32.dp),
+                spotColor = Color(0x75000000),
+                ambientColor = Color(0x35000000)
             )
+            // 2. Real-Time Backdrop Blur: backdrop-filter: blur(24px) saturate(180%)
             .hazeChild(
                 state = hazeState,
-                shape = RoundedCornerShape(36.dp),
+                shape = RoundedCornerShape(32.dp),
                 style = HazeStyle(
-                    tint = Color(0x10FFFFFF), // Ultra-clear optical transmission
-                    blurRadius = 32.dp,
+                    tint = Color(0x0CFFFFFF), // Ultra-clear optical transmission
+                    blurRadius = 24.dp,
                     noiseFactor = 0f
                 )
             )
-            .clip(RoundedCornerShape(36.dp))
+            .clip(RoundedCornerShape(32.dp))
+            // 3. Liquid Glass Body: background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.03))
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        Color(0x35FFFFFF), // Specular convex crown transmission
-                        Color(0x0CFFFFFF), // Crystal clear optical body
-                        Color(0x22FFFFFF)  // Caustic bottom reflection pool
+                        Color(0x24FFFFFF), // 14% white top sheen
+                        Color(0x08FFFFFF)  // 3% white optical body
                     )
                 )
             )
+            // 4. Glass Structural Border: border: 1px solid rgba(255, 255, 255, 0.22)
             .border(
-                width = 1.4.dp,
+                width = 1.2.dp,
                 brush = Brush.verticalGradient(
                     listOf(
-                        Color(0xF8FFFFFF), // Razor-sharp top specular catch
-                        Color(0x40FFFFFF), // Translucent optical sides
+                        Color(0x85FFFFFF), // Razor-sharp top specular catch
+                        Color(0x35FFFFFF), // Translucent sides
                         Color(0x18FFFFFF),
-                        Color(0x65FFFFFF)  // Bottom caustic return rim
+                        Color(0x45FFFFFF)  // Bottom caustic return rim
                     )
                 ),
-                shape = RoundedCornerShape(36.dp)
+                shape = RoundedCornerShape(32.dp)
             )
     ) {
-        // Layer 1: Inset Snell's Law Refraction Bezel (archisvaze/liquid-glass SDF glass thickness shadow)
-        // Dark optical refraction contour along the curved perimeter where light rays bend inward
+        // Inset Layer 1: Ambient Inner Glass Luminescence (inset 0 0 24px rgba(255, 255, 255, 0.08))
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .padding(1.2.dp)
-                .border(
-                    width = 4.dp,
-                    brush = Brush.verticalGradient(
-                        listOf(
-                            Color(0x35000000),
-                            Color(0x65000000),
-                            Color(0x40000000)
-                        )
-                    ),
-                    shape = RoundedCornerShape(34.8.dp)
-                )
-        )
-
-        // Layer 2: Lateral Cylinder Lens Refraction Shadows on the curved semi-circular ends
-        Box(
-            modifier = Modifier
-                .matchParentSize()
+                .padding(1.dp)
                 .background(
-                    Brush.horizontalGradient(
-                        listOf(
-                            Color(0x45000000),
-                            Color.Transparent,
-                            Color.Transparent,
-                            Color(0x45000000)
-                        )
-                    )
-                )
-        )
-
-        // Layer 3: Flowing Liquid Glass Caustics Canvas (Watery / Molten refraction ripples inside the dock)
-        Canvas(modifier = Modifier.matchParentSize()) {
-            val width = size.width
-            val height = size.height
-
-            // Internal liquid glass dispersion ribbon
-            drawOval(
-                brush = Brush.horizontalGradient(
-                    listOf(
-                        Color(0x1000E5FF), // Subtle cyan refraction edge
-                        Color(0x18FFFFFF), // Liquid specular center
-                        Color(0x08FF0055)  // Subtle magenta refraction edge
-                    )
-                ),
-                topLeft = Offset(width * 0.15f + causticShift, height * 0.20f),
-                size = androidx.compose.ui.geometry.Size(width * 0.70f, height * 0.50f)
-            )
-
-            // Dynamic bottom caustic light pool
-            drawOval(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        Color(0x22FFFFFF),
-                        Color(0x08FFFFFF),
-                        Color.Transparent
-                    ),
-                    center = Offset(width * 0.5f - causticShift, height * 0.85f),
-                    radius = width * 0.45f
-                )
-            )
-        }
-
-        // Layer 4: Razor-Sharp Specular Top Rim Reflection (Reflecting overhead light off curved crown)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(28.dp)
-                .clip(RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp))
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color(0x75FFFFFF),
-                            Color(0x20FFFFFF),
+                    Brush.radialGradient(
+                        colors = listOf(
+                            Color(0x14FFFFFF),
                             Color.Transparent
                         )
                     )
                 )
         )
 
-        // Layer 5: Inner Caustic Refraction Contour Line (Inner crystal bevel)
+        // Inset Layer 2: Chromatic Refraction Fringe along the rim (deepika-builds/liquid-glass chroma simulation)
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .padding(2.dp)
+                .padding(1.dp)
                 .border(
-                    width = 0.8.dp,
-                    brush = Brush.verticalGradient(
+                    width = 1.dp,
+                    brush = Brush.horizontalGradient(
                         listOf(
-                            Color(0x85FFFFFF),
-                            Color(0x15FFFFFF),
-                            Color(0x35FFFFFF)
+                            Color(0x1500E5FF), // Subtle cyan dispersion
+                            Color.Transparent,
+                            Color(0x15FF007F)  // Subtle magenta dispersion
                         )
                     ),
-                    shape = RoundedCornerShape(34.dp)
+                    shape = RoundedCornerShape(31.dp)
                 )
         )
 
-        // Layer 6: Bottom Caustic Reflection Return Rim
+        // Inset Layer 3: Razor-Sharp Specular Top Highlight (inset 0 1.5px 1px rgba(255, 255, 255, 0.65))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(20.dp)
+                .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0x90FFFFFF),
+                            Color(0x25FFFFFF),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+
+        // Inset Layer 4: Specular Bottom Return Rim (inset 0 -1px 1px rgba(255, 255, 255, 0.25))
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(1.dp)
                 .align(Alignment.BottomCenter)
-                .clip(RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp))
+                .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
                 .background(Color(0x40FFFFFF))
         )
 
-        // Interactive Layer: Sliding Liquid Glass Droplet Lens + Clean Minimalist Tab Icons
+        // Interactive Layer: Sliding Liquid Droplet Lens + Clean Minimalist Tab Icons
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
@@ -930,18 +870,18 @@ fun LiquidGlassBottomBar(
                     .fillMaxHeight()
                     .padding(horizontal = 4.dp, vertical = 2.dp)
                     .shadow(
-                        elevation = 14.dp,
-                        shape = RoundedCornerShape(26.dp),
-                        spotColor = Color(0x60000000),
-                        ambientColor = Color(0x25000000)
+                        elevation = 12.dp,
+                        shape = RoundedCornerShape(24.dp),
+                        spotColor = Color(0x50000000),
+                        ambientColor = Color(0x20000000)
                     )
-                    .clip(RoundedCornerShape(26.dp))
+                    .clip(RoundedCornerShape(24.dp))
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                Color(0x45FFFFFF), // Specular crown
-                                Color(0x14FFFFFF), // Crystalline body
-                                Color(0x28FFFFFF)  // Base caustic return
+                                Color(0x40FFFFFF), // Specular crown
+                                Color(0x12FFFFFF), // Crystalline body
+                                Color(0x25FFFFFF)  // Base caustic return
                             )
                         )
                     )
@@ -949,24 +889,24 @@ fun LiquidGlassBottomBar(
                         1.2.dp,
                         Brush.verticalGradient(
                             listOf(
-                                Color(0xBDFFFFFF), // Razor top catch
-                                Color(0x38FFFFFF),
-                                Color(0x18FFFFFF)
+                                Color(0xB5FFFFFF), // Razor top catch
+                                Color(0x35FFFFFF),
+                                Color(0x15FFFFFF)
                             )
                         ),
-                        RoundedCornerShape(26.dp)
+                        RoundedCornerShape(24.dp)
                     )
             ) {
                 // Specular Light Dome on the Sliding Droplet
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(20.dp)
-                        .clip(RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp))
+                        .height(18.dp)
+                        .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                         .background(
                             Brush.verticalGradient(
                                 listOf(
-                                    Color(0x55FFFFFF),
+                                    Color(0x50FFFFFF),
                                     Color.Transparent
                                 )
                             )
