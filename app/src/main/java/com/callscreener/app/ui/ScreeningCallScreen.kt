@@ -172,6 +172,7 @@ fun ScreeningCallScreen(
     onSelectPersona: (VoicePersona) -> Unit = {},
     onSwitchToAiTypeMode: () -> Unit = {},
     onSwitchToDirectMicMode: () -> Unit = {},
+    onSwitchToVoiceChangerMode: () -> Unit = {},
     onSimulateCallerReply: (String) -> Unit = {},
     onToggleAiVoiceListening: () -> Unit = {},
     onToggleAutoRelay: (Boolean) -> Unit = {},
@@ -399,6 +400,7 @@ fun ScreeningCallScreen(
                     isSpeakerOn = state.isSpeakerOn,
                     onSwitchToAiType = onSwitchToAiTypeMode,
                     onSwitchToDirectMic = onSwitchToDirectMicMode,
+                    onSwitchToVoiceChanger = onSwitchToVoiceChangerMode,
                     onTakeOver = onTakeOver,
                     onHangUp = onHangUp,
                     onToggleMute = onToggleMute,
@@ -983,6 +985,7 @@ fun UnifiedLiquidCommandIsland(
     isSpeakerOn: Boolean,
     onSwitchToAiType: () -> Unit,
     onSwitchToDirectMic: () -> Unit,
+    onSwitchToVoiceChanger: () -> Unit = {},
     onTakeOver: () -> Unit,
     onHangUp: () -> Unit,
     onToggleMute: () -> Unit,
@@ -1067,6 +1070,57 @@ fun UnifiedLiquidCommandIsland(
                     )
                 }
             }
+        } else if (audioMode == AudioCallMode.VOICE_CHANGER) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0x288E2DE2))
+                    .border(
+                        0.8.dp,
+                        Color(0x608E2DE2),
+                        RoundedCornerShape(12.dp)
+                    )
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(ApplePurple)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Voice Morph Active: ${state.currentPersona.name} • Raw Mic Muted",
+                        color = Color(0xFFE4C4FB),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(ApplePurple.copy(alpha = 0.35f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "15ms DSP",
+                        color = Color.White,
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
 
         // Type-to-Speak Input Bar (Fluid Apple Liquid Glass with Coordinated Horizontal Expansion)
@@ -1081,6 +1135,7 @@ fun UnifiedLiquidCommandIsland(
                     Text(
                         text = when (audioMode) {
                             AudioCallMode.AI_TYPE_SPEAK -> if (state.isListeningToUserSpeech) "Listening... speak into mic or type" else "Type a message to speak in AI Voice..."
+                            AudioCallMode.VOICE_CHANGER -> "Voice morph active: speaking as ${state.currentPersona.name}..."
                             else -> "Direct microphone active..."
                         },
                         color = TextTertiary,
@@ -1255,10 +1310,10 @@ fun UnifiedLiquidCommandIsland(
                     )
                 }
 
-                // Row 2: AI Voice Relay | Direct Mic
+                // Row 2: AI Voice Relay | Voice Morph (DSP) | Direct Mic
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(48.dp, Alignment.CenterHorizontally),
+                    horizontalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterHorizontally),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Button 4: AI Voice Relay Mode
@@ -1272,7 +1327,18 @@ fun UnifiedLiquidCommandIsland(
                         onClick = onSwitchToAiType
                     )
 
-                    // Button 5: Direct Mic Mode
+                    // Button 5: Live Voice Morph (DSP Realtime Pitch Shifter)
+                    val isVoiceMorph = audioMode == AudioCallMode.VOICE_CHANGER
+                    OemInCallControlButton(
+                        icon = Icons.Rounded.GraphicEq,
+                        label = "Voice Morph",
+                        isActive = isVoiceMorph,
+                        activeColor = ApplePurple,
+                        activeContentColor = Color.White,
+                        onClick = onSwitchToVoiceChanger
+                    )
+
+                    // Button 6: Direct Mic Mode
                     val isDirect = audioMode == AudioCallMode.DIRECT_MIC
                     OemInCallControlButton(
                         icon = Icons.Filled.Call,

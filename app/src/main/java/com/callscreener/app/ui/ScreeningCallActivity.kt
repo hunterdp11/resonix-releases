@@ -74,6 +74,7 @@ class ScreeningCallActivity : ComponentActivity() {
                     onSelectPersona = { persona -> sessionManager.setVoicePersona(persona) },
                     onSwitchToAiTypeMode = { sessionManager.switchToAiTypeMode() },
                     onSwitchToDirectMicMode = { sessionManager.switchToDirectMicMode() },
+                    onSwitchToVoiceChangerMode = { sessionManager.switchToVoiceChangerMode() },
                     onSimulateCallerReply = { simReply -> sessionManager.simulateCallerResponse(simReply) },
                     onToggleAiVoiceListening = { sessionManager.toggleAiVoiceListening() },
                     onToggleAutoRelay = { sessionManager.setAutoRelayEnabled(it) },

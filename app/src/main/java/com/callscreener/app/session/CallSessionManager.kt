@@ -49,6 +49,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
     val recordingEngine = CallRecordingEngine(appContext)
     val presetManager = AudioPresetManager(appContext)
     val quickReplyManager = QuickReplyManager(appContext)
+    val voiceChangerEngine = com.callscreener.app.engine.RealtimeVoiceChangerEngine()
     private var recordingTimerJob: Job? = null
     private val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
@@ -502,6 +503,10 @@ class CallSessionManager private constructor(private val appContext: Context) {
             }
         }
 
+        if (voiceChangerEngine.isVoiceChangerActive.value) {
+            voiceChangerEngine.stop()
+        }
+
         audioManager.isMicrophoneMute = false
         CallScreeningInCallService.setCallMute(true) // Carrier uplink MUST be muted so caller cannot hear user's real voice!
 
@@ -528,6 +533,9 @@ class CallSessionManager private constructor(private val appContext: Context) {
     fun switchToDirectMicMode() {
         speechManager.stop()
         aiVoiceRelayManager.release()
+        if (voiceChangerEngine.isVoiceChangerActive.value) {
+            voiceChangerEngine.stop()
+        }
 
         audioManager.mode = AudioManager.MODE_IN_CALL
 
@@ -573,11 +581,69 @@ class CallSessionManager private constructor(private val appContext: Context) {
     }
 
     /**
+     * MODE 3: Switch to Real-Time Voice Changer Mode.
+     * Mic -> In-memory ultra-low-latency DSP (Pitch Shift, Formant Smoothing, Robot, Radio, Deep Voice)
+     * -> Telecom voice uplink. Raw physical microphone is isolated so caller NEVER hears your real voice!
+     */
+    fun switchToVoiceChangerMode(persona: VoicePersona? = null) {
+        speechManager.stop()
+        aiVoiceRelayManager.release()
+
+        val targetPersona = persona ?: _sessionState.value.currentPersona
+        voiceChangerEngine.setPersona(targetPersona)
+
+        if (voiceChangerEngine.isVoiceChangerActive.value) {
+            voiceChangerEngine.stop()
+        }
+
+        audioManager.mode = AudioManager.MODE_IN_CALL
+        audioManager.isMicrophoneMute = false
+        CallScreeningInCallService.setCallMute(true) // Carrier uplink muted from raw mic
+
+        // Disconnect raw physical mic from hardware voice uplink via root ALSA mixer
+        scope.launch {
+            try {
+                val script = """
+                    tinymix 'Voice_Tx Mixer MultiMedia1' 1 2>/dev/null || true
+                    tinymix 'Incall_Music Audio Mixer MultiMedia1' 1 2>/dev/null || true
+                    tinymix 'Incall_Music Audio Mixer MultiMedia2' 1 2>/dev/null || true
+                    tinymix 'Voice_Tx Mixer TX_CDC_DMA_TX_3' 0 2>/dev/null || true
+                    tinymix 'Voice_Tx Mixer SLIM_0_TX' 0 2>/dev/null || true
+                    tinymix 'Voice_Tx Mixer AFE_PCM_TX' 0 2>/dev/null || true
+                    tinymix 'Voice_Tx Mixer PRI_TX_Voice' 0 2>/dev/null || true
+                    tinymix 'Voice_Tx Mixer TERT_MI2S_TX_Voice' 0 2>/dev/null || true
+                    tinymix 'Voice_Tx Mixer TX_Voice' 0 2>/dev/null || true
+                """.trimIndent()
+                RootPrivilegeManager.executeSuCommand(script)
+            } catch (_: Exception) {}
+        }
+
+        val isSim = _sessionState.value.isSimulated
+        voiceChangerEngine.start(
+            streamType = if (isSim) AudioManager.STREAM_MUSIC else AudioManager.STREAM_VOICE_CALL,
+            context = appContext,
+            isTestMode = isSim
+        )
+
+        _sessionState.update {
+            it.copy(
+                audioCallMode = AudioCallMode.VOICE_CHANGER,
+                isRealtimeVoiceChangerActive = true,
+                status = CallStatus.USER_TALKING,
+                currentPersona = targetPersona,
+                isMuted = false
+            )
+        }
+        addMessage(MessageSender.SYSTEM, "Audio Mode: Live Voice Changer (${targetPersona.name}). Your voice is modified in real-time. Caller cannot hear your real voice.")
+    }
+
+    /**
      * Change AI Voice Persona in real time.
      */
     fun setVoicePersona(persona: VoicePersona) {
         speechManager.setVoicePersona(persona)
         aiVoiceRelayManager.targetLanguageTag = persona.localeTag
+        voiceChangerEngine.setPersona(persona)
         _sessionState.update { it.copy(currentPersona = persona) }
         addMessage(MessageSender.SYSTEM, "Voice profile updated: ${persona.name} (${persona.tag})")
     }
@@ -862,6 +928,9 @@ class CallSessionManager private constructor(private val appContext: Context) {
 
     private fun resetAudioMode() {
         try {
+            if (voiceChangerEngine.isVoiceChangerActive.value) {
+                voiceChangerEngine.stop()
+            }
             CallScreeningInCallService.setSpeaker(false)
             CallScreeningInCallService.setCallMute(false)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

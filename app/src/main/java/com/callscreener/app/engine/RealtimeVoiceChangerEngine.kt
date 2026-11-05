@@ -66,6 +66,9 @@ class RealtimeVoiceChangerEngine {
     @Volatile
     private var currentPersona: VoicePersona = VoicePersona.DEFAULT
 
+    @Volatile
+    private var customPitchFactor: Float? = null
+
     private val _isVoiceChangerActive = MutableStateFlow(false)
     val isVoiceChangerActive: StateFlow<Boolean> = _isVoiceChangerActive.asStateFlow()
 
@@ -92,8 +95,17 @@ class RealtimeVoiceChangerEngine {
 
     fun setPersona(persona: VoicePersona) {
         currentPersona = persona
+        customPitchFactor = null
         Log.i(TAG, "Voice Changer persona switched to: ${persona.name} (pitch: ${persona.pitch}x, effect: ${persona.effectType})")
     }
+
+    fun setCustomPitch(factor: Float?) {
+        customPitchFactor = factor?.coerceIn(0.60f, 1.50f)
+        Log.i(TAG, "Voice Changer custom pitch set to: $customPitchFactor")
+    }
+
+    fun getCurrentPersona(): VoicePersona = currentPersona
+    fun getCustomPitch(): Float? = customPitchFactor
 
     @SuppressLint("MissingPermission")
     fun start(
@@ -142,9 +154,9 @@ class RealtimeVoiceChangerEngine {
                 )
             } else {
                 intArrayOf(
-                    MediaRecorder.AudioSource.VOICE_COMMUNICATION,
                     MediaRecorder.AudioSource.VOICE_RECOGNITION,
                     MediaRecorder.AudioSource.MIC,
+                    MediaRecorder.AudioSource.VOICE_COMMUNICATION,
                     MediaRecorder.AudioSource.DEFAULT
                 )
             }
@@ -379,7 +391,7 @@ class RealtimeVoiceChangerEngine {
                     }
 
                     VoiceEffectType.NONE -> {
-                        val pitchShift = if (persona.gender == VoiceGender.FEMALE) {
+                        val pitchShift = customPitchFactor ?: if (persona.gender == VoiceGender.FEMALE) {
                             persona.dspPitchFactor
                         } else if (persona.pitch != 1.0f) {
                             persona.pitch
