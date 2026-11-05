@@ -143,8 +143,11 @@ import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.haze
@@ -160,7 +163,9 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -889,6 +894,7 @@ fun LiquidGlassBottomBar(
 /**
  * Screen 1: Recents (Clean OEM Frosted Glass Call History, Edge-to-Edge Status Bar Scroll)
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun RecentsScreen(
     callLogs: List<CallLogItem>,
@@ -983,13 +989,27 @@ fun RecentsScreen(
                         val isMissed = log.type == CallLog.Calls.MISSED_TYPE || log.type == CallLog.Calls.REJECTED_TYPE
                         val isOutgoing = log.type == CallLog.Calls.OUTGOING_TYPE
 
+                        val rowInteraction = remember { MutableInteractionSource() }
+                        val isRowPressed by rowInteraction.collectIsPressedAsState()
+                        val rowScale by animateFloatAsState(
+                            targetValue = if (isRowPressed) 0.975f else 1.0f,
+                            animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+                            label = "recentRowScale"
+                        )
+
                         Box(
                             modifier = Modifier
+                                .animateItemPlacement()
+                                .scale(rowScale)
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(18.dp))
-                                .background(Color(0x14FFFFFF))
-                                .border(0.8.dp, Color(0x22FFFFFF), RoundedCornerShape(18.dp))
-                                .clickable { onCall(log.number) }
+                                .background(if (isRowPressed) Color(0x22FFFFFF) else Color(0x14FFFFFF))
+                                .border(0.8.dp, if (isRowPressed) Color(0x40FFFFFF) else Color(0x22FFFFFF), RoundedCornerShape(18.dp))
+                                .clickable(
+                                    interactionSource = rowInteraction,
+                                    indication = null,
+                                    onClick = { onCall(log.number) }
+                                )
                                 .padding(horizontal = 14.dp, vertical = 11.dp)
                         ) {
                             Row(
@@ -1054,21 +1074,34 @@ fun RecentsScreen(
                                         fontSize = 12.sp
                                     )
 
+                                    val infoInteraction = remember { MutableInteractionSource() }
+                                    val isInfoPressed by infoInteraction.collectIsPressedAsState()
+                                    val infoScale by animateFloatAsState(
+                                        targetValue = if (isInfoPressed) 0.88f else 1.0f,
+                                        animationSpec = spring(dampingRatio = 0.65f),
+                                        label = "infoBtnScale"
+                                    )
+
                                     // Info Sheet Button (i) -> Opens iOS 26 Details
                                     Box(
                                         modifier = Modifier
                                             .size(32.dp)
+                                            .scale(infoScale)
                                             .clip(CircleShape)
                                             .background(Color(0x1AFFFFFF))
                                             .border(0.8.dp, Color(0x30FFFFFF), CircleShape)
-                                            .clickable {
-                                                val contact = ContactItem(
-                                                    id = log.id,
-                                                    name = log.name ?: log.number,
-                                                    number = log.number
-                                                )
-                                                onOpenDetails(contact)
-                                            },
+                                            .clickable(
+                                                interactionSource = infoInteraction,
+                                                indication = null,
+                                                onClick = {
+                                                    val contact = ContactItem(
+                                                        id = log.id,
+                                                        name = log.name ?: log.number,
+                                                        number = log.number
+                                                    )
+                                                    onOpenDetails(contact)
+                                                }
+                                            ),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
@@ -1271,8 +1304,25 @@ fun Ios26LiquidContactDetailsSheet(
 
     Dialog(
         onDismissRequest = { animateDismiss() },
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
     ) {
+        val view = LocalView.current
+        SideEffect {
+            val dialogWindow = (view.parent as? DialogWindowProvider)?.window
+            dialogWindow?.let { win ->
+                win.setDimAmount(0f)
+                WindowCompat.setDecorFitsSystemWindows(win, false)
+                win.navigationBarColor = android.graphics.Color.TRANSPARENT
+                win.statusBarColor = android.graphics.Color.TRANSPARENT
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    win.isNavigationBarContrastEnforced = false
+                }
+            }
+        }
+
         val scrimAlpha by animateFloatAsState(
             targetValue = if (isVisible) 0.65f else 0f,
             animationSpec = tween(durationMillis = 240, easing = LinearOutSlowInEasing),
@@ -1334,14 +1384,14 @@ fun Ios26LiquidContactDetailsSheet(
                             ),
                             RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp)
                         )
-                        .padding(horizontal = 22.dp)
-                        .padding(top = 14.dp)
-                        .navigationBarsPadding()
-                        .padding(bottom = 16.dp)
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .padding(horizontal = 22.dp)
+                            .padding(top = 14.dp)
+                            .navigationBarsPadding()
+                            .padding(bottom = 20.dp)
                             .verticalScroll(rememberScrollState()),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -1736,16 +1786,30 @@ fun ContactHeroActionPill(
     accentColor: Color,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.90f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
+        label = "heroActionScale"
+    )
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable(onClick = onClick)
+        modifier = Modifier
+            .scale(scale)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
     ) {
         Box(
             modifier = Modifier
                 .size(54.dp)
                 .clip(CircleShape)
-                .background(Color(0x1EFFFFFF))
-                .border(1.dp, Color(0x35FFFFFF), CircleShape),
+                .background(if (isPressed) Color(0x35FFFFFF) else Color(0x1EFFFFFF))
+                .border(1.dp, if (isPressed) Color(0x60FFFFFF) else Color(0x35FFFFFF), CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Icon(imageVector = icon, contentDescription = label, tint = accentColor, modifier = Modifier.size(22.dp))
@@ -1779,8 +1843,119 @@ fun CallLogDetailsDialog(
 }
 
 /**
+ * Unified Premium Obsidian Glass Search Bar (Clean glowing border, smooth clear transition & tactile feedback)
+ */
+@Composable
+fun PremiumGlassSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    placeholder: String = "Search contacts...",
+    modifier: Modifier = Modifier,
+    onSearchFocused: (Boolean) -> Unit = {}
+) {
+    var isFocused by remember { mutableStateOf(false) }
+
+    val borderColor by animateColorAsState(
+        targetValue = if (isFocused) Color(0x65FFFFFF) else Color(0x24FFFFFF),
+        animationSpec = tween(durationMillis = 200),
+        label = "searchBorderGlow"
+    )
+
+    val bgColor by animateColorAsState(
+        targetValue = if (isFocused) Color(0xFF1E2432) else Color(0xFF151924),
+        animationSpec = tween(durationMillis = 200),
+        label = "searchBgColor"
+    )
+
+    val iconTint by animateColorAsState(
+        targetValue = if (isFocused) Color.White else Color(0x80FFFFFF),
+        animationSpec = tween(durationMillis = 200),
+        label = "searchIconTint"
+    )
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .shadow(
+                elevation = if (isFocused) 10.dp else 4.dp,
+                shape = RoundedCornerShape(16.dp),
+                spotColor = Color(0x60000000)
+            )
+            .clip(RoundedCornerShape(16.dp))
+            .background(bgColor)
+            .border(1.dp, borderColor, RoundedCornerShape(16.dp))
+            .padding(horizontal = 14.dp, vertical = 11.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Search,
+                contentDescription = "Search",
+                tint = iconTint,
+                modifier = Modifier.size(19.dp)
+            )
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                textStyle = TextStyle(
+                    color = Color.White,
+                    fontSize = 14.5.sp,
+                    fontWeight = FontWeight.Normal
+                ),
+                cursorBrush = SolidColor(Color.White),
+                singleLine = true,
+                modifier = Modifier
+                    .weight(1f)
+                    .onFocusChanged {
+                        isFocused = it.isFocused
+                        onSearchFocused(it.isFocused)
+                    },
+                decorationBox = { innerTextField ->
+                    if (query.isEmpty()) {
+                        Text(
+                            text = placeholder,
+                            color = Color(0x55FFFFFF),
+                            fontSize = 14.5.sp
+                        )
+                    }
+                    innerTextField()
+                }
+            )
+
+            AnimatedVisibility(
+                visible = query.isNotEmpty(),
+                enter = fadeIn(tween(120)) + scaleIn(spring(stiffness = Spring.StiffnessMediumLow)),
+                exit = fadeOut(tween(100)) + scaleOut(tween(100))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x28FFFFFF))
+                        .clickable { onQueryChange("") },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Clear,
+                        contentDescription = "Clear",
+                        tint = Color.White,
+                        modifier = Modifier.size(13.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
  * Screen 2: Contacts (Searchable, Alphabetical Indexing, Clean Minimal Frosted Glass Rows)
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ContactsScreen(
     contacts: List<ContactItem>,
@@ -1862,7 +2037,7 @@ fun ContactsScreen(
             // LazyColumn extends edge-to-edge; items scroll fluidly underneath the transparent status bar!
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = statusBarTop + 124.dp, bottom = 120.dp, start = 20.dp, end = 20.dp),
+                contentPadding = PaddingValues(top = statusBarTop + 110.dp, bottom = 120.dp, start = 20.dp, end = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 groupedContacts.forEach { (sectionKey, contactsInSection) ->
@@ -1870,7 +2045,7 @@ fun ContactsScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 10.dp, bottom = 4.dp, start = 4.dp),
+                                .padding(top = 2.dp, bottom = 4.dp, start = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
@@ -1899,14 +2074,28 @@ fun ContactsScreen(
                             }
                         }
 
+                        val interactionSource = remember { MutableInteractionSource() }
+                        val isPressed by interactionSource.collectIsPressedAsState()
+                        val rowScale by animateFloatAsState(
+                            targetValue = if (isPressed) 0.975f else 1.0f,
+                            animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+                            label = "contactRowScale"
+                        )
+
                         // Minimalist, uniform frosted glass contact row
                         Box(
                             modifier = Modifier
+                                .animateItemPlacement()
+                                .scale(rowScale)
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(18.dp))
-                                .background(Color(0x14FFFFFF))
-                                .border(0.8.dp, Color(0x22FFFFFF), RoundedCornerShape(18.dp))
-                                .clickable { onOpenDetails(contact) }
+                                .background(if (isPressed) Color(0x22FFFFFF) else Color(0x14FFFFFF))
+                                .border(0.8.dp, if (isPressed) Color(0x40FFFFFF) else Color(0x22FFFFFF), RoundedCornerShape(18.dp))
+                                .clickable(
+                                    interactionSource = interactionSource,
+                                    indication = null,
+                                    onClick = { onOpenDetails(contact) }
+                                )
                                 .padding(horizontal = 14.dp, vertical = 11.dp)
                         ) {
                             Row(
@@ -1956,16 +2145,29 @@ fun ContactsScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
+                                    val msgInteraction = remember { MutableInteractionSource() }
+                                    val isMsgPressed by msgInteraction.collectIsPressedAsState()
+                                    val msgScale by animateFloatAsState(
+                                        targetValue = if (isMsgPressed) 0.88f else 1.0f,
+                                        animationSpec = spring(dampingRatio = 0.65f),
+                                        label = "msgBtnScale"
+                                    )
+
                                     // Send Message Button
                                     Box(
                                         modifier = Modifier
                                             .size(32.dp)
+                                            .scale(msgScale)
                                             .clip(CircleShape)
                                             .background(Color(0x1EFFFFFF))
                                             .border(0.8.dp, Color(0x35FFFFFF), CircleShape)
-                                            .clickable {
-                                                DialerRepository.sendSms(context, contact.number)
-                                            },
+                                            .clickable(
+                                                interactionSource = msgInteraction,
+                                                indication = null,
+                                                onClick = {
+                                                    DialerRepository.sendSms(context, contact.number)
+                                                }
+                                            ),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
@@ -1976,13 +2178,26 @@ fun ContactsScreen(
                                         )
                                     }
 
+                                    val callInteraction = remember { MutableInteractionSource() }
+                                    val isCallPressed by callInteraction.collectIsPressedAsState()
+                                    val callScale by animateFloatAsState(
+                                        targetValue = if (isCallPressed) 0.88f else 1.0f,
+                                        animationSpec = spring(dampingRatio = 0.65f),
+                                        label = "callBtnScale"
+                                    )
+
                                     // Call Button
                                     Box(
                                         modifier = Modifier
                                             .size(32.dp)
+                                            .scale(callScale)
                                             .clip(CircleShape)
                                             .background(AppleGreen)
-                                            .clickable { onCall(contact.number) },
+                                            .clickable(
+                                                interactionSource = callInteraction,
+                                                indication = null,
+                                                onClick = { onCall(contact.number) }
+                                            ),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
@@ -2009,20 +2224,19 @@ fun ContactsScreen(
                         listOf(
                             Color(0xFF000000),
                             Color(0xFF000000),
-                            Color(0xFF000000),
                             Color(0xF5000000),
-                            Color(0xD0000000),
+                            Color(0xCC000000),
                             Color.Transparent
                         )
                     )
                 )
                 .statusBarsPadding()
-                .padding(top = 4.dp, start = 20.dp, end = 20.dp, bottom = 14.dp)
+                .padding(top = 8.dp, start = 20.dp, end = 20.dp, bottom = 10.dp)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 10.dp),
+                    .padding(bottom = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -2125,67 +2339,12 @@ fun ContactsScreen(
                 }
             }
 
-            // Visible, High-Contrast Solid Search Bar (Never gets hidden or blurred into scrolling text)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .shadow(elevation = 6.dp, shape = RoundedCornerShape(16.dp), spotColor = Color(0x60000000))
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFF1A1F2C))
-                    .border(1.2.dp, Color(0x38FFFFFF), RoundedCornerShape(16.dp))
-                    .padding(horizontal = 14.dp, vertical = 11.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Filled.Search,
-                        contentDescription = "Search",
-                        tint = Color(0xB5FFFFFF),
-                        modifier = Modifier.size(19.dp)
-                    )
-
-                    Spacer(modifier = Modifier.width(10.dp))
-
-                    BasicTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        textStyle = TextStyle(
-                            color = Color.White,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Normal
-                        ),
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        decorationBox = { innerTextField ->
-                            if (searchQuery.isEmpty()) {
-                                Text(
-                                    text = "Search contacts...",
-                                    color = Color(0x65FFFFFF),
-                                    fontSize = 15.sp
-                                )
-                            }
-                            innerTextField()
-                        }
-                    )
-
-                    if (searchQuery.isNotEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .size(22.dp)
-                                .clip(CircleShape)
-                                .background(Color(0x30FFFFFF))
-                                .clickable { searchQuery = "" },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Clear,
-                                contentDescription = "Clear",
-                                tint = Color.White,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                    }
-                }
-            }
+            // Visible, High-Contrast Solid Search Bar
+            PremiumGlassSearchBar(
+                query = searchQuery,
+                onQueryChange = { searchQuery = it },
+                placeholder = "Search contacts..."
+            )
         }
     }
 }
@@ -2322,6 +2481,7 @@ fun KeypadScreen(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     var typedNumber by remember { mutableStateOf("") }
+    var keypadSearchQuery by remember { mutableStateOf("") }
 
     val toneGenerator = remember {
         try { ToneGenerator(AudioManager.STREAM_DTMF, 70) } catch (_: Exception) { null }
@@ -2519,85 +2679,218 @@ fun KeypadScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 if (isEmpty) {
-                    // Solid High-Contrast Search Pill in Keypad
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(Color(0xFF1A1F2C))
-                            .border(1.dp, Color(0x35FFFFFF), RoundedCornerShape(18.dp))
-                            .padding(horizontal = 16.dp, vertical = 11.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Search,
-                            contentDescription = "Search",
-                            tint = Color(0xB5FFFFFF),
-                            modifier = Modifier.size(17.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Search contacts or dial number",
-                            color = Color(0x75FFFFFF),
-                            fontSize = 14.sp
-                        )
+                    PremiumGlassSearchBar(
+                        query = keypadSearchQuery,
+                        onQueryChange = { keypadSearchQuery = it },
+                        placeholder = "Search contacts or dial number..."
+                    )
+
+                    val keypadMatches = remember(keypadSearchQuery, contacts) {
+                        if (keypadSearchQuery.isBlank()) emptyList()
+                        else contacts.filter {
+                            it.name.contains(keypadSearchQuery, ignoreCase = true) ||
+                            it.number.contains(keypadSearchQuery)
+                        }.take(3)
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Quick Recents / Frequent Dial Carousel
-                    val recentLogs = remember(callLogs) { callLogs.distinctBy { it.number }.take(4) }
-                    if (recentLogs.isNotEmpty()) {
-                        LazyRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(recentLogs) { log ->
-                                Row(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(14.dp))
-                                        .background(Color(0x16FFFFFF))
-                                        .border(0.8.dp, Color(0x26FFFFFF), RoundedCornerShape(14.dp))
-                                        .clickable {
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            typedNumber = log.number
-                                        }
-                                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(22.dp)
-                                            .clip(CircleShape)
-                                            .background(AppleGreen.copy(alpha = 0.2f)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Schedule,
-                                            contentDescription = null,
-                                            tint = AppleGreen,
-                                            modifier = Modifier.size(12.dp)
-                                        )
+                    if (keypadSearchQuery.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        if (keypadMatches.isNotEmpty()) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(Color(0xFF161A26))
+                                    .border(0.8.dp, Color(0x30FFFFFF), RoundedCornerShape(16.dp))
+                                    .padding(vertical = 4.dp),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                keypadMatches.forEach { contact ->
+                                    val matchInitials = remember(contact.name) {
+                                        val parts = contact.name.trim().split(" ").filter { it.isNotBlank() }
+                                        if (parts.size >= 2) "${parts[0].first().uppercaseChar()}${parts[1].first().uppercaseChar()}"
+                                        else contact.name.take(2).uppercase()
                                     }
-                                    Text(
-                                        text = log.name ?: DialerRepository.formatPhoneNumber(log.number),
-                                        color = Color.White,
-                                        fontSize = 12.5.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                    val rowInteraction = remember { MutableInteractionSource() }
+                                    val isRowPressed by rowInteraction.collectIsPressedAsState()
+                                    val rowScale by animateFloatAsState(
+                                        targetValue = if (isRowPressed) 0.97f else 1.0f,
+                                        animationSpec = spring(dampingRatio = 0.7f),
+                                        label = "keypadSearchMatchScale"
                                     )
+
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .scale(rowScale)
+                                            .clickable(
+                                                interactionSource = rowInteraction,
+                                                indication = null,
+                                                onClick = { onOpenDetails(contact) }
+                                            )
+                                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(30.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(0x22FFFFFF)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(text = matchInitials, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+
+                                        Spacer(modifier = Modifier.width(10.dp))
+
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = contact.name,
+                                                color = Color.White,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = DialerRepository.formatPhoneNumber(contact.number),
+                                                color = Color(0x90FFFFFF),
+                                                fontSize = 11.sp,
+                                                fontFamily = FontFamily.Monospace,
+                                                maxLines = 1
+                                            )
+                                        }
+
+                                        val callInteraction = remember { MutableInteractionSource() }
+                                        val isCallPressed by callInteraction.collectIsPressedAsState()
+                                        val callScale by animateFloatAsState(
+                                            targetValue = if (isCallPressed) 0.88f else 1.0f,
+                                            animationSpec = spring(dampingRatio = 0.65f),
+                                            label = "keypadMatchCallScale"
+                                        )
+
+                                        Box(
+                                            modifier = Modifier
+                                                .size(30.dp)
+                                                .scale(callScale)
+                                                .clip(CircleShape)
+                                                .background(AppleGreen)
+                                                .clickable(
+                                                    interactionSource = callInteraction,
+                                                    indication = null,
+                                                    onClick = { onCall(contact.number) }
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Call,
+                                                contentDescription = "Call",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                        }
+                                    }
                                 }
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0x18FFFFFF))
+                                    .border(0.8.dp, Color(0x25FFFFFF), RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        typedNumber = keypadSearchQuery
+                                        keypadSearchQuery = ""
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Dialpad,
+                                    contentDescription = null,
+                                    tint = AppleBlue,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Dial \"$keypadSearchQuery\" on keypad",
+                                    color = Color.White,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
                             }
                         }
                     } else {
-                        Text(
-                            text = "Press & hold 0 for +, 1 for Voicemail",
-                            color = TextMuted,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(vertical = 4.dp)
-                        )
+                        // Quick Recents / Frequent Dial Carousel
+                        Spacer(modifier = Modifier.height(10.dp))
+                        val recentLogs = remember(callLogs) { callLogs.distinctBy { it.number }.take(4) }
+                        if (recentLogs.isNotEmpty()) {
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(recentLogs) { log ->
+                                    val itemInteraction = remember { MutableInteractionSource() }
+                                    val isItemPressed by itemInteraction.collectIsPressedAsState()
+                                    val itemScale by animateFloatAsState(
+                                        targetValue = if (isItemPressed) 0.94f else 1.0f,
+                                        animationSpec = spring(dampingRatio = 0.65f),
+                                        label = "recentPillScale"
+                                    )
+
+                                    Row(
+                                        modifier = Modifier
+                                            .scale(itemScale)
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(if (isItemPressed) Color(0x26FFFFFF) else Color(0x16FFFFFF))
+                                            .border(0.8.dp, if (isItemPressed) Color(0x40FFFFFF) else Color(0x26FFFFFF), RoundedCornerShape(14.dp))
+                                            .clickable(
+                                                interactionSource = itemInteraction,
+                                                indication = null,
+                                                onClick = {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    typedNumber = log.number
+                                                }
+                                            )
+                                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(22.dp)
+                                                .clip(CircleShape)
+                                                .background(AppleGreen.copy(alpha = 0.2f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Schedule,
+                                                contentDescription = null,
+                                                tint = AppleGreen,
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                        }
+                                        Text(
+                                            text = log.name ?: DialerRepository.formatPhoneNumber(log.number),
+                                            color = Color.White,
+                                            fontSize = 12.5.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            Text(
+                                text = "Press & hold 0 for +, 1 for Voicemail",
+                                color = TextMuted,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            )
+                        }
                     }
                 } else {
                     // T9 Matched Contact Capsule
@@ -5590,8 +5883,25 @@ fun SavedRecordingsDialog(onDismiss: () -> Unit) {
 
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
     ) {
+        val view = LocalView.current
+        SideEffect {
+            val dialogWindow = (view.parent as? DialogWindowProvider)?.window
+            dialogWindow?.let { win ->
+                win.setDimAmount(0f)
+                WindowCompat.setDecorFitsSystemWindows(win, false)
+                win.navigationBarColor = android.graphics.Color.TRANSPARENT
+                win.statusBarColor = android.graphics.Color.TRANSPARENT
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    win.isNavigationBarContrastEnforced = false
+                }
+            }
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -5626,9 +5936,15 @@ fun SavedRecordingsDialog(onDismiss: () -> Unit) {
                         ),
                         RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
                     )
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 12.dp)
+                        .navigationBarsPadding()
+                        .padding(bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
                     // Drag Handle Pill
                     Box(
                         modifier = Modifier
