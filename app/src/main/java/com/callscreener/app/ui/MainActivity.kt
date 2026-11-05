@@ -124,6 +124,7 @@ import androidx.compose.material.icons.rounded.Chat
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Dialpad
 import androidx.compose.material.icons.rounded.DragIndicator
@@ -5523,6 +5524,7 @@ fun DialerSettingsSheet(
     val haptic = LocalHapticFeedback.current
 
     var showRecordingsDialog by remember { mutableStateOf(false) }
+    var showPrivateTrunkDialog by remember { mutableStateOf(false) }
     var rootAvailable by remember { mutableStateOf(RootPrivilegeManager.isRootAvailable()) }
     var isPrivileged by remember { mutableStateOf(RootPrivilegeManager.isPrivilegedApp(context)) }
     var isModuleInstalled by remember { mutableStateOf(RootPrivilegeManager.isMagiskModuleInstalled()) }
@@ -5847,6 +5849,41 @@ fun DialerSettingsSheet(
                                         uncheckedTrackColor = Color(0x22FFFFFF)
                                     )
                                 )
+                            }
+                        )
+
+                        SettingsDivider()
+
+                        // Row 3: Private VoIP Trunk Gateway (Bypasses Airtel / SIM restrictions)
+                        val trunkEngine = remember { com.callscreener.app.engine.PrivateTrunkEngine.getInstance(context) }
+                        val trunkCfg by trunkEngine.trunkConfig.collectAsState()
+                        SettingsItemRow(
+                            icon = Icons.Rounded.Cloud,
+                            iconTint = if (trunkCfg.isEnabled) AppleBlue else Color.White,
+                            iconBgColor = if (trunkCfg.isEnabled) AppleBlue.copy(alpha = 0.25f) else Color(0x18FFFFFF),
+                            title = "Private Trunk Gateway",
+                            subtitle = if (trunkCfg.isEnabled)
+                                "Active (${trunkCfg.providerType.name.replace("_", " ")}): routes over encrypted VoIP, bypassing Airtel cellular SIM completely"
+                            else
+                                "Disabled: standard cellular voice line will be used",
+                            trailingContent = {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(AppleBlue.copy(alpha = 0.2f))
+                                        .clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            showPrivateTrunkDialog = true
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        text = "Configure",
+                                        color = AppleBlue,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
                             }
                         )
                     }
@@ -6254,6 +6291,14 @@ fun DialerSettingsSheet(
         }
     }
 }
+
+    if (showPrivateTrunkDialog) {
+        val trunkEngine = remember { com.callscreener.app.engine.PrivateTrunkEngine.getInstance(context) }
+        PrivateTrunkSetupDialog(
+            engine = trunkEngine,
+            onDismiss = { showPrivateTrunkDialog = false }
+        )
+    }
 
     if (showRecordingsDialog) {
         SavedRecordingsDialog(onDismiss = { showRecordingsDialog = false })

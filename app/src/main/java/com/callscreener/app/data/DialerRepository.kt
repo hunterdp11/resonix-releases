@@ -258,6 +258,35 @@ object DialerRepository {
         )
 
         if (shouldInjectClir) {
+            val trunkEngine = com.callscreener.app.engine.PrivateTrunkEngine.getInstance(context)
+            if (trunkEngine.isConfigured()) {
+                if (sessionState.isIncognitoDialActive) {
+                    sessionManager.setIncognitoDialActive(false)
+                }
+                val destNumber = cleanNumber.removePrefix("#31#")
+                val callerId = trunkEngine.trunkConfig.value.callerIdDisplay
+                Toast.makeText(context, "🔒 Private Trunk: Caller ID masked as '$callerId' (Airtel bypassed)", Toast.LENGTH_SHORT).show()
+                Log.i(TAG, "Routing call to $destNumber through Private Trunk (bypassing carrier SIM)")
+
+                trunkEngine.placePrivateCall(
+                    targetNumber = destNumber,
+                    onSuccess = { _ ->
+                        sessionManager.startSimulatedCall(
+                            simulatedNumber = destNumber,
+                            simulatedName = "Private Trunk ($callerId)"
+                        )
+                        val callIntent = Intent(context, com.callscreener.app.ui.ScreeningCallActivity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        context.startActivity(callIntent)
+                    },
+                    onError = { err ->
+                        Toast.makeText(context, "Private Trunk error: $err", Toast.LENGTH_LONG).show()
+                    }
+                )
+                return
+            }
+
             if (!cleanNumber.startsWith("#31#")) {
                 cleanNumber = "#31#$cleanNumber"
             }
