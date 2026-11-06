@@ -132,10 +132,15 @@ class RealtimeVoiceChangerEngine {
                         tinymix 'Incall_Music Audio Mixer MultiMedia2' 1 2>/dev/null || true
                         tinymix 'Voice_Tx Mixer TX_CDC_DMA_TX_3' 0 2>/dev/null || true
                         tinymix 'Voice_Tx Mixer SLIM_0_TX' 0 2>/dev/null || true
+                        tinymix 'Voice_Tx Mixer SLIM_0_TX_Voice' 0 2>/dev/null || true
                         tinymix 'Voice_Tx Mixer AFE_PCM_TX' 0 2>/dev/null || true
                         tinymix 'Voice_Tx Mixer PRI_TX_Voice' 0 2>/dev/null || true
                         tinymix 'Voice_Tx Mixer TERT_MI2S_TX_Voice' 0 2>/dev/null || true
                         tinymix 'Voice_Tx Mixer TX_Voice' 0 2>/dev/null || true
+                        tinymix 'Voice Tx Mute' 0 2>/dev/null || true
+                        tinymix 'Voice Tx Device Mute' 0 2>/dev/null || true
+                        tinymix 'Voice Rx Mute' 0 2>/dev/null || true
+                        tinymix 'Voice Rx Device Mute' 0 2>/dev/null || true
                     """.trimIndent()
                     RootPrivilegeManager.executeSuCommand(mixerCommands)
                 } catch (e: Exception) {
@@ -252,7 +257,9 @@ class RealtimeVoiceChangerEngine {
             }
 
             audioTrack = track
-            track.setVolume(1.0f)
+            try {
+                track.setVolume(AudioTrack.getMaxVolume())
+            } catch (_: Exception) {}
 
             // Reset circular delay line pointers
             writePos = 0

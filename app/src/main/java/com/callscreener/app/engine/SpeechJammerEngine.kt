@@ -93,6 +93,7 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
     // Audio Pipeline State
     private var audioRecord: AudioRecord? = null
     private var audioTrack: AudioTrack? = null
+    private var localMonitorTrack: AudioTrack? = null
     private var echoCanceler: AcousticEchoCanceler? = null
     private var gainControl: AutomaticGainControl? = null
     private var processingThread: Thread? = null
@@ -227,6 +228,32 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
             track.setVolume(AudioTrack.getMaxVolume())
         } catch (_: Exception) {}
 
+        // Setup local monitor track so the USER hears the caller's real-time voice in their earpiece/speaker!
+        if (!forTestLab) {
+            try {
+                val localAttributes = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+
+                val localTrack = AudioTrack.Builder()
+                    .setAudioAttributes(localAttributes)
+                    .setAudioFormat(audioFormat)
+                    .setBufferSizeInBytes(trackBufSize)
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .build()
+
+                if (localTrack.state == AudioTrack.STATE_INITIALIZED) {
+                    localTrack.setVolume(AudioTrack.getMaxVolume())
+                    localTrack.play()
+                    localMonitorTrack = localTrack
+                    Log.i(TAG, "Speech Jammer local monitor AudioTrack active (Caller voice -> User ear)")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not initialize local monitor AudioTrack: ${e.message}")
+            }
+        }
+
         // Reset buffer
         synchronized(ringBuffer) {
             ringBuffer.fill(0.0f)
@@ -292,6 +319,14 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
         audioTrack = null
 
         try {
+            localMonitorTrack?.apply {
+                stop()
+                release()
+            }
+        } catch (_: Exception) {}
+        localMonitorTrack = null
+
+        try {
             echoCanceler?.release()
         } catch (_: Exception) {}
         echoCanceler = null
@@ -315,6 +350,11 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
         while (isRunning && !Thread.currentThread().isInterrupted) {
             val readCount = record.read(inShorts, 0, chunkSize)
             if (readCount <= 0) continue
+
+            // 0. Stream real-time caller voice (0ms latency) directly to user's local ear/speaker!
+            if (!isTestMode) {
+                localMonitorTrack?.write(inShorts, 0, readCount)
+            }
 
             val gain = intensityGain
             val currentDelay = delaySamples
@@ -355,8 +395,9 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
     private fun tryCreateAudioRecord(preferredSource: Int, bufferSize: Int): AudioRecord? {
         val sources = intArrayOf(
             preferredSource,
-            MediaRecorder.AudioSource.VOICE_COMMUNICATION,
+            MediaRecorder.AudioSource.VOICE_DOWNLINK,
             MediaRecorder.AudioSource.VOICE_CALL,
+            MediaRecorder.AudioSource.VOICE_COMMUNICATION,
             MediaRecorder.AudioSource.MIC
         )
 
@@ -391,6 +432,8 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
                 audioManager?.setParameters("audio_capability=call_recording=1")
                 audioManager?.setParameters("voice_tx_mute=0")
                 audioManager?.setParameters("voice_tx_mute=false")
+                audioManager?.setParameters("voice_rx_mute=0")
+                audioManager?.setParameters("voice_rx_mute=false")
 
                 RootPrivilegeManager.executeSuCommand("""
                     # 1. Route MultiMedia1 directly to Voice_Tx so the CALLER receives the delayed feedback!
@@ -404,11 +447,15 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
                     tinymix 'Voice_Rx Audio Mixer MultiMedia1' 0 2>/dev/null || true
                     tinymix 'Voice_Rx Audio Mixer MultiMedia2' 0 2>/dev/null || true
 
-                    # 3. Ensure Voice_Tx is completely unmuted
+                    # 3. Ensure Voice_Tx is completely unmuted for uplink to caller
                     tinymix 'Voice Tx Mute' 0 2>/dev/null || true
                     tinymix 'Voice Tx Device Mute' 0 2>/dev/null || true
+
+                    # 4. Ensure Voice_Rx is unmuted so user hears caller voice
+                    tinymix 'Voice Rx Mute' 0 2>/dev/null || true
+                    tinymix 'Voice Rx Device Mute' 0 2>/dev/null || true
                 """.trimIndent())
-                Log.i(TAG, "Unmasked Voice_Tx ALSA mixers for Speech Jammer uplink")
+                Log.i(TAG, "Unmasked Voice_Tx ALSA mixers for Speech Jammer uplink and unmuted Voice_Rx")
             } catch (e: Exception) {
                 Log.w(TAG, "Root hardware mixer unmask notice: ${e.message}")
             }

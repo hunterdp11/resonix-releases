@@ -213,10 +213,12 @@ fun ScreeningCallScreen(
         }
     }
 
-    val currentDisplayMode = remember(state.status, state.isIncoming) {
+    val currentDisplayMode = remember(state.status, state.isIncoming, state.audioCallMode, state.isRealtimeVoiceChangerActive) {
         if (state.status == CallStatus.RINGING && state.isIncoming) {
             CallDisplayMode.INCOMING_RINGING
-        } else if (state.status == CallStatus.SCREENING_ACTIVE) {
+        } else if (state.status == CallStatus.SCREENING_ACTIVE ||
+                   state.audioCallMode == AudioCallMode.VOICE_CHANGER ||
+                   state.isRealtimeVoiceChangerActive) {
             CallDisplayMode.ASSISTANT_SCREENING
         } else {
             CallDisplayMode.STANDARD_IN_CALL
@@ -272,6 +274,9 @@ fun ScreeningCallScreen(
                         onToggleHold = onToggleHold,
                         isSpeechJammerActive = state.isSpeechJammerActive,
                         onToggleSpeechJammer = onToggleSpeechJammer,
+                        isVoiceMorphActive = state.isRealtimeVoiceChangerActive || state.audioCallMode == AudioCallMode.VOICE_CHANGER,
+                        onToggleVoiceMorph = onSwitchToVoiceChangerMode,
+                        currentPersona = state.currentPersona,
                         onScreenWithAi = onStartScreening,
                         onDtmfDigit = onDtmfDigit,
                         onHangUp = onHangUp
@@ -2661,6 +2666,9 @@ fun StandardInCallScreen(
     onToggleHold: () -> Unit,
     isSpeechJammerActive: Boolean = false,
     onToggleSpeechJammer: () -> Unit = {},
+    isVoiceMorphActive: Boolean = false,
+    onToggleVoiceMorph: () -> Unit = {},
+    currentPersona: com.callscreener.app.model.VoicePersona = com.callscreener.app.model.VoicePersona.DEFAULT,
     onScreenWithAi: () -> Unit,
     onDtmfDigit: (Char) -> Unit,
     onHangUp: () -> Unit
@@ -2927,6 +2935,84 @@ fun StandardInCallScreen(
                                     fontFamily = FontFamily.Monospace
                                 )
                             }
+                        }
+                    }
+                }
+            }
+
+            // Voice Morph (Real-time DSP Voice Disguise) Live Interactive Pill
+            if (status != CallStatus.ENDED) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.92f)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(if (isVoiceMorphActive) Color(0x358E2DE2) else Color(0x14FFFFFF))
+                        .border(
+                            width = if (isVoiceMorphActive) 1.5.dp else 0.8.dp,
+                            color = if (isVoiceMorphActive) ApplePurple else Color(0x22FFFFFF),
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onToggleVoiceMorph()
+                        }
+                        .padding(horizontal = 14.dp, vertical = 9.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isVoiceMorphActive) ApplePurple else Color(0x288E2DE2)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.GraphicEq,
+                                    contentDescription = null,
+                                    tint = if (isVoiceMorphActive) Color.White else Color(0xFFE4C4FB),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = if (isVoiceMorphActive) "VOICE MORPH ACTIVE" else "Voice Morph (Realtime DSP)",
+                                    color = if (isVoiceMorphActive) Color(0xFFE4C4FB) else Color.White,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = if (isVoiceMorphActive)
+                                        "${currentPersona.name} • 15ms DSP live disguise active"
+                                    else
+                                        "Disguise voice in real time as ${currentPersona.name}",
+                                    color = TextSecondary,
+                                    fontSize = 10.5.sp
+                                )
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isVoiceMorphActive) ApplePurple else Color(0x258E2DE2))
+                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Text(
+                                text = if (isVoiceMorphActive) "STOP" else "MORPH",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
                         }
                     }
                 }

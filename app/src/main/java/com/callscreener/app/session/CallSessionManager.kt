@@ -221,17 +221,12 @@ class CallSessionManager private constructor(private val appContext: Context) {
             it.copy(
                 status = CallStatus.SCREENING_ACTIVE,
                 audioCallMode = AudioCallMode.AI_TYPE_SPEAK,
-                isSpeakerOn = !isPrivileged && !isSim
+                isSpeakerOn = true
             )
         }
 
         if (!isSim) {
-            if (isPrivileged) {
-                Log.i(TAG, "Root/Privileged mode active: Silent digital call audio injection enabled!")
-                setSpeakerphone(false) // Stay silent locally, caller hears audio in-system!
-            } else {
-                setSpeakerphone(true)
-            }
+            setSpeakerphone(true)
         }
         startDurationTimer()
 
@@ -606,9 +601,11 @@ class CallSessionManager private constructor(private val appContext: Context) {
 
         audioManager.mode = AudioManager.MODE_IN_CALL
         audioManager.isMicrophoneMute = false
-        CallScreeningInCallService.setCallMute(true) // Carrier uplink muted from raw mic
+        // Ensure Telecom call is UNMUTED so modulated DSP AudioTrack transmits over carrier uplink!
+        CallScreeningInCallService.setCallMute(false)
 
-        // Disconnect raw physical mic from hardware voice uplink via root ALSA mixer
+        // Disconnect raw physical mic from hardware voice uplink via root ALSA mixer,
+        // while routing MultiMedia1 into Voice_Tx and unmuting Voice Tx / Rx hardware paths
         scope.launch {
             try {
                 val script = """
@@ -617,10 +614,15 @@ class CallSessionManager private constructor(private val appContext: Context) {
                     tinymix 'Incall_Music Audio Mixer MultiMedia2' 1 2>/dev/null || true
                     tinymix 'Voice_Tx Mixer TX_CDC_DMA_TX_3' 0 2>/dev/null || true
                     tinymix 'Voice_Tx Mixer SLIM_0_TX' 0 2>/dev/null || true
+                    tinymix 'Voice_Tx Mixer SLIM_0_TX_Voice' 0 2>/dev/null || true
                     tinymix 'Voice_Tx Mixer AFE_PCM_TX' 0 2>/dev/null || true
                     tinymix 'Voice_Tx Mixer PRI_TX_Voice' 0 2>/dev/null || true
                     tinymix 'Voice_Tx Mixer TERT_MI2S_TX_Voice' 0 2>/dev/null || true
                     tinymix 'Voice_Tx Mixer TX_Voice' 0 2>/dev/null || true
+                    tinymix 'Voice Tx Mute' 0 2>/dev/null || true
+                    tinymix 'Voice Tx Device Mute' 0 2>/dev/null || true
+                    tinymix 'Voice Rx Mute' 0 2>/dev/null || true
+                    tinymix 'Voice Rx Device Mute' 0 2>/dev/null || true
                 """.trimIndent()
                 RootPrivilegeManager.executeSuCommand(script)
             } catch (_: Exception) {}
@@ -637,12 +639,23 @@ class CallSessionManager private constructor(private val appContext: Context) {
             it.copy(
                 audioCallMode = AudioCallMode.VOICE_CHANGER,
                 isRealtimeVoiceChangerActive = true,
-                status = CallStatus.USER_TALKING,
+                status = CallStatus.SCREENING_ACTIVE, // Keep active in assistant screening / Voice Morph studio view!
                 currentPersona = targetPersona,
                 isMuted = false
             )
         }
         addMessage(MessageSender.SYSTEM, "Audio Mode: Live Voice Changer (${targetPersona.name}). Your voice is modified in real-time. Caller cannot hear your real voice.")
+    }
+
+    /**
+     * Toggle Voice Changer Mode: switches to Voice Changer if not active; otherwise reverts to Direct Mic.
+     */
+    fun toggleVoiceChangerMode(persona: VoicePersona? = null) {
+        if (_sessionState.value.audioCallMode == AudioCallMode.VOICE_CHANGER || _sessionState.value.isRealtimeVoiceChangerActive) {
+            switchToDirectMicMode()
+        } else {
+            switchToVoiceChangerMode(persona)
+        }
     }
 
     /**
