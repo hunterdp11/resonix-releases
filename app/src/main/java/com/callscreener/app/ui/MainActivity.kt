@@ -468,7 +468,6 @@ fun MainDashboard(
     var selectedContactForDetails by remember { mutableStateOf<ContactItem?>(null) }
     var isSettingsOpen by remember { mutableStateOf(false) }
     var isPresetManagerOpen by remember { mutableStateOf(false) }
-    var isVoiceChangerStudioOpen by remember { mutableStateOf(false) }
     val presets by sessionManager.presetManager.presets.collectAsState()
 
     Box(
@@ -574,8 +573,7 @@ fun MainDashboard(
                         },
                         onOpenDetails = { contact -> selectedContactForDetails = contact },
                         onOpenSettings = { isSettingsOpen = true },
-                        onOpenPresetManager = { isPresetManagerOpen = true },
-                        onOpenVoiceChangerStudio = { isVoiceChangerStudioOpen = true }
+                        onOpenPresetManager = { isPresetManagerOpen = true }
                     )
                     DialerTab.CONTACTS -> ContactsScreen(
                         contacts = contacts,
@@ -583,8 +581,7 @@ fun MainDashboard(
                         onCall = { number -> DialerRepository.placeCall(context, number) },
                         onOpenDetails = { contact -> selectedContactForDetails = contact },
                         onOpenSettings = { isSettingsOpen = true },
-                        onOpenPresetManager = { isPresetManagerOpen = true },
-                        onOpenVoiceChangerStudio = { isVoiceChangerStudioOpen = true }
+                        onOpenPresetManager = { isPresetManagerOpen = true }
                     )
                     DialerTab.KEYPAD -> KeypadScreen(
                         contacts = contacts,
@@ -593,7 +590,6 @@ fun MainDashboard(
                         onOpenDetails = { contact -> selectedContactForDetails = contact },
                         onOpenSettings = { isSettingsOpen = true },
                         onOpenPresetManager = { isPresetManagerOpen = true },
-                        onOpenVoiceChangerStudio = { isVoiceChangerStudioOpen = true },
                         onSwitchTab = { currentTab = it }
                     )
                     DialerTab.ASSISTANT -> AssistantTabScreen(
@@ -605,8 +601,7 @@ fun MainDashboard(
                         isGreetingEnabled = sessionState.isGreetingEnabled,
                         onToggleGreeting = { sessionManager.setGreetingEnabled(it) },
                         presetManager = sessionManager.presetManager,
-                        onOpenPresetManager = { isPresetManagerOpen = true },
-                        onOpenVoiceChangerStudio = { isVoiceChangerStudioOpen = true }
+                        onOpenPresetManager = { isPresetManagerOpen = true }
                     )
                 }
             }
@@ -680,14 +675,6 @@ fun MainDashboard(
                 presetManager = sessionManager.presetManager,
                 quickReplyManager = sessionManager.quickReplyManager,
                 onDismiss = { isPresetManagerOpen = false }
-            )
-        }
-
-        // Dedicated Live Voice Changer & Pitch Shifter Testing Lab
-        if (isVoiceChangerStudioOpen) {
-            LiveVoiceChangerTestSheet(
-                engine = sessionManager.voiceChangerEngine,
-                onDismiss = { isVoiceChangerStudioOpen = false }
             )
         }
     }
@@ -919,8 +906,7 @@ fun RecentsScreen(
     onScreen: (CallLogItem) -> Unit = {},
     onOpenDetails: (ContactItem) -> Unit = {},
     onOpenSettings: () -> Unit = {},
-    onOpenPresetManager: () -> Unit = {},
-    onOpenVoiceChangerStudio: () -> Unit = {}
+    onOpenPresetManager: () -> Unit = {}
 ) {
     var selectedFilter by remember { mutableStateOf("All") }
     var selectedLogForDetails by remember { mutableStateOf<CallLogItem?>(null) }
@@ -1261,21 +1247,6 @@ fun RecentsScreen(
                             onClick = {
                                 isMenuExpanded = false
                                 onOpenPresetManager()
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = ApplePurple, modifier = Modifier.size(18.dp))
-                                    Text("Voice Morph Studio", color = Color.White, fontSize = 14.sp)
-                                }
-                            },
-                            onClick = {
-                                isMenuExpanded = false
-                                onOpenVoiceChangerStudio()
                             }
                         )
                     }
@@ -2005,8 +1976,7 @@ fun ContactsScreen(
     onCall: (String) -> Unit,
     onOpenDetails: (ContactItem) -> Unit = {},
     onOpenSettings: () -> Unit = {},
-    onOpenPresetManager: () -> Unit = {},
-    onOpenVoiceChangerStudio: () -> Unit = {}
+    onOpenPresetManager: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
@@ -2378,21 +2348,6 @@ fun ContactsScreen(
                                     onOpenPresetManager()
                                 }
                             )
-                            DropdownMenuItem(
-                                text = {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-                                        Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = ApplePurple, modifier = Modifier.size(18.dp))
-                                        Text("Voice Morph Studio", color = Color.White, fontSize = 14.sp)
-                                    }
-                                },
-                                onClick = {
-                                    isMenuExpanded = false
-                                    onOpenVoiceChangerStudio()
-                                }
-                            )
                         }
                     }
                 }
@@ -2535,7 +2490,6 @@ fun KeypadScreen(
     onOpenDetails: (ContactItem) -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onOpenPresetManager: () -> Unit = {},
-    onOpenVoiceChangerStudio: () -> Unit = {},
     onSwitchTab: (DialerTab) -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -2691,21 +2645,6 @@ fun KeypadScreen(
                         onClick = {
                             isMenuExpanded = false
                             onOpenPresetManager()
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = ApplePurple, modifier = Modifier.size(18.dp))
-                                Text("Voice Morph Studio", color = Color.White, fontSize = 14.sp)
-                            }
-                        },
-                        onClick = {
-                            isMenuExpanded = false
-                            onOpenVoiceChangerStudio()
                         }
                     )
                     DropdownMenuItem(
@@ -3177,8 +3116,7 @@ fun AssistantTabScreen(
     isGreetingEnabled: Boolean,
     onToggleGreeting: (Boolean) -> Unit,
     presetManager: AudioPresetManager? = null,
-    onOpenPresetManager: () -> Unit = {},
-    onOpenVoiceChangerStudio: () -> Unit = {}
+    onOpenPresetManager: () -> Unit = {}
 ) {
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
@@ -3225,75 +3163,6 @@ fun AssistantTabScreen(
                     color = Color(0x99FFFFFF),
                     fontSize = 12.5.sp
                 )
-            }
-        }
-
-        // Live Voice Morph Studio (DSP Lab) Quick Launcher Banner
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(18.dp))
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(Color(0xFF2E124D), Color(0xFF13112E))
-                    )
-                )
-                .border(1.dp, Color(0x608E2DE2), RoundedCornerShape(18.dp))
-                .clickable { onOpenVoiceChangerStudio() }
-                .padding(14.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(ApplePurple.copy(alpha = 0.25f))
-                            .border(1.dp, ApplePurple.copy(alpha = 0.6f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.GraphicEq,
-                            contentDescription = null,
-                            tint = ApplePurple,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            text = "Live Voice Morph Studio",
-                            color = Color.White,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Test mic pitch shift, girl voices & 15ms DSP",
-                            color = Color(0xFFD4B0FF),
-                            fontSize = 11.sp
-                        )
-                    }
-                }
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(ApplePurple)
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = "Open Lab",
-                        color = Color.White,
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
             }
         }
 

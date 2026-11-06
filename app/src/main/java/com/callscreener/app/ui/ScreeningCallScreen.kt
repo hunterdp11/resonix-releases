@@ -173,7 +173,6 @@ fun ScreeningCallScreen(
     onSelectPersona: (VoicePersona) -> Unit = {},
     onSwitchToAiTypeMode: () -> Unit = {},
     onSwitchToDirectMicMode: () -> Unit = {},
-    onSwitchToVoiceChangerMode: () -> Unit = {},
     onSimulateCallerReply: (String) -> Unit = {},
     onToggleAiVoiceListening: () -> Unit = {},
     onToggleAutoRelay: (Boolean) -> Unit = {},
@@ -213,12 +212,10 @@ fun ScreeningCallScreen(
         }
     }
 
-    val currentDisplayMode = remember(state.status, state.isIncoming, state.audioCallMode, state.isRealtimeVoiceChangerActive) {
+    val currentDisplayMode = remember(state.status, state.isIncoming) {
         if (state.status == CallStatus.RINGING && state.isIncoming) {
             CallDisplayMode.INCOMING_RINGING
-        } else if (state.status == CallStatus.SCREENING_ACTIVE ||
-                   state.audioCallMode == AudioCallMode.VOICE_CHANGER ||
-                   state.isRealtimeVoiceChangerActive) {
+        } else if (state.status == CallStatus.SCREENING_ACTIVE) {
             CallDisplayMode.ASSISTANT_SCREENING
         } else {
             CallDisplayMode.STANDARD_IN_CALL
@@ -274,9 +271,6 @@ fun ScreeningCallScreen(
                         onToggleHold = onToggleHold,
                         isSpeechJammerActive = state.isSpeechJammerActive,
                         onToggleSpeechJammer = onToggleSpeechJammer,
-                        isVoiceMorphActive = state.isRealtimeVoiceChangerActive || state.audioCallMode == AudioCallMode.VOICE_CHANGER,
-                        onToggleVoiceMorph = onSwitchToVoiceChangerMode,
-                        currentPersona = state.currentPersona,
                         onScreenWithAi = onStartScreening,
                         onDtmfDigit = onDtmfDigit,
                         onHangUp = onHangUp
@@ -411,7 +405,6 @@ fun ScreeningCallScreen(
                     isSpeakerOn = state.isSpeakerOn,
                     onSwitchToAiType = onSwitchToAiTypeMode,
                     onSwitchToDirectMic = onSwitchToDirectMicMode,
-                    onSwitchToVoiceChanger = onSwitchToVoiceChangerMode,
                     onTakeOver = onTakeOver,
                     onHangUp = onHangUp,
                     onToggleMute = onToggleMute,
@@ -1031,7 +1024,6 @@ fun UnifiedLiquidCommandIsland(
     isSpeakerOn: Boolean,
     onSwitchToAiType: () -> Unit,
     onSwitchToDirectMic: () -> Unit,
-    onSwitchToVoiceChanger: () -> Unit = {},
     onTakeOver: () -> Unit,
     onHangUp: () -> Unit,
     onToggleMute: () -> Unit,
@@ -1118,59 +1110,7 @@ fun UnifiedLiquidCommandIsland(
                     )
                 }
             }
-        } else if (audioMode == AudioCallMode.VOICE_CHANGER) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0x288E2DE2))
-                    .border(
-                        0.8.dp,
-                        Color(0x608E2DE2),
-                        RoundedCornerShape(12.dp)
-                    )
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(ApplePurple)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Voice Morph Active: ${state.currentPersona.name} • Raw Mic Muted",
-                        color = Color(0xFFE4C4FB),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(ApplePurple.copy(alpha = 0.35f))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = "15ms DSP",
-                        color = Color.White,
-                        fontSize = 9.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
         }
-
         // Type-to-Speak Input Bar (Fluid Apple Liquid Glass with Coordinated Horizontal Expansion)
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1181,10 +1121,10 @@ fun UnifiedLiquidCommandIsland(
                 onValueChange = onTextChanged,
                 placeholder = {
                     Text(
-                        text = when (audioMode) {
-                            AudioCallMode.AI_TYPE_SPEAK -> if (state.isListeningToUserSpeech) "Listening... speak into mic or type" else "Type a message to speak in AI Voice..."
-                            AudioCallMode.VOICE_CHANGER -> "Voice morph active: speaking as ${state.currentPersona.name}..."
-                            else -> "Direct microphone active..."
+                        text = if (audioMode == AudioCallMode.AI_TYPE_SPEAK) {
+                            if (state.isListeningToUserSpeech) "Listening... speak into mic or type" else "Type a message to speak in AI Voice..."
+                        } else {
+                            "Direct microphone active..."
                         },
                         color = TextTertiary,
                         fontSize = 13.sp
@@ -1358,10 +1298,10 @@ fun UnifiedLiquidCommandIsland(
                     )
                 }
 
-                // Row 2: AI Voice Relay | Voice Morph (DSP) | Direct Mic
+                // Row 2: AI Voice Relay | Direct Mic
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterHorizontally),
+                    horizontalArrangement = Arrangement.spacedBy(36.dp, Alignment.CenterHorizontally),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Button 4: AI Voice Relay Mode
@@ -1375,18 +1315,7 @@ fun UnifiedLiquidCommandIsland(
                         onClick = onSwitchToAiType
                     )
 
-                    // Button 5: Live Voice Morph (DSP Realtime Pitch Shifter)
-                    val isVoiceMorph = audioMode == AudioCallMode.VOICE_CHANGER
-                    OemInCallControlButton(
-                        icon = Icons.Rounded.GraphicEq,
-                        label = "Voice Morph",
-                        isActive = isVoiceMorph,
-                        activeColor = ApplePurple,
-                        activeContentColor = Color.White,
-                        onClick = onSwitchToVoiceChanger
-                    )
-
-                    // Button 6: Direct Mic Mode
+                    // Button 5: Direct Mic Mode
                     val isDirect = audioMode == AudioCallMode.DIRECT_MIC
                     OemInCallControlButton(
                         icon = Icons.Filled.Call,
@@ -2666,9 +2595,6 @@ fun StandardInCallScreen(
     onToggleHold: () -> Unit,
     isSpeechJammerActive: Boolean = false,
     onToggleSpeechJammer: () -> Unit = {},
-    isVoiceMorphActive: Boolean = false,
-    onToggleVoiceMorph: () -> Unit = {},
-    currentPersona: com.callscreener.app.model.VoicePersona = com.callscreener.app.model.VoicePersona.DEFAULT,
     onScreenWithAi: () -> Unit,
     onDtmfDigit: (Char) -> Unit,
     onHangUp: () -> Unit
@@ -2935,84 +2861,6 @@ fun StandardInCallScreen(
                                     fontFamily = FontFamily.Monospace
                                 )
                             }
-                        }
-                    }
-                }
-            }
-
-            // Voice Morph (Real-time DSP Voice Disguise) Live Interactive Pill
-            if (status != CallStatus.ENDED) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.92f)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(if (isVoiceMorphActive) Color(0x358E2DE2) else Color(0x14FFFFFF))
-                        .border(
-                            width = if (isVoiceMorphActive) 1.5.dp else 0.8.dp,
-                            color = if (isVoiceMorphActive) ApplePurple else Color(0x22FFFFFF),
-                            shape = RoundedCornerShape(16.dp)
-                        )
-                        .clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onToggleVoiceMorph()
-                        }
-                        .padding(horizontal = 14.dp, vertical = 9.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(30.dp)
-                                    .clip(CircleShape)
-                                    .background(if (isVoiceMorphActive) ApplePurple else Color(0x288E2DE2)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.GraphicEq,
-                                    contentDescription = null,
-                                    tint = if (isVoiceMorphActive) Color.White else Color(0xFFE4C4FB),
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                            Column {
-                                Text(
-                                    text = if (isVoiceMorphActive) "VOICE MORPH ACTIVE" else "Voice Morph (Realtime DSP)",
-                                    color = if (isVoiceMorphActive) Color(0xFFE4C4FB) else Color.White,
-                                    fontSize = 12.5.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = if (isVoiceMorphActive)
-                                        "${currentPersona.name} • 15ms DSP live disguise active"
-                                    else
-                                        "Disguise voice in real time as ${currentPersona.name}",
-                                    color = TextSecondary,
-                                    fontSize = 10.5.sp
-                                )
-                            }
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (isVoiceMorphActive) ApplePurple else Color(0x258E2DE2))
-                                .padding(horizontal = 10.dp, vertical = 5.dp)
-                        ) {
-                            Text(
-                                text = if (isVoiceMorphActive) "STOP" else "MORPH",
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace
-                            )
                         }
                     }
                 }

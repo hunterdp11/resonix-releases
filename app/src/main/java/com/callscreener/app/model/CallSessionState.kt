@@ -12,7 +12,6 @@ enum class CallStatus {
 
 enum class AudioCallMode {
     AI_TYPE_SPEAK,     // AI Voice speaks typed words & greetings
-    VOICE_CHANGER,     // Real-time live mic voice changer (female / persona)
     DIRECT_MIC         // Direct real mic (natural voice)
 }
 
@@ -27,7 +26,6 @@ data class CallSessionState(
     val isMuted: Boolean = false,
     val isTtsSpeaking: Boolean = false,
     val currentPersona: VoicePersona = VoicePersona.DEFAULT,
-    val isRealtimeVoiceChangerActive: Boolean = false,
     val isListeningToUserSpeech: Boolean = false,
     val userLiveTranscript: String = "",
     val isAutoRelayEnabled: Boolean = false,
