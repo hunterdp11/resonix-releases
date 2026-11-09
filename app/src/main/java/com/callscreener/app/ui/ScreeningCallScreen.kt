@@ -1,12 +1,42 @@
 package com.callscreener.app.ui
 
+import android.os.Build
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Security
+import androidx.compose.material.icons.automirrored.rounded.Message
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PersonAdd
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
+import kotlin.math.abs
+import kotlin.math.sin
+import kotlin.math.PI
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import com.callscreener.app.data.CallerProfileManager
+import com.callscreener.app.data.rememberContactPhotoBitmap
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.ui.unit.Dp
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -33,10 +63,14 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import com.callscreener.app.data.DialerRepository
+import com.callscreener.app.engine.JammerMode
+import com.callscreener.app.session.CallSessionManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -51,18 +85,20 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Backspace
+import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
@@ -78,7 +114,12 @@ import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Psychology
+import androidx.compose.material.icons.rounded.PhoneInTalk
 import androidx.compose.material.icons.rounded.RecordVoiceOver
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material.icons.rounded.Tune
 import com.callscreener.app.engine.AudioPresetManager
@@ -86,12 +127,14 @@ import com.callscreener.app.engine.QuickReplyManager
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -135,6 +178,7 @@ import com.callscreener.app.ui.theme.AppleRed
 import com.callscreener.app.ui.theme.AppleRedGlassFill
 import com.callscreener.app.ui.theme.AppleTeal
 import com.callscreener.app.ui.theme.GlassBackgroundGradient
+import com.callscreener.app.ui.theme.GoogleSans
 import com.callscreener.app.ui.theme.LiquidGlassBorder
 import com.callscreener.app.ui.theme.LiquidGlassBorderSubtle
 import com.callscreener.app.ui.theme.LiquidGlassFill
@@ -184,9 +228,7 @@ fun ScreeningCallScreen(
     quickReplyManager: QuickReplyManager? = null
 ) {
     var inputText by remember { mutableStateOf("") }
-    var activeRibbonTab by remember { mutableStateOf(RibbonTab.QUICK_REPLIES) }
     var isPresetManagerOpen by remember { mutableStateOf(false) }
-    var isFocusChatMode by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
     // Smooth auto-scroll to the newest message
@@ -196,11 +238,19 @@ fun ScreeningCallScreen(
         }
     }
 
-    val isInCall = state.status == CallStatus.SCREENING_ACTIVE ||
-            state.status == CallStatus.DIALING ||
-            state.status == CallStatus.USER_TALKING
-
     val context = LocalContext.current
+
+    val monetColors = remember(context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                dynamicDarkColorScheme(context)
+            } catch (_: Throwable) {
+                getPixelMonetDarkColorScheme()
+            }
+        } else {
+            getPixelMonetDarkColorScheme()
+        }
+    }
 
     // Prioritize contact name saved in phone's contacts; only show network owner name for unsaved contacts
     val effectiveCallerName = remember(state.callerNumber, state.callerName) {
@@ -222,6 +272,10 @@ fun ScreeningCallScreen(
         }
     }
 
+    var isQuickReplyOpen by remember { mutableStateOf(false) }
+    var isToolsMenuOpen by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -233,10 +287,36 @@ fun ScreeningCallScreen(
         AnimatedContent(
             targetState = currentDisplayMode,
             transitionSpec = {
-                fadeIn(animationSpec = tween(400, easing = FastOutSlowInEasing)) +
-                    scaleIn(initialScale = 0.94f, animationSpec = tween(400, easing = FastOutSlowInEasing)) togetherWith
-                fadeOut(animationSpec = tween(280, easing = FastOutSlowInEasing)) +
-                    scaleOut(targetScale = 1.05f, animationSpec = tween(280, easing = FastOutSlowInEasing))
+                if (initialState == CallDisplayMode.INCOMING_RINGING && targetState == CallDisplayMode.ASSISTANT_SCREENING) {
+                    (fadeIn(animationSpec = tween(420, easing = FastOutSlowInEasing)) +
+                     scaleIn(initialScale = 0.92f, animationSpec = spring(dampingRatio = 0.80f, stiffness = Spring.StiffnessMediumLow)) +
+                     slideInVertically(initialOffsetY = { (it * 0.08f).toInt() }, animationSpec = spring(dampingRatio = 0.80f, stiffness = Spring.StiffnessMediumLow))
+                    ).togetherWith(
+                        fadeOut(animationSpec = tween(280, easing = FastOutSlowInEasing)) +
+                        scaleOut(targetScale = 1.06f, animationSpec = tween(280, easing = FastOutSlowInEasing))
+                    )
+                } else if (initialState == CallDisplayMode.ASSISTANT_SCREENING && targetState == CallDisplayMode.STANDARD_IN_CALL) {
+                    (fadeIn(animationSpec = tween(400, easing = FastOutSlowInEasing)) +
+                     scaleIn(initialScale = 0.94f, animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow))
+                    ).togetherWith(
+                        fadeOut(animationSpec = tween(260, easing = FastOutSlowInEasing)) +
+                        scaleOut(targetScale = 1.04f, animationSpec = tween(260, easing = FastOutSlowInEasing))
+                    )
+                } else if (initialState == CallDisplayMode.INCOMING_RINGING && targetState == CallDisplayMode.STANDARD_IN_CALL) {
+                    (fadeIn(animationSpec = tween(400, easing = FastOutSlowInEasing)) +
+                     scaleIn(initialScale = 0.93f, animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow))
+                    ).togetherWith(
+                        fadeOut(animationSpec = tween(260, easing = FastOutSlowInEasing)) +
+                        scaleOut(targetScale = 1.05f, animationSpec = tween(260, easing = FastOutSlowInEasing))
+                    )
+                } else {
+                    (fadeIn(animationSpec = tween(360, easing = FastOutSlowInEasing)) +
+                     scaleIn(initialScale = 0.95f, animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow))
+                    ).togetherWith(
+                        fadeOut(animationSpec = tween(240, easing = FastOutSlowInEasing)) +
+                        scaleOut(targetScale = 1.04f, animationSpec = tween(240, easing = FastOutSlowInEasing))
+                    )
+                }
             },
             label = "callScreenModeTransition",
             modifier = Modifier.fillMaxSize()
@@ -250,11 +330,14 @@ fun ScreeningCallScreen(
                         isNumberHidden = state.isHideNumberOnCallerId,
                         onDecline = onHangUp,
                         onScreenWithAi = onStartScreening,
-                        onAnswer = onAnswerDirectly
+                        onAnswer = onAnswerDirectly,
+                        isDeclineHandledExternally = true,
+                        isQuickReplyOpen = isQuickReplyOpen,
+                        onToggleQuickReply = { isQuickReplyOpen = it }
                     )
                 }
                 CallDisplayMode.STANDARD_IN_CALL -> {
-                    // Standard In-Call Dialer (ColorOS / MIUI / iOS style)
+                    // Standard In-Call Dialer (Material You Monet Architecture)
                     StandardInCallScreen(
                         callerName = effectiveCallerName,
                         callerNumber = state.callerNumber,
@@ -273,181 +356,95 @@ fun ScreeningCallScreen(
                         onToggleSpeechJammer = onToggleSpeechJammer,
                         onScreenWithAi = onStartScreening,
                         onDtmfDigit = onDtmfDigit,
-                        onHangUp = onHangUp
+                        onHangUp = onHangUp,
+                        monetColors = monetColors,
+                        isEndCallHandledExternally = true
                     )
                 }
                 CallDisplayMode.ASSISTANT_SCREENING -> {
-                    // Screening Mode: Full Assistant Screen
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .navigationBarsPadding()
-                            .imePadding()
-                    ) {
-                // Super-Premium Redesigned Caller ID Card on Top (VisionOS / iOS 18 style)
-                SuperPremiumCallerCard(
-                    callerName = effectiveCallerName,
-                    callerNumber = state.callerNumber,
-                    isNumberHidden = state.isHideNumberOnCallerId,
-                    durationSeconds = state.durationSeconds,
-                    status = state.status,
-                    audioMode = state.audioCallMode,
-                    isSpeaking = state.isTtsSpeaking,
-                    isRecording = state.isRecording,
-                    recordingDurationSeconds = state.recordingDurationSeconds,
-                    onToggleRecording = onToggleRecording,
-                    isSpeechJammerActive = state.isSpeechJammerActive,
-                    onToggleSpeechJammer = onToggleSpeechJammer
-                )
-
-            // Central Transcript & Message Timeline (Generous breathing room)
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-            ) {
-                if (state.messages.isEmpty() && state.status == CallStatus.DIALING) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            JumpingAudioWaveform(color = AppleTeal, isPlaying = true)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Connecting Call",
-                                color = TextPrimary,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = (-0.3).sp
-                            )
-                            Text(
-                                text = "Direct audio uplink established. Assistant ready.",
-                                color = TextSecondary,
-                                fontSize = 13.sp,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                } else if (state.messages.isEmpty() && state.status == CallStatus.SCREENING_ACTIVE) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            JumpingAudioWaveform(color = AppleBlue, isPlaying = state.isTtsSpeaking)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = if (state.isTtsSpeaking) "Synthesizing Vocal Reply" else "Listening to Conversation",
-                                color = TextPrimary,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = (-0.3).sp
-                            )
-                            Text(
-                                text = if (state.isSimulated)
-                                    "Connected to audio stream. Enter reply below to synthesize speech."
-                                else
-                                    "Live speech transcription will appear here in real time.",
-                                color = TextTertiary,
-                                fontSize = 12.sp,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                } else {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(vertical = 12.dp)
-                    ) {
-                        items(state.messages) { msg ->
-                            LiquidGlassBubble(msg)
-                        }
-                    }
-                }
-            }
-
-            // Streamlined Liquid Hub (Debloated, Pure Elegance with Expand/Collapse Focus Toggle)
-            if (isInCall) {
-                // Fluid Apple Liquid Glass Mode Toggle Pill (Full Screen Chat Focus vs Expand Controls)
-                LiquidGlassModeTogglePill(
-                    isFocusChatMode = isFocusChatMode,
-                    onToggle = { isFocusChatMode = !isFocusChatMode }
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Unified Liquid Input & In-Call Command Island (Coordinated Single-Spring Fluid Animation)
-                UnifiedLiquidCommandIsland(
-                    text = inputText,
-                    onTextChanged = { inputText = it },
-                    onSend = {
-                        if (inputText.isNotBlank()) {
-                            onSendReply(inputText)
-                            if (state.isSimulated) {
-                                onSimulateCallerReply("Acknowledged, thank you.")
-                            }
-                            inputText = ""
-                        }
-                    },
-                    state = state,
-                    audioMode = state.audioCallMode,
-                    isMuted = state.isMuted,
-                    isSpeakerOn = state.isSpeakerOn,
-                    onSwitchToAiType = onSwitchToAiTypeMode,
-                    onSwitchToDirectMic = onSwitchToDirectMicMode,
-                    onTakeOver = onTakeOver,
-                    onHangUp = onHangUp,
-                    onToggleMute = onToggleMute,
-                    onToggleSpeaker = onToggleSpeaker,
-                    isRecording = state.isRecording,
-                    onToggleRecording = onToggleRecording,
-                    onToggleSpeechJammer = onToggleSpeechJammer,
-                    onToggleAiVoiceListening = onToggleAiVoiceListening,
-                    onToggleAutoRelay = onToggleAutoRelay,
-                    isFocusChatMode = isFocusChatMode,
-                    ribbonContent = {
-                        LiquidWavyActionRibbon(
-                            activeTab = activeRibbonTab,
-                            onSelectTab = { activeRibbonTab = it },
-                            quickReplies = state.quickReplies,
-                            onReplySelected = { reply ->
-                                onSendReply(reply.spokenText)
+                    // Authentic Material You Google Pixel Call Screen
+                    MaterialYouAssistantScreeningScreen(
+                        state = state,
+                        callerName = effectiveCallerName,
+                        callerNumber = state.callerNumber,
+                        isNumberHidden = state.isHideNumberOnCallerId,
+                        inputText = inputText,
+                        onInputTextChanged = { inputText = it },
+                        onSendReply = { text ->
+                            if (text.isNotBlank()) {
+                                onSendReply(text)
                                 if (state.isSimulated) {
-                                    val mockResponse = when (reply.id) {
-                                        "who" -> "Hello, this is Dave from Courier Logistics."
-                                        "reason" -> "I am calling regarding your express delivery."
-                                        "busy" -> "Understood, I will call back at a later time."
-                                        else -> "Thank you, noted."
-                                    }
-                                    onSimulateCallerReply(mockResponse)
+                                    onSimulateCallerReply("Acknowledged, thank you.")
                                 }
-                            },
-                            presets = presets,
-                            onPlayPreset = onPlayPreset,
-                            currentPersona = state.currentPersona,
-                            onSelectPersona = onSelectPersona,
-                            onOpenPresetManager = { isPresetManagerOpen = true }
-                        )
-                    }
-                )
-            }
-
-                    Spacer(modifier = Modifier.height(12.dp))
+                                inputText = ""
+                            }
+                        },
+                        onQuickReplySelected = { reply ->
+                            onSendReply(reply.spokenText)
+                            if (state.isSimulated) {
+                                val mockResponse = when (reply.id) {
+                                    "who" -> "Hello, this is Dave from Courier Logistics."
+                                    "reason" -> "I am calling regarding your express delivery."
+                                    "busy" -> "Understood, I will call back at a later time."
+                                    else -> "Thank you, noted."
+                                }
+                                onSimulateCallerReply(mockResponse)
+                            }
+                        },
+                        onTakeOver = onTakeOver,
+                        onHangUp = onHangUp,
+                        onToggleMute = onToggleMute,
+                        onToggleSpeaker = onToggleSpeaker,
+                        onToggleRecording = onToggleRecording,
+                        onToggleSpeechJammer = onToggleSpeechJammer,
+                        onToggleAiVoiceListening = onToggleAiVoiceListening,
+                        onSwitchToAiTypeMode = onSwitchToAiTypeMode,
+                        onSwitchToDirectMicMode = onSwitchToDirectMicMode,
+                        presets = presets,
+                        onPlayPreset = onPlayPreset,
+                        currentPersona = state.currentPersona,
+                        onSelectPersona = onSelectPersona,
+                        onOpenPresetManager = { isPresetManagerOpen = true },
+                        listState = listState,
+                        monetColors = monetColors,
+                        isHangUpHandledExternally = true,
+                        isToolsMenuOpen = isToolsMenuOpen,
+                        onToggleToolsMenu = { isToolsMenuOpen = it }
+                    )
                 }
             }
         }
+
+        // Shared Fluid Morphing Decline / End Call / Hang Up Button (Continuous layer across transitions)
+        SharedMorphingDeclineButton(
+            mode = currentDisplayMode,
+            isQuickReplyOpen = isQuickReplyOpen,
+            isToolsMenuOpen = isToolsMenuOpen,
+            onHangUp = onHangUp,
+            monetColors = monetColors,
+            isCallEnded = state.status == CallStatus.ENDED
+        )
+
+        // 6. Secondary Tools Modal Bottom Sheet (Rendered above everything so it never gets overridden)
+        ScreeningToolsBottomSheet(
+            visible = isToolsMenuOpen,
+            onDismiss = { isToolsMenuOpen = false },
+            audioMode = state.audioCallMode,
+            onSwitchToAiType = onSwitchToAiTypeMode,
+            onSwitchToDirectMic = onSwitchToDirectMicMode,
+            currentPersona = state.currentPersona,
+            onSelectPersona = onSelectPersona,
+            presets = presets,
+            onPlayPreset = onPlayPreset,
+            onOpenPresetManager = { isPresetManagerOpen = true },
+            isSpeechJammerActive = state.isSpeechJammerActive,
+            onToggleSpeechJammer = onToggleSpeechJammer,
+            isRecording = state.isRecording,
+            recordingDurationSeconds = state.recordingDurationSeconds,
+            onToggleRecording = onToggleRecording,
+            monetColors = monetColors
+        )
     }
-}
 
     if (isPresetManagerOpen && presetManager != null && quickReplyManager != null) {
         PresetManagementScreen(
@@ -459,317 +456,923 @@ fun ScreeningCallScreen(
 }
 
 /**
- * Super-Premium VisionOS / iOS 18 Caller ID Bar
- * Redesigned with liquid moving aura, initials avatar, carrier verified tag, live audio equalizer and monospace timer
+ * Shared Fluid Morphing Decline / Hang Up / End Call Action Button.
+ * Continually morphs across CallDisplayMode states (Ringing -> Assistant Screening -> Active In-Call)
+ * with fluid Pixel Material You spring physics, liquid squish & stretch on press, specular glint shimmer,
+ * and breathing ruby halo aura.
  */
 @Composable
-fun SuperPremiumCallerCard(
-    callerName: String?,
-    callerNumber: String,
-    isNumberHidden: Boolean = false,
-    durationSeconds: Long,
-    status: CallStatus,
-    audioMode: AudioCallMode,
-    isSpeaking: Boolean,
-    isRecording: Boolean = false,
-    recordingDurationSeconds: Long = 0L,
-    onToggleRecording: () -> Unit = {},
-    isSpeechJammerActive: Boolean = false,
-    onToggleSpeechJammer: () -> Unit = {}
+fun SharedMorphingDeclineButton(
+    mode: CallDisplayMode,
+    isQuickReplyOpen: Boolean,
+    isToolsMenuOpen: Boolean = false,
+    onHangUp: () -> Unit,
+    monetColors: ColorScheme,
+    isCallEnded: Boolean = false
 ) {
-    val auraTransition = rememberInfiniteTransition(label = "callerAura")
-    val rippleScale by auraTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.38f,
-        animationSpec = infiniteRepeatable(tween(2200, easing = FastOutSlowInEasing), RepeatMode.Restart),
-        label = "rippleScale"
-    )
-    val rippleAlpha by auraTransition.animateFloat(
-        initialValue = 0.50f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(tween(2200, easing = FastOutSlowInEasing), RepeatMode.Restart),
-        label = "rippleAlpha"
+    val haptic = LocalHapticFeedback.current
+
+    val isHidden = isQuickReplyOpen || isCallEnded || isToolsMenuOpen
+
+    val quickReplyAlpha by animateFloatAsState(
+        targetValue = if (isHidden) 0f else 1f,
+        animationSpec = tween(180, easing = LinearEasing),
+        label = "morphQuickReplyAlpha"
     )
 
-    val beaconPulse by auraTransition.animateFloat(
-        initialValue = 0.40f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(tween(900, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "beaconPulse"
-    )
-
-    val initials = remember(callerName) {
-        val words = (callerName ?: "Unknown").trim().split(" ")
-        if (words.size >= 2) {
-            "${words[0].take(1)}${words[1].take(1)}".uppercase()
-        } else {
-            words.firstOrNull()?.take(2)?.uppercase() ?: "CL"
-        }
+    if (quickReplyAlpha <= 0.01f && isHidden) {
+        return
     }
 
-    // VisionOS Floating Frosted Glass Dynamic Island Header Canopy
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(horizontal = 14.dp, vertical = 6.dp)
-            .shadow(
-                elevation = 22.dp,
-                shape = RoundedCornerShape(26.dp),
-                spotColor = Color(0x90000000),
-                ambientColor = Color(0x50000000)
-            )
-            .clip(RoundedCornerShape(26.dp))
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        Color(0xF2181C26), // Frosted obsidian titanium
-                        Color(0xE610131B), // AMOLED deep glass
-                        Color(0xD9080A0E)
-                    )
-                )
-            )
-            .border(
-                width = 1.dp,
-                brush = Brush.verticalGradient(
-                    listOf(
-                        Color(0x65FFFFFF), // Specular light-catching top bevel
-                        Color(0x20FFFFFF),
-                        Color(0x08FFFFFF)
-                    )
-                ),
-                shape = RoundedCornerShape(26.dp)
-            )
-            .padding(horizontal = 16.dp, vertical = 13.dp)
+            .fillMaxSize()
+            .navigationBarsPadding()
+            .imePadding()
+            .graphicsLayer {
+                alpha = quickReplyAlpha
+            }
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            // Top Auxiliary Ribbon: Carrier Tag + Equalizer + Monospace Timer
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Carrier & Screening Mode Micro-Pill
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0x18FFFFFF))
-                        .border(0.6.dp, Color(0x25FFFFFF), RoundedCornerShape(10.dp))
-                        .padding(horizontal = 8.dp, vertical = 3.5.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .clip(CircleShape)
-                            .background(AppleGreen.copy(alpha = beaconPulse))
+        val totalWidth = maxWidth
+        val totalHeight = maxHeight
+
+        val halfWidth = (totalWidth - 46.dp) / 2
+        val inCallButtonWidth = 84.dp
+        val inCallButtonHeight = 76.dp
+        val inCallCornerRadius = 38.dp
+        val inCallCenterX = (totalWidth - inCallButtonWidth) / 2
+
+        val targetWidth = when (mode) {
+            CallDisplayMode.INCOMING_RINGING -> 72.dp
+            CallDisplayMode.ASSISTANT_SCREENING -> halfWidth
+            CallDisplayMode.STANDARD_IN_CALL -> inCallButtonWidth
+        }
+        val targetHeight = when (mode) {
+            CallDisplayMode.INCOMING_RINGING -> 72.dp
+            CallDisplayMode.ASSISTANT_SCREENING -> 54.dp
+            CallDisplayMode.STANDARD_IN_CALL -> inCallButtonHeight
+        }
+        val targetCornerRadius = when (mode) {
+            CallDisplayMode.INCOMING_RINGING -> 36.dp
+            CallDisplayMode.ASSISTANT_SCREENING -> 27.dp
+            CallDisplayMode.STANDARD_IN_CALL -> inCallCornerRadius
+        }
+        val targetLeft = when (mode) {
+            CallDisplayMode.INCOMING_RINGING -> 62.dp
+            CallDisplayMode.ASSISTANT_SCREENING -> 16.dp
+            CallDisplayMode.STANDARD_IN_CALL -> inCallCenterX
+        }
+        val targetBottom = when (mode) {
+            CallDisplayMode.INCOMING_RINGING -> 62.dp
+            CallDisplayMode.ASSISTANT_SCREENING -> 12.dp
+            CallDisplayMode.STANDARD_IN_CALL -> 24.dp
+        }
+        val targetHasLabel = mode == CallDisplayMode.ASSISTANT_SCREENING
+
+        // Stutter-free fluid critically-damped spring physics (Google Pixel 120Hz feel)
+        val morphSpringSpec = spring<Dp>(
+            dampingRatio = 0.88f,
+            stiffness = Spring.StiffnessMediumLow
+        )
+
+        val buttonWidth by animateDpAsState(targetValue = targetWidth, animationSpec = morphSpringSpec, label = "morphWidth")
+        val buttonHeight by animateDpAsState(targetValue = targetHeight, animationSpec = morphSpringSpec, label = "morphHeight")
+        val buttonCornerRadius by animateDpAsState(targetValue = targetCornerRadius, animationSpec = morphSpringSpec, label = "morphRadius")
+        val buttonLeft by animateDpAsState(targetValue = targetLeft, animationSpec = morphSpringSpec, label = "morphLeft")
+        val buttonBottom by animateDpAsState(targetValue = targetBottom, animationSpec = morphSpringSpec, label = "morphBottom")
+
+        val labelAlpha by animateFloatAsState(
+            targetValue = if (targetHasLabel) 1f else 0f,
+            animationSpec = tween(
+                durationMillis = if (targetHasLabel) 220 else 70,
+                delayMillis = if (targetHasLabel) 80 else 0,
+                easing = if (targetHasLabel) FastOutSlowInEasing else LinearEasing
+            ),
+            label = "morphLabelAlpha"
+        )
+        val iconSize by animateDpAsState(
+            targetValue = when (mode) {
+                CallDisplayMode.ASSISTANT_SCREENING -> 22.dp
+                CallDisplayMode.STANDARD_IN_CALL -> 36.dp
+                CallDisplayMode.INCOMING_RINGING -> 32.dp
+            },
+            animationSpec = morphSpringSpec,
+            label = "morphIconSize"
+        )
+
+        val interactionSource = remember { MutableInteractionSource() }
+        val isPressed by interactionSource.collectIsPressedAsState()
+
+        val scaleX by animateFloatAsState(
+            targetValue = if (isPressed) 1.08f else 1.0f,
+            animationSpec = spring(dampingRatio = 0.54f, stiffness = Spring.StiffnessMediumLow),
+            label = "morphScaleX"
+        )
+        val scaleY by animateFloatAsState(
+            targetValue = if (isPressed) 0.88f else 1.0f,
+            animationSpec = spring(dampingRatio = 0.54f, stiffness = Spring.StiffnessMediumLow),
+            label = "morphScaleY"
+        )
+        val elevation by animateDpAsState(
+            targetValue = if (isPressed) 4.dp else 14.dp,
+            animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
+            label = "morphElevation"
+        )
+        val iconRotation by animateFloatAsState(
+            targetValue = if (isPressed) -12f else 0f,
+            animationSpec = spring(dampingRatio = 0.52f, stiffness = Spring.StiffnessMediumLow),
+            label = "morphIconRotation"
+        )
+
+        // Continuous Ambient Halo & Glint Sweeps
+        val infiniteTransition = rememberInfiniteTransition(label = "morphInfinite")
+        val auraPulse by infiniteTransition.animateFloat(
+            initialValue = 1.0f,
+            targetValue = 1.20f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1500, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "morphAuraPulse"
+        )
+        val auraAlpha by infiniteTransition.animateFloat(
+            initialValue = 0.35f,
+            targetValue = 0.12f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1500, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "morphAuraAlpha"
+        )
+        val glintPhase by infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(2600, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "morphGlintPhase"
+        )
+
+        // Anchored at BottomStart with lambda offset: renders purely on RenderThread without layout thrashing
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .offset {
+                    IntOffset(
+                        x = buttonLeft.roundToPx(),
+                        y = -buttonBottom.roundToPx()
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "AI SCREENING • ENCRYPTED",
-                        color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 0.5.sp
+                }
+                .size(buttonWidth, buttonHeight)
+        ) {
+            // 1. Living Breathing Ruby Halo Aura (Animates with button)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        val auraMult = if (isPressed) 1.25f else auraPulse
+                        this.scaleX = auraMult
+                        this.scaleY = auraMult
+                        this.alpha = if (isPressed) 0.50f else auraAlpha
+                    }
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFFFF2A4D).copy(alpha = 0.45f),
+                                Color(0xFFD00826).copy(alpha = 0.15f),
+                                Color.Transparent
+                            )
+                        ),
+                        shape = RoundedCornerShape(buttonCornerRadius)
+                    )
+            )
+
+            // 2. Liquid Morphing Decline / Hang Up Button
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        this.scaleX = scaleX
+                        this.scaleY = scaleY
+                    }
+                    .shadow(
+                        elevation = elevation,
+                        shape = RoundedCornerShape(buttonCornerRadius),
+                        spotColor = Color(0x95FF2A4D)
+                    )
+                    .clip(RoundedCornerShape(buttonCornerRadius))
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color(0xFFFF334B), // Vibrant Saturated Ruby Red
+                                Color(0xFFF01438),
+                                Color(0xFFD00826)
+                            )
+                        )
+                    )
+                    .border(
+                        width = 1.3.dp,
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = if (isPressed) 0.65f else 0.45f),
+                                Color.White.copy(alpha = 0.15f),
+                                Color.White.copy(alpha = if (isPressed) 0.50f else 0.22f)
+                            )
+                        ),
+                        shape = RoundedCornerShape(buttonCornerRadius)
+                    )
+                    .clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        enabled = !isHidden
+                    ) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onHangUp()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                // Specular lens highlight morphing with corner radius
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(28.dp)
+                        .align(Alignment.TopCenter)
+                        .clip(RoundedCornerShape(topStart = buttonCornerRadius, topEnd = buttonCornerRadius))
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color.White.copy(alpha = 0.30f),
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                )
+
+                // Specular glint shimmer sweep across button surface
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val glintW = size.width * 0.45f
+                    val currentX = (size.width + glintW * 2) * glintPhase - glintW
+                    drawRect(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.White.copy(alpha = 0.20f),
+                                Color.Transparent
+                            ),
+                            startX = currentX - glintW * 0.5f,
+                            endX = currentX + glintW * 0.5f
+                        )
                     )
                 }
 
-                // Live Equalizer & Call Timer
+                // Morphing Content: Icon and smooth revealing "Hang up" text
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)
                 ) {
-                    // Micro Audio Waveform
-                    JumpingAudioWaveform(
-                        color = AppleGreen,
-                        isPlaying = isSpeaking || status == CallStatus.SCREENING_ACTIVE || status == CallStatus.USER_TALKING
-                    )
-
-                    // Call Duration Tag
-                    Box(
+                    Icon(
+                        imageVector = Icons.Filled.CallEnd,
+                        contentDescription = if (targetHasLabel) "Hang up" else "Decline call",
+                        tint = Color.White,
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0x20FFFFFF))
-                            .border(0.6.dp, Color(0x35FFFFFF), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 7.dp, vertical = 2.5.dp)
-                    ) {
+                            .size(iconSize)
+                            .graphicsLayer {
+                                rotationZ = iconRotation
+                            }
+                    )
+                    if (labelAlpha > 0.05f) {
+                        Spacer(modifier = Modifier.width((8 * labelAlpha).dp))
                         Text(
-                            text = if (status == CallStatus.DIALING || status == CallStatus.RINGING)
-                                "--:--"
-                            else
-                                formatDuration(durationSeconds),
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
+                            text = "Hang up",
+                            color = Color.White.copy(alpha = labelAlpha),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.2.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Clip,
+                            modifier = Modifier.graphicsLayer {
+                                alpha = labelAlpha
+                                translationX = (1f - labelAlpha) * -12f
+                            }
                         )
                     }
+                }
+            }
+        }
+    }
+}
 
+/**
+ * Authentic Material You / Google Pixel Call Screen Interface
+ * Minimalist, authentic, uncluttered, user-friendly, and Monet-themed.
+ */
+@Composable
+fun MaterialYouAssistantScreeningScreen(
+    state: CallSessionState,
+    callerName: String?,
+    callerNumber: String,
+    isNumberHidden: Boolean,
+    inputText: String,
+    onInputTextChanged: (String) -> Unit,
+    onSendReply: (String) -> Unit,
+    onQuickReplySelected: (QuickReply) -> Unit,
+    onTakeOver: () -> Unit,
+    onHangUp: () -> Unit,
+    onToggleMute: () -> Unit,
+    onToggleSpeaker: () -> Unit,
+    onToggleRecording: () -> Unit,
+    onToggleSpeechJammer: () -> Unit,
+    onToggleAiVoiceListening: () -> Unit,
+    onSwitchToAiTypeMode: () -> Unit,
+    onSwitchToDirectMicMode: () -> Unit,
+    presets: List<AudioPreset>,
+    onPlayPreset: (AudioPreset) -> Unit,
+    currentPersona: VoicePersona,
+    onSelectPersona: (VoicePersona) -> Unit,
+    onOpenPresetManager: () -> Unit,
+    listState: LazyListState,
+    monetColors: ColorScheme,
+    isHangUpHandledExternally: Boolean = false,
+    isToolsMenuOpen: Boolean = false,
+    onToggleToolsMenu: (Boolean) -> Unit = {}
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(monetColors.surface)
+    ) {
+        // Subtle Monet ambient light dispersion
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val width = size.width
+            val height = size.height
+
+            // Top-center gentle primary bloom
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        monetColors.primaryContainer.copy(alpha = 0.22f),
+                        monetColors.primary.copy(alpha = 0.06f),
+                        Color.Transparent
+                    ),
+                    center = Offset(width * 0.5f, height * 0.15f),
+                    radius = width * 0.65f
+                ),
+                radius = width * 0.65f,
+                center = Offset(width * 0.5f, height * 0.15f)
+            )
+
+            // Bottom-center secondary bloom
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        monetColors.tertiaryContainer.copy(alpha = 0.14f),
+                        Color.Transparent
+                    ),
+                    center = Offset(width * 0.5f, height * 0.85f),
+                    radius = width * 0.70f
+                ),
+                radius = width * 0.70f,
+                center = Offset(width * 0.5f, height * 0.85f)
+            )
+        }
+
+        // Main Screening Column
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .imePadding()
+        ) {
+            // 1. Material You Minimal Top App Bar (~64dp)
+            ScreeningTopAppBar(
+                callerName = callerName,
+                callerNumber = callerNumber,
+                isNumberHidden = isNumberHidden,
+                durationSeconds = state.durationSeconds,
+                isSpeaking = state.isTtsSpeaking,
+                isRecording = state.isRecording,
+                recordingDurationSeconds = state.recordingDurationSeconds,
+                isMuted = state.isMuted,
+                isSpeakerOn = state.isSpeakerOn,
+                isSpeechJammerActive = state.isSpeechJammerActive,
+                onToggleSpeaker = onToggleSpeaker,
+                onToggleMute = onToggleMute,
+                onOpenTools = { onToggleToolsMenu(true) },
+                monetColors = monetColors
+            )
+
+            // 2. Central Live Transcript Timeline (Flex weight 1f)
+            ScreeningTranscriptView(
+                messages = state.messages,
+                isTtsSpeaking = state.isTtsSpeaking,
+                isListeningToUser = state.isListeningToUserSpeech,
+                userLiveTranscript = state.userLiveTranscript,
+                isSimulated = state.isSimulated,
+                listState = listState,
+                monetColors = monetColors,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            )
+
+            // 3. Quick Replies & Custom Audio Presets Row (Single-tap access)
+            ScreeningResponsesAndAudioSection(
+                quickReplies = state.quickReplies,
+                onReplySelected = onQuickReplySelected,
+                presets = presets,
+                onPlayPreset = onPlayPreset,
+                onOpenPresetManager = onOpenPresetManager,
+                monetColors = monetColors
+            )
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            // 4. Type-to-Speak Input Bar (Pixel-perfect aligned, keyboard icon)
+            ScreeningTypeToSpeakBar(
+                text = inputText,
+                onTextChanged = onInputTextChanged,
+                onSend = { onSendReply(inputText) },
+                isListeningToMic = state.isListeningToUserSpeech,
+                onToggleMic = onToggleAiVoiceListening,
+                monetColors = monetColors
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // 5. Smart Echo Chamber & Speech Jammer Capsule (Easily accessible right above call action buttons)
+            SmartJammerControl(
+                isActive = state.isSpeechJammerActive,
+                onToggle = onToggleSpeechJammer,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                monetColors = monetColors
+            )
+
+            // 6. Bottom Two-Decision Action Bar (Hang Up & Take Over Call Screen Buttons)
+            ScreeningBottomActionBar(
+                onHangUp = onHangUp,
+                onTakeOver = onTakeOver,
+                monetColors = monetColors,
+                isHangUpHandledExternally = isHangUpHandledExternally
+            )
+        }
+    }
+}
+
+/**
+ * Material You Minimal Top App Bar with Caller ID & Quick Actions
+ */
+@Composable
+private fun ScreeningTopAppBar(
+    callerName: String?,
+    callerNumber: String,
+    isNumberHidden: Boolean,
+    durationSeconds: Long,
+    isSpeaking: Boolean,
+    isRecording: Boolean,
+    recordingDurationSeconds: Long,
+    isMuted: Boolean,
+    isSpeakerOn: Boolean,
+    isSpeechJammerActive: Boolean,
+    onToggleSpeaker: () -> Unit,
+    onToggleMute: () -> Unit,
+    onOpenTools: () -> Unit,
+    monetColors: ColorScheme
+) {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    val displayName = if (!callerName.isNullOrBlank() && callerName != "Unknown Caller") {
+        callerName
+    } else if (isNumberHidden) {
+        "Private Caller"
+    } else if (callerNumber.isNotBlank()) {
+        callerNumber
+    } else {
+        "Unknown Caller"
+    }
+
+    val initials = remember(displayName) {
+        val parts = displayName.trim().split(" ").filter { it.isNotBlank() }
+        if (parts.size >= 2) {
+            "${parts[0].first().uppercase()}${parts[1].first().uppercase()}"
+        } else {
+            parts.firstOrNull()?.take(2)?.uppercase() ?: "#"
+        }
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "topBarAura")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.18f,
+        animationSpec = infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "pulseScale"
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Contact Avatar Disc
+        Box(
+            modifier = Modifier.size(44.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            if (isSpeaking) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .scale(pulseScale)
+                        .clip(CircleShape)
+                        .background(monetColors.primary.copy(alpha = 0.25f))
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(monetColors.surfaceContainerHigh)
+                    .border(1.dp, monetColors.outlineVariant.copy(alpha = 0.40f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = initials,
+                    color = monetColors.primary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        // Title and Live Subtitle Column
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = displayName,
+                color = monetColors.onSurface,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = (-0.2).sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // Live Blue Pulse Dot
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(monetColors.primary)
+                )
+                Text(
+                    text = "Screening • ${formatDuration(durationSeconds)}",
+                    color = monetColors.onSurfaceVariant,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Normal
+                )
+
+                // Recording Indicator if active
+                if (isRecording) {
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSpeechJammerActive) Color(0x359C27B0) else Color(0x18FFFFFF))
-                            .border(
-                                0.8.dp,
-                                if (isSpeechJammerActive) Color(0xFFFF4081) else Color(0x30FFFFFF),
-                                RoundedCornerShape(8.dp)
-                            )
-                            .clickable { onToggleSpeechJammer() }
-                            .padding(horizontal = 7.dp, vertical = 2.5.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(monetColors.errorContainer.copy(alpha = 0.7f))
+                            .padding(horizontal = 5.dp, vertical = 1.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .clip(CircleShape)
-                                    .background(if (isSpeechJammerActive) Color(0xFFFF4081) else Color(0xFFBA68C8))
+                        Text(
+                            text = "REC ${formatDuration(recordingDurationSeconds)}",
+                            color = monetColors.onErrorContainer,
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+        }
+
+        // Action Icons (Speaker, Mute, Tools)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            // Speaker Button
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(if (isSpeakerOn) monetColors.primaryContainer else monetColors.surfaceContainerHigh)
+                    .border(
+                        0.8.dp,
+                        if (isSpeakerOn) monetColors.primary.copy(alpha = 0.6f) else monetColors.outlineVariant.copy(alpha = 0.3f),
+                        CircleShape
+                    )
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onToggleSpeaker()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.VolumeUp,
+                    contentDescription = "Speaker",
+                    tint = if (isSpeakerOn) monetColors.onPrimaryContainer else monetColors.onSurfaceVariant,
+                    modifier = Modifier.size(19.dp)
+                )
+            }
+
+            // Mute Button
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(if (isMuted) monetColors.errorContainer else monetColors.surfaceContainerHigh)
+                    .border(
+                        0.8.dp,
+                        if (isMuted) monetColors.error.copy(alpha = 0.6f) else monetColors.outlineVariant.copy(alpha = 0.3f),
+                        CircleShape
+                    )
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onToggleMute()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isMuted) Icons.Filled.MicOff else Icons.Filled.Mic,
+                    contentDescription = "Mute",
+                    tint = if (isMuted) monetColors.onErrorContainer else monetColors.onSurfaceVariant,
+                    modifier = Modifier.size(19.dp)
+                )
+            }
+
+            // Tools / Tuning Button (Opens bottom sheet)
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(monetColors.surfaceContainerHigh)
+                    .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.3f), CircleShape)
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onOpenTools()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.MoreVert,
+                    contentDescription = "Screening tools menu",
+                    tint = monetColors.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+                if (isSpeechJammerActive) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .align(Alignment.TopEnd)
+                            .offset(x = (-3).dp, y = 3.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF6366F1))
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Iconic Google Assistant 4-Dot Breathing Wave Animation
+ */
+@Composable
+fun PixelAssistantWaveDots(
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "dotsWave")
+    val dotColors = listOf(
+        Color(0xFF4285F4), // Google Blue
+        Color(0xFFEA4335), // Google Red
+        Color(0xFFFBBC05), // Google Yellow
+        Color(0xFF34A853)  // Google Green
+    )
+    val wavePhase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "wavePhase"
+    )
+
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        dotColors.forEachIndexed { index, color ->
+            val sinVal = sin(wavePhase + index * 0.78f)
+            val scale = 0.82f + ((sinVal + 1f) * 0.22f)
+            val yOffset = sinVal * 4.5f
+            Box(
+                modifier = Modifier
+                    .offset(y = yOffset.dp)
+                    .size(10.dp)
+                    .scale(scale)
+                    .clip(CircleShape)
+                    .background(color)
+            )
+        }
+    }
+}
+
+/**
+ * Live Screening Transcript Stream with Google Assistant Breathing Empty State
+ */
+@Composable
+private fun ScreeningTranscriptView(
+    messages: List<ChatMessage>,
+    isTtsSpeaking: Boolean,
+    isListeningToUser: Boolean,
+    userLiveTranscript: String,
+    isSimulated: Boolean,
+    listState: LazyListState,
+    monetColors: ColorScheme,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        if (messages.isEmpty()) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.padding(horizontal = 32.dp)
+            ) {
+                PixelAssistantWaveDots()
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Text(
+                    text = "Call Assistant is screening this call",
+                    color = monetColors.onSurface,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = (-0.2).sp,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = if (isSimulated)
+                        "Select a suggested reply below or type a message to synthesize speech."
+                    else
+                        "Live speech transcription from the caller will appear here in real time.",
+                    color = monetColors.onSurfaceVariant,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                // Living Audio Status Pill
+                Box(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(monetColors.surfaceContainerHigh)
+                        .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.35f), CircleShape)
+                        .padding(horizontal = 14.dp, vertical = 7.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (isTtsSpeaking) {
+                            Icon(
+                                imageVector = Icons.Rounded.AutoAwesome,
+                                contentDescription = null,
+                                tint = monetColors.primary,
+                                modifier = Modifier.size(14.dp)
                             )
                             Text(
-                                text = if (isSpeechJammerActive) "JAMMING" else "JAMMER",
-                                color = if (isSpeechJammerActive) Color(0xFFFF80AB) else Color.White,
-                                fontSize = 9.sp,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold
+                                text = "Speaking vocal reply to caller...",
+                                color = monetColors.primary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        } else {
+                            JumpingAudioWaveform(color = monetColors.primary, isPlaying = true)
+                            Text(
+                                text = "Listening for caller's voice...",
+                                color = monetColors.onSurfaceVariant,
+                                fontSize = 12.sp
                             )
                         }
                     }
                 }
             }
-
-            // Subtle Hairline Divider
-            Box(
+        } else {
+            LazyColumn(
+                state = listState,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(0.6.dp)
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                Color.Transparent,
-                                Color(0x28FFFFFF),
-                                Color(0x35FFFFFF),
-                                Color(0x28FFFFFF),
-                                Color.Transparent
-                            )
-                        )
-                    )
-            )
-
-            // Main Caller Information Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(top = 10.dp, bottom = 10.dp)
             ) {
-                // High-End Specular Avatar with Dynamic Pulsing Aura
-                Box(
-                    modifier = Modifier.size(50.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isSpeaking || status == CallStatus.SCREENING_ACTIVE || status == CallStatus.USER_TALKING) {
-                        Box(
-                            modifier = Modifier
-                                .size(46.dp)
-                                .scale(rippleScale)
-                                .clip(CircleShape)
-                                .background(AppleBlue.copy(alpha = rippleAlpha * 0.4f))
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .size(46.dp)
-                            .shadow(elevation = 8.dp, shape = CircleShape, spotColor = AppleBlue.copy(alpha = 0.5f))
-                            .clip(CircleShape)
-                            .background(
-                                Brush.radialGradient(
-                                    listOf(
-                                        Color(0x35007AFF),
-                                        Color(0x25FFFFFF),
-                                        Color(0x150F1422)
-                                    )
-                                )
-                            )
-                            .border(1.2.dp, Color(0x55FFFFFF), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = initials,
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.SansSerif,
-                            letterSpacing = 0.5.sp
-                        )
-                    }
+                items(messages) { msg ->
+                    MaterialYouCallScreenBubble(msg, monetColors)
                 }
 
-                Spacer(modifier = Modifier.width(13.dp))
-
-                // Caller Details
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = callerName ?: "Unknown Caller",
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = (-0.5).sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    Spacer(modifier = Modifier.height(2.5.dp))
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                // If user is speaking live via speech-to-text:
+                if (isListeningToUser && userLiveTranscript.isNotBlank()) {
+                    item {
                         Box(
-                            modifier = Modifier
-                                .size(5.dp)
-                                .clip(CircleShape)
-                                .background(AppleGreen)
-                        )
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text(
-                            text = if (isNumberHidden) "Private Number" else callerNumber,
-                            color = Color(0xCCFFFFFF),
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Normal,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-                }
-
-                // If recording active: Red pulsing REC pill
-                if (isRecording) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(AppleRed.copy(alpha = 0.22f))
-                            .border(0.8.dp, AppleRed.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
-                            .clickable { onToggleRecording() }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.CenterEnd
                         ) {
-                            Box(
+                            Column(
+                                modifier = Modifier.fillMaxWidth(0.85f),
+                                horizontalAlignment = Alignment.End
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier.padding(end = 4.dp, bottom = 3.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Mic,
+                                        contentDescription = null,
+                                        tint = Color(0xFF00E676),
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Text(
+                                        text = "SPEAKING LIVE",
+                                        color = Color(0xFF00E676),
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 4.dp, bottomEnd = 18.dp, bottomStart = 18.dp))
+                                        .background(monetColors.secondaryContainer.copy(alpha = 0.90f))
+                                        .border(1.dp, Color(0xFF00E676).copy(alpha = 0.40f), RoundedCornerShape(topStart = 18.dp, topEnd = 4.dp, bottomEnd = 18.dp, bottomStart = 18.dp))
+                                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                                ) {
+                                    Text(
+                                        text = "\"$userLiveTranscript\"",
+                                        color = monetColors.onSecondaryContainer,
+                                        fontSize = 14.5.sp,
+                                        lineHeight = 20.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // If TTS speaking live indicator
+                if (isTtsSpeaking) {
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.CenterEnd
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 modifier = Modifier
-                                    .size(6.dp)
                                     .clip(CircleShape)
-                                    .background(AppleRed)
-                            )
-                            Text(
-                                text = "REC ${formatDuration(recordingDurationSeconds)}",
-                                color = AppleRed,
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace
-                            )
+                                    .background(monetColors.primaryContainer.copy(alpha = 0.7f))
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                JumpingAudioWaveform(color = monetColors.primary, isPlaying = true)
+                                Text(
+                                    text = "Assistant speaking...",
+                                    color = monetColors.onPrimaryContainer,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         }
                     }
                 }
@@ -779,152 +1382,286 @@ fun SuperPremiumCallerCard(
 }
 
 /**
- * Tier 1: Liquid Wavy Swipe Ribbon
- * Clean 2-segment switcher that smoothly transitions between Quick Replies and Voice Personas
+ * Material You Native Chat Bubble for Caller & Assistant
  */
 @Composable
-fun LiquidWavyActionRibbon(
-    activeTab: RibbonTab,
-    onSelectTab: (RibbonTab) -> Unit,
+fun MaterialYouCallScreenBubble(
+    message: ChatMessage,
+    monetColors: ColorScheme
+) {
+    val isCaller = message.sender == MessageSender.CALLER
+    val isSystem = message.sender == MessageSender.SYSTEM
+
+    var isVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        isVisible = true
+    }
+
+    val bubbleAlpha by animateFloatAsState(
+        targetValue = if (isVisible) 1f else 0f,
+        animationSpec = tween(220, easing = FastOutSlowInEasing),
+        label = "bubbleAlpha"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer { alpha = bubbleAlpha },
+        contentAlignment = when {
+            isSystem -> Alignment.Center
+            isCaller -> Alignment.CenterStart
+            else -> Alignment.CenterEnd
+        }
+    ) {
+        if (isSystem) {
+            Box(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(monetColors.surfaceContainerHighest.copy(alpha = 0.55f))
+                    .padding(horizontal = 14.dp, vertical = 5.dp)
+            ) {
+                Text(
+                    text = message.text,
+                    color = monetColors.onSurfaceVariant,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+        } else if (isCaller) {
+            Column(
+                modifier = Modifier.fillMaxWidth(0.85f),
+                horizontalAlignment = Alignment.Start
+            ) {
+                Text(
+                    text = "CALLER",
+                    color = monetColors.onSurfaceVariant,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.6.sp,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+                )
+                Box(
+                    modifier = Modifier
+                        .shadow(elevation = 2.dp, shape = RoundedCornerShape(topStart = 4.dp, topEnd = 20.dp, bottomEnd = 20.dp, bottomStart = 20.dp))
+                        .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 20.dp, bottomEnd = 20.dp, bottomStart = 20.dp))
+                        .background(monetColors.surfaceContainerHigh)
+                        .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.30f), RoundedCornerShape(topStart = 4.dp, topEnd = 20.dp, bottomEnd = 20.dp, bottomStart = 20.dp))
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Text(
+                        text = message.text,
+                        color = monetColors.onSurface,
+                        fontSize = 15.sp,
+                        lineHeight = 22.sp
+                    )
+                }
+            }
+        } else {
+            // Assistant Bubble (Right)
+            Column(
+                modifier = Modifier.fillMaxWidth(0.85f),
+                horizontalAlignment = Alignment.End
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(end = 4.dp, bottom = 4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.AutoAwesome,
+                        contentDescription = null,
+                        tint = monetColors.primary,
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Text(
+                        text = "ASSISTANT",
+                        color = monetColors.primary,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.6.sp
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .shadow(elevation = 3.dp, shape = RoundedCornerShape(topStart = 20.dp, topEnd = 4.dp, bottomEnd = 20.dp, bottomStart = 20.dp))
+                        .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 4.dp, bottomEnd = 20.dp, bottomStart = 20.dp))
+                        .background(monetColors.primaryContainer)
+                        .border(0.8.dp, monetColors.primary.copy(alpha = 0.35f), RoundedCornerShape(topStart = 20.dp, topEnd = 4.dp, bottomEnd = 20.dp, bottomStart = 20.dp))
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Text(
+                        text = message.text,
+                        color = monetColors.onPrimaryContainer,
+                        fontSize = 15.sp,
+                        lineHeight = 22.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+private enum class ScreeningActionTab {
+    QUICK_REPLIES,
+    CUSTOM_AUDIO
+}
+
+/**
+ * Suggested Responses & Custom Audio Soundboard Presets Row
+ * Allows one-tap access to Quick Replies and Custom Audio directly on the main UI.
+ */
+@Composable
+private fun ScreeningResponsesAndAudioSection(
     quickReplies: List<QuickReply>,
     onReplySelected: (QuickReply) -> Unit,
-    presets: List<AudioPreset> = emptyList(),
-    onPlayPreset: (AudioPreset) -> Unit = {},
-    currentPersona: VoicePersona,
-    onSelectPersona: (VoicePersona) -> Unit,
-    onOpenPresetManager: () -> Unit = {}
+    presets: List<AudioPreset>,
+    onPlayPreset: (AudioPreset) -> Unit,
+    onOpenPresetManager: () -> Unit,
+    monetColors: ColorScheme
 ) {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    var activeTab by remember { mutableStateOf(ScreeningActionTab.QUICK_REPLIES) }
+
+    // Standard default responses combined with custom user replies
+    val defaultSuggestions = remember {
+        listOf(
+            QuickReply(id = "who", title = "Who is this?", spokenText = "May I ask who is calling, please?"),
+            QuickReply(id = "reason", title = "What is this regarding?", spokenText = "Could you tell me what this call is regarding?"),
+            QuickReply(id = "busy", title = "I'll call back later", spokenText = "I am unavailable to talk right now. I will call you back later."),
+            QuickReply(id = "urgent", title = "Is it urgent?", spokenText = "Is this an urgent matter, or can it wait?"),
+            QuickReply(id = "text", title = "Please text me", spokenText = "Please send the details via text message instead.")
+        )
+    }
+
+    val allReplies = remember(quickReplies) {
+        val list = mutableListOf<QuickReply>()
+        val seen = mutableSetOf<String>()
+        // User custom replies first
+        quickReplies.forEach {
+            if (seen.add(it.id)) list.add(it)
+        }
+        // Then defaults
+        defaultSuggestions.forEach {
+            if (seen.add(it.id)) list.add(it)
+        }
+        list
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .animateContentSize(spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow))
+            .padding(vertical = 2.dp)
     ) {
-        // Tab Header: Ultra-slim liquid switcher
+        // Tab Pills: [ 💬 Quick Replies ]  [ 🎵 Custom Audio (count) ]
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 6.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 16.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(
+            // Quick Replies Tab
+            Box(
                 modifier = Modifier
-                    .height(30.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(LiquidGlassFillSubtle)
-                    .border(0.8.dp, LiquidGlassBorderSubtle, RoundedCornerShape(12.dp))
-                    .padding(2.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .background(
+                        if (activeTab == ScreeningActionTab.QUICK_REPLIES) monetColors.primaryContainer
+                        else monetColors.surfaceContainerHigh.copy(alpha = 0.65f)
+                    )
+                    .border(
+                        0.8.dp,
+                        if (activeTab == ScreeningActionTab.QUICK_REPLIES) monetColors.primary.copy(alpha = 0.50f)
+                        else monetColors.outlineVariant.copy(alpha = 0.25f),
+                        RoundedCornerShape(12.dp)
+                    )
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        activeTab = ScreeningActionTab.QUICK_REPLIES
+                    }
+                    .padding(horizontal = 11.dp, vertical = 5.dp),
+                contentAlignment = Alignment.Center
             ) {
-                // Tab 1: Quick Replies
-                val isReplies = activeTab == RibbonTab.QUICK_REPLIES
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(if (isReplies) AppleBlueGlassFill else SolidColor(Color.Transparent))
-                        .clickable { onSelectTab(RibbonTab.QUICK_REPLIES) }
-                        .padding(horizontal = 11.dp),
-                    contentAlignment = Alignment.Center
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.Message,
+                        contentDescription = null,
+                        tint = if (activeTab == ScreeningActionTab.QUICK_REPLIES) monetColors.onPrimaryContainer else monetColors.onSurfaceVariant,
+                        modifier = Modifier.size(13.dp)
+                    )
                     Text(
                         text = "Quick Replies",
-                        color = if (isReplies) TextPrimary else TextSecondary,
-                        fontSize = 11.sp,
-                        fontWeight = if (isReplies) FontWeight.Bold else FontWeight.Medium
+                        color = if (activeTab == ScreeningActionTab.QUICK_REPLIES) monetColors.onPrimaryContainer else monetColors.onSurfaceVariant,
+                        fontSize = 11.5.sp,
+                        fontWeight = if (activeTab == ScreeningActionTab.QUICK_REPLIES) FontWeight.Bold else FontWeight.Medium
                     )
                 }
+            }
 
-                // Tab 2: Soundboard (Audio Presets)
-                val isSoundboard = activeTab == RibbonTab.SOUNDBOARD
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(if (isSoundboard) AppleAmberGlassFill else SolidColor(Color.Transparent))
-                        .clickable { onSelectTab(RibbonTab.SOUNDBOARD) }
-                        .padding(horizontal = 11.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Soundboard",
-                        color = if (isSoundboard) TextPrimary else TextSecondary,
-                        fontSize = 11.sp,
-                        fontWeight = if (isSoundboard) FontWeight.Bold else FontWeight.Medium
+            // Custom Audio Tab
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(
+                        if (activeTab == ScreeningActionTab.CUSTOM_AUDIO) monetColors.primaryContainer
+                        else monetColors.surfaceContainerHigh.copy(alpha = 0.65f)
                     )
-                }
-
-                // Tab 3: Voice Personas
-                val isPersonas = activeTab == RibbonTab.VOICE_PERSONAS
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(if (isPersonas) AppleBlueGlassFill else SolidColor(Color.Transparent))
-                        .clickable { onSelectTab(RibbonTab.VOICE_PERSONAS) }
-                        .padding(horizontal = 11.dp),
-                    contentAlignment = Alignment.Center
+                    .border(
+                        0.8.dp,
+                        if (activeTab == ScreeningActionTab.CUSTOM_AUDIO) monetColors.primary.copy(alpha = 0.50f)
+                        else monetColors.outlineVariant.copy(alpha = 0.25f),
+                        RoundedCornerShape(12.dp)
+                    )
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        activeTab = ScreeningActionTab.CUSTOM_AUDIO
+                    }
+                    .padding(horizontal = 11.dp, vertical = 5.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
+                    Icon(
+                        imageVector = Icons.Rounded.GraphicEq,
+                        contentDescription = null,
+                        tint = if (activeTab == ScreeningActionTab.CUSTOM_AUDIO) monetColors.onPrimaryContainer else monetColors.onSurfaceVariant,
+                        modifier = Modifier.size(13.dp)
+                    )
                     Text(
-                        text = "Voice Personas",
-                        color = if (isPersonas) TextPrimary else TextSecondary,
-                        fontSize = 11.sp,
-                        fontWeight = if (isPersonas) FontWeight.Bold else FontWeight.Medium
+                        text = "Custom Audio (${presets.size})",
+                        color = if (activeTab == ScreeningActionTab.CUSTOM_AUDIO) monetColors.onPrimaryContainer else monetColors.onSurfaceVariant,
+                        fontSize = 11.5.sp,
+                        fontWeight = if (activeTab == ScreeningActionTab.CUSTOM_AUDIO) FontWeight.Bold else FontWeight.Medium
                     )
                 }
             }
         }
 
-        // Compact Single-Row Horizontal Carousel (Never fills screen or crushes bottom buttons)
-        if (activeTab == RibbonTab.QUICK_REPLIES) {
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 2.dp)
-            ) {
-                items(quickReplies, key = { it.id }) { reply ->
+        // Horizontal List of Action Chips
+        LazyRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp)
+        ) {
+            if (activeTab == ScreeningActionTab.QUICK_REPLIES) {
+                itemsIndexed(allReplies, key = { index, reply -> "reply_${reply.id}_$index" }) { _, reply ->
                     Box(
                         modifier = Modifier
-                            .shadow(elevation = 6.dp, shape = RoundedCornerShape(18.dp), spotColor = Color(0x35000000))
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(LiquidGlassFill)
-                            .border(1.2.dp, LiquidGlassBorder, RoundedCornerShape(18.dp))
-                            .clickable { onReplySelected(reply) }
-                            .padding(horizontal = 14.dp, vertical = 9.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = reply.title,
-                            color = TextPrimary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            letterSpacing = (-0.2).sp
-                        )
-                    }
-                }
-            }
-        } else if (activeTab == RibbonTab.SOUNDBOARD) {
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 2.dp)
-            ) {
-                items(presets, key = { it.id }) { preset ->
-                    Box(
-                        modifier = Modifier
-                            .shadow(elevation = 6.dp, shape = RoundedCornerShape(18.dp), spotColor = AppleAmber.copy(alpha = 0.25f))
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(LiquidGlassFill)
-                            .border(
-                                1.2.dp,
-                                if (preset.isAudioFile) Brush.verticalGradient(listOf(AppleAmber, Color(0x30FFFFFF)))
-                                else LiquidGlassBorder,
-                                RoundedCornerShape(18.dp)
-                            )
-                            .clickable { onPlayPreset(preset) }
-                            .padding(horizontal = 14.dp, vertical = 9.dp),
+                            .clip(CircleShape)
+                            .background(monetColors.surfaceContainerHigh)
+                            .border(1.dp, monetColors.outlineVariant.copy(alpha = 0.40f), CircleShape)
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onReplySelected(reply)
+                            }
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Row(
@@ -932,71 +1669,94 @@ fun LiquidWavyActionRibbon(
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Icon(
-                                imageVector = if (preset.isAudioFile) Icons.Rounded.GraphicEq else Icons.AutoMirrored.Filled.VolumeUp,
+                                imageVector = Icons.AutoMirrored.Rounded.Message,
                                 contentDescription = null,
-                                tint = if (preset.isAudioFile) AppleAmber else Color.White,
+                                tint = monetColors.primary,
                                 modifier = Modifier.size(13.dp)
                             )
                             Text(
-                                text = preset.title,
-                                color = if (preset.isAudioFile) AppleAmber else TextPrimary,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = (-0.2).sp
+                                text = reply.title,
+                                color = monetColors.onSurface,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                letterSpacing = (-0.1).sp
                             )
                         }
                     }
                 }
-            }
-        } else {
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(VoicePersona.ALL_PERSONAS, key = { it.id }) { persona ->
-                    val isSelected = persona.id == currentPersona.id
-
+            } else {
+                // Custom Audio Presets
+                itemsIndexed(presets, key = { index, preset -> "preset_${preset.id}_$index" }) { _, preset ->
                     Box(
                         modifier = Modifier
-                            .shadow(elevation = if (isSelected) 8.dp else 2.dp, shape = RoundedCornerShape(16.dp), spotColor = Color(0x40000000))
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (isSelected) LiquidGlassFillElevated else LiquidGlassFillSubtle)
-                            .border(
-                                1.2.dp,
-                                if (isSelected) LiquidGlassBorder else LiquidGlassBorderSubtle,
-                                RoundedCornerShape(16.dp)
-                            )
-                            .clickable { onSelectPersona(persona) }
-                            .padding(horizontal = 12.dp, vertical = 7.dp)
+                            .clip(CircleShape)
+                            .background(monetColors.surfaceContainerHigh)
+                            .border(1.dp, monetColors.primary.copy(alpha = 0.35f), CircleShape)
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onPlayPreset(preset)
+                            }
+                            .padding(horizontal = 13.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(
-                                        when {
-                                            isSelected -> AppleGreen.copy(alpha = 0.40f)
-                                            persona.isHindi -> AppleGreen.copy(alpha = 0.22f)
-                                            persona.isPureGirlVoice -> Color(0x25FFFFFF)
-                                            else -> Color(0x18FFFFFF)
-                                        }
-                                    )
-                                    .padding(horizontal = 5.dp, vertical = 2.dp)
+                                    .size(18.dp)
+                                    .clip(CircleShape)
+                                    .background(monetColors.primaryContainer),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = persona.code,
-                                    color = if (isSelected || persona.isHindi) AppleGreen else TextTertiary,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace
+                                Icon(
+                                    imageVector = Icons.Rounded.PlayArrow,
+                                    contentDescription = "Play preset",
+                                    tint = monetColors.onPrimaryContainer,
+                                    modifier = Modifier.size(12.dp)
                                 )
                             }
-                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = persona.name,
-                                color = TextPrimary,
+                                text = preset.title,
+                                color = monetColors.onSurface,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                letterSpacing = (-0.1).sp
+                            )
+                        }
+                    }
+                }
+
+                // Trailing Manage Presets Chip
+                item {
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(monetColors.surfaceContainerHighest.copy(alpha = 0.5f))
+                            .border(1.dp, monetColors.outlineVariant.copy(alpha = 0.35f), CircleShape)
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onOpenPresetManager()
+                            }
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Add,
+                                contentDescription = null,
+                                tint = monetColors.primary,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Text(
+                                text = "Manage Presets",
+                                color = monetColors.primary,
                                 fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
@@ -1007,436 +1767,876 @@ fun LiquidWavyActionRibbon(
 }
 
 /**
- * ColorOS / Flagship OEM-Style In-Call Command Console:
- * - Spacious 2x3 grid of 56dp circular frosted action buttons with crisp labels underneath
- * - Dedicated, large 70dp red Hang Up button centered at bottom with zero overlap
- * - Clean, full-width frosted Type-to-Speak input bar
- * - Minimalist monochromatic aesthetic without annoying rainbow saturation
+ * Type-to-Speak Pill Input Bar with Send & Push-to-Talk Mic Actions.
+ * Replaced AI sparkle icon with clean keyboard icon.
+ * Uses BasicTextField for pixel-perfect vertical centering and alignment.
  */
 @Composable
-fun UnifiedLiquidCommandIsland(
+private fun ScreeningTypeToSpeakBar(
     text: String,
     onTextChanged: (String) -> Unit,
     onSend: () -> Unit,
-    state: CallSessionState,
-    audioMode: AudioCallMode,
-    isMuted: Boolean,
-    isSpeakerOn: Boolean,
-    onSwitchToAiType: () -> Unit,
-    onSwitchToDirectMic: () -> Unit,
-    onTakeOver: () -> Unit,
-    onHangUp: () -> Unit,
-    onToggleMute: () -> Unit,
-    onToggleSpeaker: () -> Unit,
-    isRecording: Boolean = false,
-    onToggleRecording: () -> Unit = {},
-    onToggleSpeechJammer: () -> Unit = {},
-    onToggleAiVoiceListening: () -> Unit = {},
-    onToggleAutoRelay: (Boolean) -> Unit = {},
-    isFocusChatMode: Boolean = false,
-    ribbonContent: @Composable () -> Unit = {}
+    isListeningToMic: Boolean,
+    onToggleMic: () -> Unit,
+    monetColors: ColorScheme
 ) {
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    val sendSource = remember { MutableInteractionSource() }
+    val isSendPressed by sendSource.collectIsPressedAsState()
     val sendScale by animateFloatAsState(
-        targetValue = if (text.isNotBlank()) 1.0f else 0.88f,
+        targetValue = if (isSendPressed) 0.88f else 1.0f,
         animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
-        label = "sendScale"
+        label = "typeSendScale"
     )
 
-    Column(
+    val isHasText = text.isNotBlank()
+
+    // Outer unified Liquid Glass capsule container
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        // Status & Live Relay Transcription Banner
-        if (audioMode == AudioCallMode.AI_TYPE_SPEAK) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(if (state.isListeningToUserSpeech) Color(0x2230D158) else Color(0x14FFFFFF))
-                    .border(
-                        0.8.dp,
-                        if (state.isListeningToUserSpeech) Color(0x6030D158) else Color(0x24FFFFFF),
-                        RoundedCornerShape(12.dp)
-                    )
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(if (state.isListeningToUserSpeech) AppleGreen else Color.White.copy(alpha = 0.6f))
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (state.userLiveTranscript.isNotBlank())
-                            "\"${state.userLiveTranscript}\""
-                        else if (state.isListeningToUserSpeech)
-                            "Listening to mic • Relaying in AI Voice"
-                        else
-                            "AI Voice Relay: Speak in mic or type",
-                        color = if (state.isListeningToUserSpeech) AppleGreen else TextPrimary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (state.isAutoRelayEnabled) AppleGreen.copy(alpha = 0.25f) else Color(0x18FFFFFF))
-                        .clickable { onToggleAutoRelay(!state.isAutoRelayEnabled) }
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = if (state.isAutoRelayEnabled) "AUTO ON" else "AUTO OFF",
-                        color = if (state.isAutoRelayEnabled) AppleGreen else TextSecondary,
-                        fontSize = 9.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
-        // Type-to-Speak Input Bar (Fluid Apple Liquid Glass with Coordinated Horizontal Expansion)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value = text,
-                onValueChange = onTextChanged,
-                placeholder = {
-                    Text(
-                        text = if (audioMode == AudioCallMode.AI_TYPE_SPEAK) {
-                            if (state.isListeningToUserSpeech) "Listening... speak into mic or type" else "Type a message to speak in AI Voice..."
-                        } else {
-                            "Direct microphone active..."
-                        },
-                        color = TextTertiary,
-                        fontSize = 13.sp
-                    )
-                },
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(Color(0x16FFFFFF))
-                    .border(
-                        0.8.dp,
-                        if (text.isNotBlank()) Color(0x60FFFFFF) else Color(0x22FFFFFF),
-                        RoundedCornerShape(22.dp)
-                    ),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    focusedBorderColor = Color.Transparent,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White
-                ),
-                singleLine = true
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .height(52.dp)
+            .shadow(
+                elevation = 8.dp,
+                shape = CircleShape,
+                spotColor = if (isHasText) monetColors.primary.copy(alpha = 0.35f) else Color.Black.copy(alpha = 0.25f)
             )
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            if (text.isNotBlank()) {
-                // Send Typed Text Button
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .scale(sendScale)
-                        .clip(CircleShape)
-                        .background(AppleGreen)
-                        .clickable(onClick = onSend),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "Speak",
-                        tint = Color.Black,
-                        modifier = Modifier.size(18.dp)
+            .clip(CircleShape)
+            .background(
+                Brush.horizontalGradient(
+                    listOf(
+                        monetColors.surfaceContainerHigh,
+                        monetColors.surfaceContainerHighest,
+                        monetColors.surfaceContainerHigh
                     )
-                }
-            } else if (audioMode == AudioCallMode.AI_TYPE_SPEAK) {
-                // Mic PTT / Toggle Button
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(if (state.isListeningToUserSpeech) AppleGreen else Color(0x22FFFFFF))
-                        .border(1.dp, if (state.isListeningToUserSpeech) AppleGreen else Color(0x35FFFFFF), CircleShape)
-                        .clickable(onClick = onToggleAiVoiceListening),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = if (state.isListeningToUserSpeech) Icons.Filled.Mic else Icons.Filled.MicOff,
-                        contentDescription = "Toggle Mic",
-                        tint = if (state.isListeningToUserSpeech) Color.Black else Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
-            // Compact Liquid Glass Decline Button in Chat Focus Mode (Glides in/out horizontally with Apple physics)
-            AnimatedVisibility(
-                visible = isFocusChatMode,
-                enter = fadeIn(animationSpec = tween(220)) + expandHorizontally(
-                    animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow),
-                    expandFrom = Alignment.End
-                ),
-                exit = fadeOut(animationSpec = tween(160)) + shrinkHorizontally(
-                    animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow),
-                    shrinkTowards = Alignment.End
                 )
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .shadow(elevation = 14.dp, shape = CircleShape, spotColor = Color(0xAAFF3B30))
-                            .clip(CircleShape)
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(
-                                        Color(0xFFFF453A),
-                                        Color(0xFFD70015)
-                                    )
-                                )
-                            )
-                            .border(
-                                1.dp,
-                                Brush.verticalGradient(
-                                    listOf(
-                                        Color(0x90FFFFFF),
-                                        Color(0x30FFFFFF)
-                                    )
-                                ),
-                                CircleShape
-                            )
-                            .clickable(onClick = onHangUp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.CallEnd,
-                            contentDescription = "Decline Call",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
+            )
+            .border(
+                width = 1.2.dp,
+                brush = Brush.linearGradient(
+                    if (isHasText) {
+                        listOf(
+                            Color.White.copy(alpha = 0.50f),
+                            monetColors.primary,
+                            monetColors.outlineVariant.copy(alpha = 0.35f)
+                        )
+                    } else {
+                        listOf(
+                            Color.White.copy(alpha = 0.35f),
+                            monetColors.outlineVariant.copy(alpha = 0.35f)
                         )
                     }
-                }
-            }
+                ),
+                shape = CircleShape
+            )
+            .padding(start = 12.dp, end = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Leading Keyboard Icon inside subtle tinted disc
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(
+                    if (isHasText) monetColors.primary.copy(alpha = 0.18f)
+                    else monetColors.surfaceContainerLowest.copy(alpha = 0.40f)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Keyboard,
+                contentDescription = "Type response",
+                tint = if (isHasText) monetColors.primary else monetColors.onSurfaceVariant.copy(alpha = 0.75f),
+                modifier = Modifier.size(18.dp)
+            )
         }
 
-        // ColorOS 2x3 Grid of 56dp Circular In-Call Control Buttons & Massive Decline Button + Action Ribbon
-        // Smoothly collapses downwards/upwards in ONE synchronized fluid motion in Chat Focus Mode (Zero Bottom Jitter)
-        AnimatedVisibility(
-            visible = !isFocusChatMode,
-            enter = fadeIn(animationSpec = tween(220)) + expandVertically(
-                animationSpec = tween(260, easing = FastOutSlowInEasing),
-                expandFrom = Alignment.Bottom
+        Spacer(modifier = Modifier.width(10.dp))
+
+        // Center Text Input with Pixel-Perfect vertical alignment
+        BasicTextField(
+            value = text,
+            onValueChange = onTextChanged,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            singleLine = true,
+            textStyle = TextStyle(
+                fontFamily = GoogleSans,
+                color = monetColors.onSurface,
+                fontSize = 14.5.sp,
+                fontWeight = FontWeight.Normal,
+                lineHeight = 20.sp
             ),
-            exit = fadeOut(animationSpec = tween(160)) + shrinkVertically(
-                animationSpec = tween(220, easing = FastOutSlowInEasing),
-                shrinkTowards = Alignment.Bottom
-            )
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+            cursorBrush = SolidColor(monetColors.primary),
+            decorationBox = { innerTextField ->
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    if (text.isEmpty()) {
+                        Text(
+                            text = if (isListeningToMic) "Listening... speak into mic" else "Type message to speak aloud...",
+                            color = if (isListeningToMic) Color(0xFF00E676) else monetColors.onSurfaceVariant.copy(alpha = 0.55f),
+                            fontSize = 14.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    innerTextField()
+                }
+            }
+        )
+
+        // Clear text button if not blank
+        if (isHasText) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onTextChanged("")
+                    },
+                contentAlignment = Alignment.Center
             ) {
-                // Tier 1: Action Ribbon (Quick replies, soundboard, voice personas)
-                ribbonContent()
-                // Row 1: Mute | Speaker | Record
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceAround,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Button 1: Mute
-                    OemInCallControlButton(
-                        icon = if (isMuted) Icons.Filled.MicOff else Icons.Filled.Mic,
-                        label = if (isMuted) "Unmute" else "Mute",
-                        isActive = isMuted,
-                        activeColor = Color.White,
-                        activeContentColor = Color.Black,
-                        onClick = onToggleMute
-                    )
+                Icon(
+                    imageVector = Icons.Rounded.Close,
+                    contentDescription = "Clear text",
+                    tint = monetColors.onSurfaceVariant.copy(alpha = 0.65f),
+                    modifier = Modifier.size(17.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(4.dp))
+        }
 
-                    // Button 2: Speaker
-                    OemInCallControlButton(
-                        icon = Icons.AutoMirrored.Filled.VolumeUp,
-                        label = "Speaker",
-                        isActive = isSpeakerOn,
-                        activeColor = Color.White,
-                        activeContentColor = Color.Black,
-                        onClick = onToggleSpeaker
+        // Integrated Trailing Action Button: Saturated Send Rocket or Mic Voice
+        if (isHasText) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .scale(sendScale)
+                    .shadow(elevation = 6.dp, shape = CircleShape, spotColor = monetColors.primary.copy(alpha = 0.45f))
+                    .clip(CircleShape)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                monetColors.primary,
+                                monetColors.primaryContainer
+                            )
+                        )
                     )
+                    .border(1.dp, Color.White.copy(alpha = 0.40f), CircleShape)
+                    .clickable(
+                        interactionSource = sendSource,
+                        indication = null
+                    ) {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onSend()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Send,
+                    contentDescription = "Send and speak aloud",
+                    tint = monetColors.onPrimary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (isListeningToMic) Color(0xFF00C853)
+                        else monetColors.surfaceContainerLowest.copy(alpha = 0.50f)
+                    )
+                    .border(
+                        0.8.dp,
+                        if (isListeningToMic) Color.White.copy(alpha = 0.60f)
+                        else monetColors.outlineVariant.copy(alpha = 0.35f),
+                        CircleShape
+                    )
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onToggleMic()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isListeningToMic) Icons.Filled.Mic else Icons.Filled.MicOff,
+                    contentDescription = "Toggle mic voice",
+                    tint = if (isListeningToMic) Color.White else monetColors.onSurfaceVariant.copy(alpha = 0.80f),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
 
-                    // Button 3: Record
-                    OemInCallControlButton(
-                        icon = Icons.Rounded.GraphicEq,
-                        label = if (isRecording) "${state.recordingDurationSeconds}s" else "Record",
-                        isActive = isRecording,
-                        activeColor = AppleRed,
-                        activeContentColor = Color.White,
-                        onClick = onToggleRecording
+/**
+ * Symmetrical Material You Two-Decision Action Bar (Hang up & Take over)
+ */
+@Composable
+private fun ScreeningBottomActionBar(
+    onHangUp: () -> Unit,
+    onTakeOver: () -> Unit,
+    monetColors: ColorScheme,
+    isHangUpHandledExternally: Boolean = false
+) {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+
+    val infiniteTransition = rememberInfiniteTransition(label = "bottomBarInfinite")
+    val glintPhase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "actionBarGlint"
+    )
+
+    // Tactile Springs & Morph for Hang Up
+    val hangUpSource = remember { MutableInteractionSource() }
+    val isHangUpPressed by hangUpSource.collectIsPressedAsState()
+    val hangUpScaleX by animateFloatAsState(
+        targetValue = if (isHangUpPressed) 1.04f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.54f, stiffness = Spring.StiffnessMediumLow),
+        label = "hangUpScaleX"
+    )
+    val hangUpScaleY by animateFloatAsState(
+        targetValue = if (isHangUpPressed) 0.88f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.54f, stiffness = Spring.StiffnessMediumLow),
+        label = "hangUpScaleY"
+    )
+    val hangUpCornerRadius by animateDpAsState(
+        targetValue = if (isHangUpPressed) 18.dp else 27.dp,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow),
+        label = "hangUpCornerRadius"
+    )
+    val hangUpElevation by animateDpAsState(
+        targetValue = if (isHangUpPressed) 3.dp else 8.dp,
+        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
+        label = "hangUpElevation"
+    )
+    val hangUpIconRotation by animateFloatAsState(
+        targetValue = if (isHangUpPressed) -12f else 0f,
+        animationSpec = spring(dampingRatio = 0.52f, stiffness = Spring.StiffnessMediumLow),
+        label = "hangUpIconRotation"
+    )
+
+    // Tactile Springs & Morph for Take Over
+    val takeOverSource = remember { MutableInteractionSource() }
+    val isTakeOverPressed by takeOverSource.collectIsPressedAsState()
+    val takeOverScaleX by animateFloatAsState(
+        targetValue = if (isTakeOverPressed) 1.04f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.54f, stiffness = Spring.StiffnessMediumLow),
+        label = "takeOverScaleX"
+    )
+    val takeOverScaleY by animateFloatAsState(
+        targetValue = if (isTakeOverPressed) 0.88f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.54f, stiffness = Spring.StiffnessMediumLow),
+        label = "takeOverScaleY"
+    )
+    val takeOverCornerRadius by animateDpAsState(
+        targetValue = if (isTakeOverPressed) 18.dp else 27.dp,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow),
+        label = "takeOverCornerRadius"
+    )
+    val takeOverElevation by animateDpAsState(
+        targetValue = if (isTakeOverPressed) 3.dp else 8.dp,
+        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
+        label = "takeOverElevation"
+    )
+    val takeOverIconRotation by animateFloatAsState(
+        targetValue = if (isTakeOverPressed) 10f else 0f,
+        animationSpec = spring(dampingRatio = 0.52f, stiffness = Spring.StiffnessMediumLow),
+        label = "takeOverIconRotation"
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Decline / Hang Up Button (Saturated Ruby Red with Liquid Morph)
+        if (!isHangUpHandledExternally) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(54.dp)
+                    .graphicsLayer {
+                        scaleX = hangUpScaleX
+                        scaleY = hangUpScaleY
+                    }
+                    .shadow(
+                        elevation = hangUpElevation,
+                        shape = RoundedCornerShape(hangUpCornerRadius),
+                        spotColor = Color(0x95FF334B)
+                    )
+                    .clip(RoundedCornerShape(hangUpCornerRadius))
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color(0xFFFF334B),
+                                Color(0xFFD00826)
+                            )
+                        )
+                    )
+                    .border(
+                        1.2.dp,
+                        Brush.linearGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = if (isHangUpPressed) 0.65f else 0.45f),
+                                Color.White.copy(alpha = 0.15f),
+                                Color.White.copy(alpha = if (isHangUpPressed) 0.50f else 0.22f)
+                            )
+                        ),
+                        RoundedCornerShape(hangUpCornerRadius)
+                    )
+                    .clickable(
+                        interactionSource = hangUpSource,
+                        indication = null
+                    ) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onHangUp()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                // Top glass lens glint morphing with corner radius
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(26.dp)
+                        .align(Alignment.TopCenter)
+                        .clip(RoundedCornerShape(topStart = hangUpCornerRadius, topEnd = hangUpCornerRadius))
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color.White.copy(alpha = 0.28f),
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                )
+
+                // Specular glint shimmer sweep
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val glintW = size.width * 0.45f
+                    val currentX = (size.width + glintW * 2) * glintPhase - glintW
+                    drawRect(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.White.copy(alpha = 0.20f),
+                                Color.Transparent
+                            ),
+                            startX = currentX - glintW * 0.5f,
+                            endX = currentX + glintW * 0.5f
+                        )
                     )
                 }
 
-                // Row 2: AI Voice Relay | Direct Mic
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(36.dp, Alignment.CenterHorizontally),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Button 4: AI Voice Relay Mode
-                    val isAi = audioMode == AudioCallMode.AI_TYPE_SPEAK
-                    OemInCallControlButton(
-                        icon = Icons.Rounded.RecordVoiceOver,
-                        label = "AI Voice",
-                        isActive = isAi,
-                        activeColor = AppleGreen,
-                        activeContentColor = Color.Black,
-                        onClick = onSwitchToAiType
+                    Icon(
+                        imageVector = Icons.Filled.CallEnd,
+                        contentDescription = "Hang up",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .size(22.dp)
+                            .graphicsLayer {
+                                rotationZ = hangUpIconRotation
+                            }
                     )
-
-                    // Button 5: Direct Mic Mode
-                    val isDirect = audioMode == AudioCallMode.DIRECT_MIC
-                    OemInCallControlButton(
-                        icon = Icons.Filled.Call,
-                        label = "Direct Mic",
-                        isActive = isDirect,
-                        activeColor = Color.White,
-                        activeContentColor = Color.Black,
-                        onClick = onSwitchToDirectMic
+                    Text(
+                        text = "Hang up",
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.2.sp
                     )
                 }
+            }
+        } else {
+            // Invisible placeholder so Take Over button on the right stays identically aligned while Morphing button renders smoothly on top
+            Spacer(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(54.dp)
+            )
+        }
 
-                // Speech Jammer (DAF Disruption) Live Trigger Pill in Assistant Screening
-                val jammerEngine = remember { com.callscreener.app.engine.SpeechJammerEngine.getInstance(context) }
-                if (jammerEngine.isEnabled) {
-                    val isJammerActive = state.isSpeechJammerActive
+        // Take Over / Answer Button (Saturated Emerald Green with Liquid Morph)
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(54.dp)
+                .graphicsLayer {
+                    scaleX = takeOverScaleX
+                    scaleY = takeOverScaleY
+                }
+                .shadow(
+                    elevation = takeOverElevation,
+                    shape = RoundedCornerShape(takeOverCornerRadius),
+                    spotColor = Color(0x9000E676)
+                )
+                .clip(RoundedCornerShape(takeOverCornerRadius))
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xFF00E676),
+                            Color(0xFF009624)
+                        )
+                    )
+                )
+                .border(
+                    1.2.dp,
+                    Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = if (isTakeOverPressed) 0.65f else 0.45f),
+                            Color.White.copy(alpha = 0.15f),
+                            Color.White.copy(alpha = if (isTakeOverPressed) 0.50f else 0.22f)
+                        )
+                    ),
+                    RoundedCornerShape(takeOverCornerRadius)
+                )
+                .clickable(
+                    interactionSource = takeOverSource,
+                    indication = null
+                ) {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onTakeOver()
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            // Top glass lens glint morphing with corner radius
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(26.dp)
+                    .align(Alignment.TopCenter)
+                    .clip(RoundedCornerShape(topStart = takeOverCornerRadius, topEnd = takeOverCornerRadius))
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.White.copy(alpha = 0.28f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+
+            // Specular glint shimmer sweep
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val glintW = size.width * 0.45f
+                val currentX = (size.width + glintW * 2) * glintPhase - glintW
+                drawRect(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.White.copy(alpha = 0.20f),
+                            Color.Transparent
+                        ),
+                        startX = currentX - glintW * 0.5f,
+                        endX = currentX + glintW * 0.5f
+                    )
+                )
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Call,
+                    contentDescription = "Take over call",
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(22.dp)
+                        .graphicsLayer {
+                            rotationZ = takeOverIconRotation
+                        }
+                )
+                Text(
+                    text = "Take over",
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.2.sp
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Secondary Tools Modal Bottom Sheet
+ * Tucks all advanced options (Voice Relay mode, Personas, Soundboard Presets, Jammer, Recording)
+ * cleanly into an accessible Material 3 sheet without cluttering the primary screening interface.
+ */
+@Composable
+private fun ScreeningToolsBottomSheet(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    audioMode: AudioCallMode,
+    onSwitchToAiType: () -> Unit,
+    onSwitchToDirectMic: () -> Unit,
+    currentPersona: VoicePersona,
+    onSelectPersona: (VoicePersona) -> Unit,
+    presets: List<AudioPreset>,
+    onPlayPreset: (AudioPreset) -> Unit,
+    onOpenPresetManager: () -> Unit,
+    isSpeechJammerActive: Boolean,
+    onToggleSpeechJammer: () -> Unit,
+    isRecording: Boolean,
+    recordingDurationSeconds: Long,
+    onToggleRecording: () -> Unit,
+    monetColors: ColorScheme
+) {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+
+    BackHandler(enabled = visible) {
+        onDismiss()
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(200)) + slideInVertically(tween(280)) { it },
+        exit = fadeOut(tween(160)) + slideOutVertically(tween(240)) { it }
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0x80000000))
+                .clickable { onDismiss() },
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = false) {} // Prevent click-through
+                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                    .background(monetColors.surfaceContainerHigh)
+                    .border(1.dp, monetColors.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                    .navigationBarsPadding()
+                    .padding(20.dp)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Drag Handle
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth(0.92f)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (isJammerActive) Color(0x359C27B0) else Color(0x14FFFFFF))
-                            .border(
-                                width = if (isJammerActive) 1.5.dp else 0.8.dp,
-                                color = if (isJammerActive) Color(0xFFBA68C8) else Color(0x25FFFFFF),
-                                shape = RoundedCornerShape(16.dp)
-                            )
-                            .clickable { onToggleSpeechJammer() }
-                            .padding(horizontal = 14.dp, vertical = 9.dp)
+                            .size(36.dp, 4.dp)
+                            .clip(CircleShape)
+                            .background(monetColors.outlineVariant)
+                            .align(Alignment.CenterHorizontally)
+                    )
+
+                    // Header Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Tune,
+                                contentDescription = null,
+                                tint = monetColors.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Screening Tools & Audio",
+                                color = monetColors.onSurface,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(monetColors.surfaceContainerHighest)
+                                .clickable { onDismiss() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = "Close",
+                                tint = monetColors.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+
+                    // 1. Audio Mode Relay Switcher
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "VOICE RELAY MODE",
+                            color = monetColors.onSurfaceVariant,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(monetColors.surfaceContainer)
+                                .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
+                                .padding(4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            val isAi = audioMode == AudioCallMode.AI_TYPE_SPEAK
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(40.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isAi) monetColors.primaryContainer else Color.Transparent)
+                                    .clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onSwitchToAiType()
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.RecordVoiceOver,
+                                        contentDescription = null,
+                                        tint = if (isAi) monetColors.onPrimaryContainer else monetColors.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "AI Voice (TTS)",
+                                        color = if (isAi) monetColors.onPrimaryContainer else monetColors.onSurfaceVariant,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isAi) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                }
+                            }
+
+                            val isDirect = audioMode == AudioCallMode.DIRECT_MIC
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(40.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isDirect) monetColors.primaryContainer else Color.Transparent)
+                                    .clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onSwitchToDirectMic()
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Call,
+                                        contentDescription = null,
+                                        tint = if (isDirect) monetColors.onPrimaryContainer else monetColors.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "Direct Mic",
+                                        color = if (isDirect) monetColors.onPrimaryContainer else monetColors.onSurfaceVariant,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isDirect) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. Voice Persona Selection
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "VOICE PERSONA",
+                            color = monetColors.onSurfaceVariant,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            items(VoicePersona.ALL_PERSONAS, key = { it.id }) { persona ->
+                                val isSelected = persona.id == currentPersona.id
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(if (isSelected) monetColors.primaryContainer else monetColors.surfaceContainer)
+                                        .border(
+                                            0.8.dp,
+                                            if (isSelected) monetColors.primary else monetColors.outlineVariant.copy(alpha = 0.3f),
+                                            RoundedCornerShape(12.dp)
+                                        )
+                                        .clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            onSelectPersona(persona)
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 7.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = persona.code,
+                                            color = if (isSelected) monetColors.primary else monetColors.onSurfaceVariant,
+                                            fontSize = 10.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                        Text(
+                                            text = persona.name,
+                                            color = if (isSelected) monetColors.onPrimaryContainer else monetColors.onSurface,
+                                            fontSize = 12.5.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 3. Soundboard Presets
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Text(
+                                text = "SOUNDBOARD AUDIO",
+                                color = monetColors.onSurfaceVariant,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp
+                            )
+                            Text(
+                                text = "Manage Presets",
+                                color = monetColors.primary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.clickable {
+                                    onDismiss()
+                                    onOpenPresetManager()
+                                }
+                            )
+                        }
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            itemsIndexed(presets, key = { index, preset -> "preset_${preset.id}_$index" }) { _, preset ->
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(monetColors.surfaceContainer)
+                                        .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            onPlayPreset(preset)
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (preset.isAudioFile) Icons.Rounded.GraphicEq else Icons.AutoMirrored.Filled.VolumeUp,
+                                            contentDescription = null,
+                                            tint = if (preset.isAudioFile) AppleAmber else monetColors.primary,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Text(
+                                            text = preset.title,
+                                            color = monetColors.onSurface,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 4. Speech Jammer & Recording Controls Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Speech Jammer Pill
+                        Box(modifier = Modifier.weight(1f)) {
+                            SmartJammerControl(
+                                isActive = isSpeechJammerActive,
+                                onToggle = onToggleSpeechJammer,
+                                modifier = Modifier.fillMaxWidth(),
+                                monetColors = monetColors
+                            )
+                        }
+
+                        // Call Audio Record Pill
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(if (isRecording) AppleRed.copy(alpha = 0.22f) else monetColors.surfaceContainer)
+                                .border(
+                                    0.8.dp,
+                                    if (isRecording) AppleRed else monetColors.outlineVariant.copy(alpha = 0.35f),
+                                    RoundedCornerShape(20.dp)
+                                )
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onToggleRecording()
+                                }
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(30.dp)
+                                        .size(7.dp)
                                         .clip(CircleShape)
-                                        .background(if (isJammerActive) Color(0xFFFF4081) else Color(0x28BA68C8)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Psychology,
-                                        contentDescription = null,
-                                        tint = if (isJammerActive) Color.White else Color(0xFFE1BEE7),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                                Column {
-                                    Text(
-                                        text = if (isJammerActive) "JAMMING CALLER ACTIVE" else "Acoustic Speech Jammer (DAF)",
-                                        color = if (isJammerActive) Color(0xFFFF80AB) else Color.White,
-                                        fontSize = 12.5.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = if (isJammerActive)
-                                            "${jammerEngine.delayMs}ms delayed feedback • caller speech motor paralyzed"
-                                        else
-                                            "Tap to disrupt caller with 200ms delayed auditory feedback",
-                                        color = TextSecondary,
-                                        fontSize = 10.5.sp
-                                    )
-                                }
-                            }
-
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isJammerActive) Color(0xFFFF4081) else Color(0x25BA68C8))
-                                    .padding(horizontal = 10.dp, vertical = 5.dp)
-                            ) {
+                                        .background(if (isRecording) AppleRed else monetColors.onSurfaceVariant)
+                                )
                                 Text(
-                                    text = if (isJammerActive) "STOP" else "ENGAGE",
-                                    color = Color.White,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace
+                                    text = if (isRecording) "REC ${formatDuration(recordingDurationSeconds)}" else "Record Call",
+                                    color = if (isRecording) AppleRed else monetColors.onSurface,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
                         }
                     }
-                }
-
-                // Dedicated, Massive, Centered iOS Specular Liquid Glass Red End Call Button
-                Box(
-                    modifier = Modifier
-                        .padding(top = 8.dp, bottom = 4.dp)
-                        .size(72.dp)
-                        .shadow(elevation = 22.dp, shape = CircleShape, spotColor = Color(0xAAFF3B30))
-                        .clip(CircleShape)
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color(0xFFFF453A),
-                                    Color(0xFFD70015)
-                                )
-                            )
-                        )
-                        .border(
-                            1.5.dp,
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color(0x90FFFFFF),
-                                    Color(0x28FFFFFF)
-                                )
-                            ),
-                            CircleShape
-                        )
-                        .clickable(onClick = onHangUp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.CallEnd,
-                        contentDescription = "End Call",
-                        tint = Color.White,
-                        modifier = Modifier.size(32.dp)
-                    )
                 }
             }
         }
@@ -1444,88 +2644,143 @@ fun UnifiedLiquidCommandIsland(
 }
 
 /**
- * iOS 26 Inspired Liquid Glass Circular In-Call Control Button
+ * Smart, ultra-compact in-call Speech Jammer & Echo Chamber capsule.
+ * Replaces large clunky card with a minimal, premium single-row pill.
+ * Features centered, beautifully aligned mode (ECHO/DAF) and action (ENGAGE/ACTIVE) pills.
  */
 @Composable
-fun OemInCallControlButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    isActive: Boolean = false,
-    activeColor: Color = Color.White,
-    activeContentColor: Color = Color.Black,
-    onClick: () -> Unit
+fun SmartJammerControl(
+    isActive: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+    monetColors: ColorScheme = getPixelMonetDarkColorScheme()
 ) {
+    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    val jammerEngine = remember { com.callscreener.app.engine.SpeechJammerEngine.getInstance(context) }
+    if (!jammerEngine.isEnabled) return
 
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable(
-            interactionSource = remember { MutableInteractionSource() },
-            indication = null
-        ) {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            onClick()
-        }
+    val activeMode by jammerEngine.activeModeFlow.collectAsState()
+    val isEcho = activeMode == JammerMode.INFINITE_ECHO
+
+    val accentColor = if (isEcho) Color(0xFF6366F1) else Color(0xFFFF2D55)
+    val activeBorder = if (isEcho) Color(0xFFA5B4FC) else Color(0xFFFDA4AF)
+    val activeBg = if (isEcho) Color(0x356366F1) else Color(0x35FF2D55)
+
+    Row(
+        modifier = modifier
+            .height(44.dp)
+            .clip(CircleShape)
+            .background(if (isActive) activeBg else monetColors.surfaceContainerHigh)
+            .border(
+                width = if (isActive) 1.2.dp else 0.8.dp,
+                color = if (isActive) activeBorder else monetColors.outlineVariant.copy(alpha = 0.40f),
+                shape = CircleShape
+            )
+            .padding(start = 10.dp, end = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        // Mode Icon Disc
         Box(
             modifier = Modifier
-                .size(60.dp)
+                .size(28.dp)
                 .clip(CircleShape)
-                .background(
-                    if (isActive) {
-                        Brush.verticalGradient(
-                            listOf(
-                                activeColor.copy(alpha = 0.95f),
-                                activeColor.copy(alpha = 0.70f)
-                            )
-                        )
-                    } else {
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0x35FFFFFF),
-                                Color(0x12FFFFFF),
-                                Color(0x1EFFFFFF)
-                            )
-                        )
-                    }
-                )
-                .border(
-                    1.2.dp,
-                    if (isActive) {
-                        Brush.verticalGradient(
-                            listOf(
-                                Color.White.copy(alpha = 0.8f),
-                                activeColor.copy(alpha = 0.5f)
-                            )
-                        )
-                    } else {
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0x6AFFFFFF),
-                                Color(0x18FFFFFF)
-                            )
-                        )
-                    },
-                    CircleShape
-                ),
+                .background(if (isActive) accentColor else monetColors.surfaceContainerHighest),
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = if (isActive) activeContentColor else Color.White,
-                modifier = Modifier.size(24.dp)
+                imageVector = if (isEcho) Icons.Rounded.GraphicEq else Icons.Rounded.Psychology,
+                contentDescription = null,
+                tint = if (isActive) Color.White else monetColors.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
             )
         }
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = label,
-            color = if (isActive) activeColor else TextSecondary,
-            fontSize = 11.sp,
-            fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal
-        )
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        // Title and live status dot (Single perfectly centered row)
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = if (isEcho) "Echo Chamber" else "Speech Jammer",
+                color = if (isActive) Color.White else monetColors.onSurface,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (isActive) {
+                Box(
+                    modifier = Modifier
+                        .size(6.5.dp)
+                        .clip(CircleShape)
+                        .background(accentColor)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        // Mode Switcher Pill (ECHO vs DAF - Clean, no emojis)
+        Box(
+            modifier = Modifier
+                .height(28.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(monetColors.surfaceContainerHighest)
+                .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+                .clickable {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    val nextMode = if (activeMode == JammerMode.DAF_JAMMER) JammerMode.INFINITE_ECHO else JammerMode.DAF_JAMMER
+                    jammerEngine.mode = nextMode
+                }
+                .padding(horizontal = 10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = if (isEcho) "ECHO" else "DAF",
+                color = if (isEcho) Color(0xFF818CF8) else Color(0xFFFF6482),
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.3.sp
+            )
+        }
+
+        Spacer(modifier = Modifier.width(6.dp))
+
+        // Action Status Pill (ACTIVE vs ENGAGE - Clean, no emojis)
+        Box(
+            modifier = Modifier
+                .height(28.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(if (isActive) accentColor else monetColors.primary.copy(alpha = 0.16f))
+                .border(
+                    width = 0.8.dp,
+                    color = if (isActive) Color.Transparent else monetColors.primary.copy(alpha = 0.40f),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                .clickable {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onToggle()
+                }
+                .padding(horizontal = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = if (isActive) "ACTIVE" else "ENGAGE",
+                color = if (isActive) Color.White else monetColors.primary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 0.4.sp
+            )
+        }
     }
 }
+
 
 /**
  * Animated Apple-Style 5-Bar Jumping Waveform with Luminous Gradient Ends
@@ -1749,131 +3004,48 @@ fun AmbientLiquidBackdrop(isRinging: Boolean = false) {
     }
 }
 
+
 /**
- * Glass Transcript Chat Bubble with Spring Entrance Animation & Liquid Glow Pulse
+ * Authentic Pixel Monet Dark Color Scheme Fallback (Android 11 or non-Monet devices).
  */
-@Composable
-fun LiquidGlassBubble(message: ChatMessage) {
-    val isCaller = message.sender == MessageSender.CALLER
-    val isSystem = message.sender == MessageSender.SYSTEM
-    val isAssistant = message.sender == MessageSender.USER_TTS
-
-    var isVisible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        isVisible = true
-    }
-
-    val bubbleAlpha by animateFloatAsState(
-        targetValue = if (isVisible) 1f else 0f,
-        animationSpec = tween(320, easing = FastOutSlowInEasing),
-        label = "bubbleAlpha"
+internal fun getPixelMonetDarkColorScheme(): ColorScheme {
+    return darkColorScheme(
+        primary = Color(0xFFA8C7FA),          // Google Blue (Pixel primary)
+        onPrimary = Color(0xFF042E69),
+        primaryContainer = Color(0xFF234479), // Tonal container
+        onPrimaryContainer = Color(0xFFD3E3FD),
+        secondary = Color(0xFFC2E7FF),
+        secondaryContainer = Color(0xFF2A4257),
+        onSecondaryContainer = Color(0xFFD4E4F7),
+        tertiary = Color(0xFFD0BCFF),
+        tertiaryContainer = Color(0xFF4A4458),
+        onTertiaryContainer = Color(0xFFE8DEF8),
+        surface = Color(0xFF111318),          // Pixel Obsidian/Charcoal surface
+        surfaceContainer = Color(0xFF1E2025),
+        surfaceContainerHigh = Color(0xFF282A2F),
+        surfaceContainerHighest = Color(0xFF33353A),
+        onSurface = Color(0xFFE2E2E6),
+        onSurfaceVariant = Color(0xFFC4C6D0),
+        outline = Color(0xFF8E9099),
+        outlineVariant = Color(0xFF44474F),
+        error = Color(0xFFFFB4AB),
+        errorContainer = Color(0xFF93000A),
+        onErrorContainer = Color(0xFFFFDAD6)
     )
-    val bubbleScale by animateFloatAsState(
-        targetValue = if (isVisible) 1f else 0.90f,
-        animationSpec = spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow),
-        label = "bubbleScale"
-    )
-
-    val pulseTransition = rememberInfiniteTransition(label = "bubblePulse")
-    val pulseGlow by pulseTransition.animateFloat(
-        initialValue = 0.55f,
-        targetValue = 0.95f,
-        animationSpec = infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "pulseGlow"
-    )
-
-    val bubbleBrush = when {
-        isSystem -> LiquidGlassFillSubtle
-        isCaller -> LiquidGlassFill
-        else -> AppleBlueGlassFill
-    }
-
-    val borderBrush = when {
-        isSystem -> LiquidGlassBorderSubtle
-        isCaller -> LiquidGlassBorder
-        isAssistant -> Brush.verticalGradient(
-            listOf(
-                Color.White.copy(alpha = pulseGlow),
-                Color(0x35FFFFFF)
-            )
-        )
-        else -> LiquidGlassBorder
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .graphicsLayer {
-                alpha = bubbleAlpha
-                scaleX = bubbleScale
-                scaleY = bubbleScale
-            },
-        contentAlignment = when {
-            isSystem -> Alignment.Center
-            isCaller -> Alignment.CenterStart
-            else -> Alignment.CenterEnd
-        }
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth(if (isSystem) 0.92f else 0.82f)
-                .shadow(elevation = 6.dp, shape = RoundedCornerShape(
-                    topStart = 18.dp,
-                    topEnd = 18.dp,
-                    bottomStart = if (isCaller) 4.dp else 18.dp,
-                    bottomEnd = if (!isCaller && !isSystem) 4.dp else 18.dp
-                ), spotColor = Color(0x40000000))
-                .clip(
-                    RoundedCornerShape(
-                        topStart = 18.dp,
-                        topEnd = 18.dp,
-                        bottomStart = if (isCaller) 4.dp else 18.dp,
-                        bottomEnd = if (!isCaller && !isSystem) 4.dp else 18.dp
-                    )
-                )
-                .background(bubbleBrush)
-                .border(
-                    1.2.dp,
-                    borderBrush,
-                    RoundedCornerShape(
-                        topStart = 18.dp,
-                        topEnd = 18.dp,
-                        bottomStart = if (isCaller) 4.dp else 18.dp,
-                        bottomEnd = if (!isCaller && !isSystem) 4.dp else 18.dp
-                    )
-                )
-                .padding(horizontal = 14.dp, vertical = 10.dp)
-        ) {
-            if (!isSystem) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (isCaller) "CALLER" else "AI ASSISTANT",
-                        color = if (isCaller) AppleAmber else Color.White.copy(alpha = 0.9f),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp
-                    )
-                }
-                Spacer(modifier = Modifier.height(3.dp))
-            }
-            Text(
-                text = message.text,
-                color = TextPrimary,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                letterSpacing = (-0.2).sp
-            )
-        }
-    }
 }
 
 /**
- * Ultra-Premium OEM-Grade Flagship Incoming Call Screen
- * (Apple iOS 18 / Samsung S24 Ultra / VisionOS Calling Architecture)
+ * Android Monet / Material You Pixel Incoming Call Screen.
+ *
+ * Implements the authentic Google Phone / Pixel Material 3 architecture:
+ * - Dynamic Monet color extraction (dynamicDarkColorScheme on Android 12+ / Pixel fallback)
+ * - Atmospheric wallpaper-tinted ambient orbs with organic breathing
+ * - Centered Google Verified Caller chip with security shield and live pulse dot
+ * - Generous Material 3 circular contact avatar with soothing ambient primary wave ripples
+ * - Large, clean Google Sans headline typography for caller name & number
+ * - The Iconic Google Pixel "Screen call" Material 3 elevated pill button with sparkles & Assistant badge
+ * - Dedicated Quick Reply action ("Reply") with a Material 3 canned response sheet
+ * - Symmetrical, high-contrast, tactile Google Phone circular action buttons (Decline Red & Answer Green)
  */
 @Composable
 fun OemIncomingCallScreen(
@@ -1882,188 +3054,149 @@ fun OemIncomingCallScreen(
     isNumberHidden: Boolean = false,
     onDecline: () -> Unit,
     onScreenWithAi: () -> Unit,
-    onAnswer: () -> Unit
+    onAnswer: () -> Unit,
+    isDeclineHandledExternally: Boolean = false,
+    isQuickReplyOpen: Boolean = false,
+    onToggleQuickReply: ((Boolean) -> Unit)? = null
 ) {
+    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
-    val infiniteTransition = rememberInfiniteTransition(label = "callingRipples")
 
-    // Multi-layered pulsing radar rings around caller avatar
-    val ring1Scale by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 1.65f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "ring1Scale"
-    )
-    val ring1Alpha by infiniteTransition.animateFloat(
-        initialValue = 0.48f,
-        targetValue = 0.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "ring1Alpha"
-    )
+    val monetColors = remember(context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                dynamicDarkColorScheme(context)
+            } catch (_: Throwable) {
+                getPixelMonetDarkColorScheme()
+            }
+        } else {
+            getPixelMonetDarkColorScheme()
+        }
+    }
 
-    val ring2Scale by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 2.15f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2200, delayMillis = 500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "ring2Scale"
-    )
-    val ring2Alpha by infiniteTransition.animateFloat(
-        initialValue = 0.32f,
-        targetValue = 0.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2200, delayMillis = 500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "ring2Alpha"
-    )
+    var localQuickReplySheet by remember { mutableStateOf(false) }
+    val effectiveQuickReplyOpen = if (onToggleQuickReply != null) isQuickReplyOpen else localQuickReplySheet
 
-    val ring3Scale by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 2.65f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2200, delayMillis = 1000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "ring3Scale"
-    )
-    val ring3Alpha by infiniteTransition.animateFloat(
-        initialValue = 0.20f,
-        targetValue = 0.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2200, delayMillis = 1000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "ring3Alpha"
-    )
+    val infiniteTransition = rememberInfiniteTransition(label = "monetIncomingAnimations")
 
-    // Gentle organic avatar breathing
-    val avatarBreathing by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 1.045f,
+    // Ambient wallpaper-tinted background breathing
+    val orbBreath by infiniteTransition.animateFloat(
+        initialValue = 0.90f,
+        targetValue = 1.12f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = FastOutSlowInEasing),
+            animation = tween(3800, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "avatarBreathing"
+        label = "orbBreath"
     )
 
-    // Carrier badge status dot pulse
-    val dotAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 1.0f,
+    // Avatar subtle breathing pulse
+    val avatarPulse by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.04f,
         animationSpec = infiniteRepeatable(
-            animation = tween(850, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "dotAlpha"
+        label = "avatarPulse"
     )
 
-    // Answer button gentle organic pulse
+    // Answer button aura ring pulse
     val answerPulse by infiniteTransition.animateFloat(
         initialValue = 1.0f,
-        targetValue = 1.05f,
+        targetValue = 1.18f,
         animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = FastOutSlowInEasing),
+            animation = tween(1000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "answerPulse"
     )
 
-    // Answer ambient aura scale
-    val answerAuraScale by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 1.16f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "answerAuraScale"
-    )
-
-    val declineGlowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.25f,
-        targetValue = 0.60f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1100, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "declineGlowAlpha"
-    )
-
-    val declineGlowScale by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 1.14f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1100, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "declineGlowScale"
-    )
-
-    // Subtle incoming call ringing handset vibration wiggle (every 2.4s)
+    // Ringing handset subtle wiggle
     val phoneWiggleAngle by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 0f,
         animationSpec = infiniteRepeatable(
             animation = keyframes {
-                durationMillis = 2400
+                durationMillis = 2200
                 0f at 0
-                -12f at 160 using FastOutSlowInEasing
-                12f at 320 using FastOutSlowInEasing
-                -8f at 480 using FastOutSlowInEasing
-                8f at 640 using FastOutSlowInEasing
-                -4f at 800 using FastOutSlowInEasing
-                0f at 960 using FastOutSlowInEasing
-                0f at 2400
+                -14f at 140 using FastOutSlowInEasing
+                14f at 280 using FastOutSlowInEasing
+                -10f at 420 using FastOutSlowInEasing
+                10f at 560 using FastOutSlowInEasing
+                -4f at 700 using FastOutSlowInEasing
+                0f at 840 using FastOutSlowInEasing
+                0f at 2200
             },
             repeatMode = RepeatMode.Restart
         ),
         label = "phoneWiggleAngle"
     )
 
-    // AI Screen Pill shimmer sweep
-    val shimmerOffset by infiniteTransition.animateFloat(
+    // Enhanced Endless Screen Call Button Animations
+    val screenShimmerPhase by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2800, easing = LinearEasing),
+            animation = tween(2400, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "shimmerOffset"
+        label = "screenShimmerPhase"
     )
 
-    // Tactile Springs for buttons
+    val screenAuraPulse by infiniteTransition.animateFloat(
+        initialValue = 0.15f,
+        targetValue = 0.35f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "screenAuraPulse"
+    )
+
+    // Tactile Springs for Decline Button
     val declineSource = remember { MutableInteractionSource() }
     val isDeclinePressed by declineSource.collectIsPressedAsState()
     val declineScale by animateFloatAsState(
-        targetValue = if (isDeclinePressed) 0.85f else 1.0f,
-        animationSpec = spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessMediumLow),
+        targetValue = if (isDeclinePressed) 0.90f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
         label = "declineScale"
     )
 
-    val answerSource = remember { MutableInteractionSource() }
-    val isAnswerPressed by answerSource.collectIsPressedAsState()
+    // Drag & Press State for Answer Button (Supports both swipe up and tap)
+    var isAnswerPressed by remember { mutableStateOf(false) }
+    var dragOffsetY by remember { mutableStateOf(0f) }
+    val animatedOffsetY by animateFloatAsState(
+        targetValue = dragOffsetY,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "animatedAnswerOffsetY"
+    )
+    val dragProgress = (abs(dragOffsetY) / 100f).coerceIn(0f, 1f)
     val answerScale by animateFloatAsState(
-        targetValue = if (isAnswerPressed) 0.85f else answerPulse,
-        animationSpec = spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessMediumLow),
+        targetValue = if (isAnswerPressed) 0.90f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
         label = "answerScale"
     )
 
-    val screenAiSource = remember { MutableInteractionSource() }
-    val isScreenAiPressed by screenAiSource.collectIsPressedAsState()
-    val screenAiScale by animateFloatAsState(
-        targetValue = if (isScreenAiPressed) 0.94f else 1.0f,
-        animationSpec = spring(dampingRatio = 0.68f, stiffness = Spring.StiffnessMediumLow),
-        label = "screenAiScale"
+    // Screen Call Button Tactile State
+    val screenSource = remember { MutableInteractionSource() }
+    val isScreenPressed by screenSource.collectIsPressedAsState()
+    val screenScale by animateFloatAsState(
+        targetValue = if (isScreenPressed) 0.96f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
+        label = "screenScale"
+    )
+
+    // Quick Reply Button Tactile State
+    val replySource = remember { MutableInteractionSource() }
+    val isReplyPressed by replySource.collectIsPressedAsState()
+    val replyScale by animateFloatAsState(
+        targetValue = if (isReplyPressed) 0.94f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
+        label = "replyScale"
     )
 
     val initials = remember(callerName, callerNumber) {
@@ -2076,485 +3209,740 @@ fun OemIncomingCallScreen(
                 name.take(2).uppercase()
             }
         } else {
-            "ID"
+            ""
         }
     }
 
-    Column(
+    val photoPath = remember(callerNumber) {
+        CallerProfileManager.getCustomPhotoPath(context, callerNumber)
+    }
+    val contactBitmap = rememberContactPhotoBitmap(photoPath)
+
+    val displayCallerTitle = if (!callerName.isNullOrBlank() && callerName != "Unknown Caller") {
+        callerName
+    } else if (isNumberHidden) {
+        "Private Caller"
+    } else {
+        "Unknown Caller"
+    }
+
+    val displayCallerNumber = if (isNumberHidden) {
+        "Private / Hidden Number"
+    } else {
+        callerNumber
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .padding(horizontal = 24.dp, vertical = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
+            .background(monetColors.surface)
     ) {
-        // Top Network & Carrier Tag
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(top = 16.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0x1AFFFFFF))
-                    .border(0.8.dp, LiquidGlassBorderSubtle, RoundedCornerShape(12.dp))
-                    .padding(horizontal = 12.dp, vertical = 5.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(AppleGreen.copy(alpha = dotAlpha))
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "CARRIER VERIFIED • INCOMING CALL",
-                        color = TextSecondary,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 0.6.sp
-                    )
-                }
-            }
+        // Atmospheric Android Monet Ambient Aura Canvas
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val width = size.width
+            val height = size.height
 
-            Spacer(modifier = Modifier.height(30.dp))
-
-            // Large Glowing Avatar with Triple Pulsing Radar Rings
-            Box(
-                modifier = Modifier.size(160.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                // Outer Ripple Ring 3
-                Box(
-                    modifier = Modifier
-                        .size(110.dp)
-                        .scale(ring3Scale)
-                        .clip(CircleShape)
-                        .border(1.2.dp, Color(0x7030D158).copy(alpha = ring3Alpha), CircleShape)
-                )
-
-                // Outer Ripple Ring 2
-                Box(
-                    modifier = Modifier
-                        .size(110.dp)
-                        .scale(ring2Scale)
-                        .clip(CircleShape)
-                        .border(1.5.dp, AppleTeal.copy(alpha = ring2Alpha), CircleShape)
-                )
-
-                // Outer Ripple Ring 1
-                Box(
-                    modifier = Modifier
-                        .size(110.dp)
-                        .scale(ring1Scale)
-                        .clip(CircleShape)
-                        .border(1.5.dp, AppleBlue.copy(alpha = ring1Alpha), CircleShape)
-                )
-
-                // Central Specular Glass Avatar
-                Box(
-                    modifier = Modifier
-                        .size(110.dp)
-                        .scale(avatarBreathing)
-                        .shadow(elevation = 20.dp, shape = CircleShape, spotColor = AppleBlue.copy(alpha = 0.5f))
-                        .clip(CircleShape)
-                        .background(
-                            Brush.radialGradient(
-                                listOf(
-                                    AppleBlue.copy(alpha = 0.35f),
-                                    Color(0x28FFFFFF),
-                                    Color(0x100D1426)
-                                )
-                            )
-                        )
-                        .border(1.5.dp, LiquidGlassBorder, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = initials,
-                        color = Color.White,
-                        fontSize = 36.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.SansSerif,
-                        letterSpacing = 1.sp
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            val displayCallerTitle = if (!callerName.isNullOrBlank() && callerName != "Unknown Caller") {
-                callerName
-            } else if (isNumberHidden) {
-                "Private Caller"
-            } else {
-                "Unknown Caller"
-            }
-
-            val displayCallerNumber = if (isNumberHidden) {
-                "Private / Hidden Number"
-            } else {
-                callerNumber
-            }
-
-            // Caller Name with High-Contrast Typography
-            Text(
-                text = displayCallerTitle,
-                color = TextPrimary,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.6).sp,
-                textAlign = TextAlign.Center
+            // Upper-Center Monet Primary Bloom
+            val orb1Radius = width * 0.70f * orbBreath
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        monetColors.primaryContainer.copy(alpha = 0.35f),
+                        monetColors.primary.copy(alpha = 0.12f),
+                        Color.Transparent
+                    ),
+                    center = Offset(width * 0.50f, height * 0.28f),
+                    radius = orb1Radius
+                ),
+                radius = orb1Radius,
+                center = Offset(width * 0.50f, height * 0.28f)
             )
 
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Phone Number
-            Text(
-                text = displayCallerNumber,
-                color = TextSecondary,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Normal,
-                fontFamily = FontFamily.Monospace
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = "Mobile • High Definition Audio",
-                color = TextTertiary,
-                fontSize = 12.sp
+            // Lower-Center Monet Tertiary / Secondary Bloom
+            val orb2Radius = width * 0.75f * (2.0f - orbBreath)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        monetColors.tertiaryContainer.copy(alpha = 0.22f),
+                        monetColors.secondaryContainer.copy(alpha = 0.10f),
+                        Color.Transparent
+                    ),
+                    center = Offset(width * 0.50f, height * 0.76f),
+                    radius = orb2Radius
+                ),
+                radius = orb2Radius,
+                center = Offset(width * 0.50f, height * 0.76f)
             )
         }
 
-        // Bottom OEM ColorOS-Style Incoming Call Controls
+        // Full Screen Content Column (Google Dialer Expressive Incoming Call Screen)
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Screen with AI Assistant - Shimmering Border & Spring Pill
-            Box(
+            // TOP SECTION: Google Dialer Caller Info & Avatar
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .height(54.dp)
-                    .scale(screenAiScale)
-                    .shadow(elevation = 14.dp, shape = RoundedCornerShape(27.dp), spotColor = Color(0x60000000))
-                    .clip(RoundedCornerShape(27.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0x38FFFFFF),
-                                Color(0x18FFFFFF),
-                                Color(0x22FFFFFF)
-                            )
-                        )
-                    )
-                    .border(
-                        1.2.dp,
-                        Brush.linearGradient(
-                            colors = listOf(
-                                Color(0x40FFFFFF),
-                                Color(0xC0FFFFFF),
-                                Color(0x8030D158),
-                                Color(0x40FFFFFF)
-                            ),
-                            start = Offset(shimmerOffset * 500f, 0f),
-                            end = Offset((shimmerOffset + 1f) * 500f, 150f)
-                        ),
-                        RoundedCornerShape(27.dp)
-                    )
-                    .clickable(
-                        interactionSource = screenAiSource,
-                        indication = null
-                    ) {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onScreenWithAi()
-                    },
-                contentAlignment = Alignment.Center
+                    .padding(top = 16.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Rounded.RecordVoiceOver,
-                        contentDescription = "Screen with AI",
-                        tint = AppleGreen,
-                        modifier = Modifier.size(20.dp)
+                // Caller Portrait Container (Google Dialer 120dp Avatar)
+                Box(
+                    modifier = Modifier.size(124.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Soft ambient halo ring
+                    Box(
+                        modifier = Modifier
+                            .size(120.dp)
+                            .scale(avatarPulse)
+                            .background(monetColors.primary.copy(alpha = 0.12f), CircleShape)
                     )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "Screen Call with AI Assistant",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+
+                    // Central Avatar Circle
+                    Box(
+                        modifier = Modifier
+                            .size(112.dp)
+                            .shadow(
+                                elevation = 6.dp,
+                                shape = CircleShape,
+                                spotColor = monetColors.primary.copy(alpha = 0.25f)
+                            )
+                            .clip(CircleShape)
+                            .background(monetColors.primaryContainer)
+                            .border(
+                                width = 1.dp,
+                                color = monetColors.outlineVariant.copy(alpha = 0.40f),
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (contactBitmap != null) {
+                            Image(
+                                bitmap = contactBitmap,
+                                contentDescription = displayCallerTitle,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape)
+                            )
+                        } else if (initials.isNotBlank()) {
+                            Text(
+                                text = initials,
+                                color = monetColors.onPrimaryContainer,
+                                fontSize = 36.sp,
+                                fontWeight = FontWeight.Medium,
+                                letterSpacing = 0.5.sp
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Rounded.Person,
+                                contentDescription = null,
+                                tint = monetColors.onPrimaryContainer,
+                                modifier = Modifier.size(52.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                // Caller Headline Name (Google Sans Aesthetic)
+                Text(
+                    text = displayCallerTitle,
+                    color = monetColors.onSurface,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Normal,
+                    letterSpacing = (-0.5).sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Caller Phone Number
+                Text(
+                    text = displayCallerNumber,
+                    color = monetColors.onSurfaceVariant,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Normal,
+                    letterSpacing = 0.4.sp,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // HD Voice & Spam Protection Badges Row
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Modern HD Voice Badge
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(monetColors.surfaceContainerHigh.copy(alpha = 0.85f))
+                            .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.40f), CircleShape)
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.GraphicEq,
+                                contentDescription = "HD Voice",
+                                tint = monetColors.primary,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Text(
+                                text = "HD Voice",
+                                color = monetColors.onSurface,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 0.2.sp
+                            )
+                        }
+                    }
+
+                    // Spam Protection / Verified Badge
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(monetColors.surfaceContainerHigh.copy(alpha = 0.85f))
+                            .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.40f), CircleShape)
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Security,
+                                contentDescription = null,
+                                tint = Color(0xFF34A853),
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Text(
+                                text = "Spam Protected",
+                                color = monetColors.onSurfaceVariant,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Normal
+                            )
+                        }
+                    }
                 }
             }
 
-            // Bottom Decline (Left) and Answer (Right) - Modern Minimalist Frosted Glass Discs
-            Row(
+            // BOTTOM SECTION: Controls anchored in thumb zone
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 42.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(bottom = 16.dp)
             ) {
-                // Ultra-Saturated Liquid Ruby Glass Decline Button (Left)
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(88.dp)
+                // 1. Signature Google Pixel "Screen call" Pill Button
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
                 ) {
-                    // Deep Luminous Saturated Ruby Glow Aura
-                    Box(
-                        modifier = Modifier
-                            .size(86.dp)
-                            .scale(declineGlowScale)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.radialGradient(
-                                    listOf(
-                                        Color(0xFFFF3B30).copy(alpha = declineGlowAlpha * 0.90f),
-                                        Color(0xFFFF2D55).copy(alpha = declineGlowAlpha * 0.45f),
-                                        Color.Transparent
-                                    )
-                                )
-                            )
-                    )
+                    val density = LocalDensity.current
+                    val buttonWidthPx = with(density) { maxWidth.toPx() }
+                    val shimmerSpan = buttonWidthPx * 0.85f
+                    val totalSweepDistance = buttonWidthPx + shimmerSpan * 2f
+                    val sweepStartX = -shimmerSpan + (totalSweepDistance * screenShimmerPhase)
 
-                    // Pure Saturated Liquid Ruby Glass Disc
                     Box(
                         modifier = Modifier
-                            .size(76.dp)
-                            .scale(declineScale)
+                            .fillMaxWidth()
+                            .height(54.dp)
+                            .graphicsLayer {
+                                scaleX = screenScale
+                                scaleY = screenScale
+                            }
                             .shadow(
-                                elevation = 16.dp,
-                                shape = CircleShape,
-                                spotColor = Color(0x90FF3B30),
-                                ambientColor = Color(0x50FF2D55)
+                                elevation = if (isScreenPressed) 2.dp else 6.dp,
+                                shape = RoundedCornerShape(27.dp),
+                                spotColor = monetColors.primary.copy(alpha = 0.25f + screenAuraPulse * 0.15f)
                             )
-                            .clip(CircleShape)
+                            .clip(RoundedCornerShape(27.dp))
                             .background(
-                                Brush.verticalGradient(
-                                    listOf(
-                                        Color(0xFFFF453A), // Brilliant luminous ruby crown
-                                        Color(0xFFFF3B30), // Saturated vivid Apple red core
-                                        Color(0xFFD70015), // Deep jewel-toned crimson
-                                        Color(0xFFA50011)  // Rich optical base
+                                Brush.horizontalGradient(
+                                    colors = listOf(
+                                        monetColors.surfaceContainerHigh,
+                                        monetColors.primaryContainer.copy(alpha = 0.25f + screenAuraPulse * 0.15f),
+                                        monetColors.surfaceContainerHigh
                                     )
                                 )
                             )
                             .border(
-                                1.6.dp,
-                                Brush.verticalGradient(
-                                    listOf(
-                                        Color(0xF5FFFFFF), // Razor-sharp crystalline specular top
-                                        Color(0x90FFB4AE), // Luminous rose refraction
-                                        Color(0x40FFFFFF), // Mid transmission
-                                        Color(0x80FF3B30)  // Bottom caustic return rim
-                                    )
+                                width = 1.2.dp,
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        monetColors.outlineVariant.copy(alpha = 0.35f),
+                                        monetColors.primary.copy(alpha = 0.40f),
+                                        Color(0xFF4285F4).copy(alpha = 0.85f), // Radiant Google Blue
+                                        Color(0xFF34A853).copy(alpha = 0.80f), // Google Green accent
+                                        monetColors.primary.copy(alpha = 0.85f),
+                                        monetColors.outlineVariant.copy(alpha = 0.35f)
+                                    ),
+                                    start = Offset(sweepStartX, 0f),
+                                    end = Offset(sweepStartX + shimmerSpan, 140f)
                                 ),
-                                CircleShape
+                                shape = RoundedCornerShape(27.dp)
                             )
                             .clickable(
-                                interactionSource = declineSource,
+                                interactionSource = screenSource,
                                 indication = null
                             ) {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onDecline()
-                            },
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onScreenWithAi()
+                            }
+                            .padding(horizontal = 16.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Inner Caustic Lens Contour Bevel
-                        Box(
-                            modifier = Modifier
-                                .matchParentSize()
-                                .padding(1.5.dp)
-                                .border(
-                                    0.8.dp,
-                                    Brush.verticalGradient(
-                                        listOf(
-                                            Color(0x95FFFFFF),
-                                            Color(0x20FFFFFF),
-                                            Color(0x50FFA39E)
-                                        )
-                                    ),
-                                    CircleShape
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Assistant Screening Icon Disc
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(monetColors.primary.copy(alpha = 0.14f))
+                                    .border(0.8.dp, monetColors.primary.copy(alpha = 0.30f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.RecordVoiceOver,
+                                    contentDescription = "Screen call",
+                                    tint = monetColors.primary,
+                                    modifier = Modifier.size(19.dp)
                                 )
+                            }
+
+                            Spacer(modifier = Modifier.width(14.dp))
+
+                            Text(
+                                text = "Screen call",
+                                color = monetColors.onSurface,
+                                fontSize = 15.5.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+
+                            Spacer(modifier = Modifier.weight(1f))
+
+                            // Assistant Badge
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(monetColors.primaryContainer.copy(alpha = 0.85f))
+                                    .border(
+                                        0.6.dp,
+                                        monetColors.primary.copy(alpha = 0.35f),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .padding(horizontal = 9.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = "Assistant",
+                                    color = monetColors.onPrimaryContainer,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.3.sp
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 2. Google Dialer "Quick reply" Capsule Pill Button
+                Box(
+                    modifier = Modifier
+                        .graphicsLayer {
+                            scaleX = replyScale
+                            scaleY = replyScale
+                        }
+                        .shadow(
+                            elevation = if (isReplyPressed) 2.dp else 4.dp,
+                            shape = RoundedCornerShape(21.dp),
+                            spotColor = monetColors.primary.copy(alpha = 0.20f)
+                        )
+                        .clip(RoundedCornerShape(21.dp))
+                        .background(monetColors.surfaceContainerHigh)
+                        .border(
+                            width = 1.dp,
+                            color = monetColors.outlineVariant.copy(alpha = 0.45f),
+                            shape = RoundedCornerShape(21.dp)
+                        )
+                        .clickable(
+                            interactionSource = replySource,
+                            indication = null
+                        ) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            if (onToggleQuickReply != null) onToggleQuickReply(true) else localQuickReplySheet = true
+                        }
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.Message,
+                            contentDescription = "Quick reply",
+                            tint = monetColors.primary,
+                            modifier = Modifier.size(16.dp)
                         )
 
-                        // Top Optical Glass Specular Dome Sheen
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(38.dp)
-                                .align(Alignment.TopCenter)
-                                .clip(RoundedCornerShape(topStart = 38.dp, topEnd = 38.dp))
-                                .background(
-                                    Brush.verticalGradient(
-                                        listOf(
-                                            Color(0x75FFFFFF),
-                                            Color(0x24FFFFFF),
-                                            Color.Transparent
-                                        )
-                                    )
-                                )
-                        )
-
-                        // Bottom Caustic Reflection Bounce
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(16.dp)
-                                .align(Alignment.BottomCenter)
-                                .background(
-                                    Brush.verticalGradient(
-                                        listOf(
-                                            Color.Transparent,
-                                            Color(0x35FFFFFF)
-                                        )
-                                    )
-                                )
+                        Text(
+                            text = "Quick reply",
+                            color = monetColors.onSurface,
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            letterSpacing = 0.2.sp
                         )
 
                         Icon(
-                            imageVector = Icons.Filled.CallEnd,
-                            contentDescription = "Decline",
-                            tint = Color.White,
-                            modifier = Modifier.size(34.dp)
+                            imageVector = Icons.Rounded.KeyboardArrowUp,
+                            contentDescription = null,
+                            tint = monetColors.onSurfaceVariant.copy(alpha = 0.70f),
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
 
-                // Ultra-Saturated Liquid Emerald Glass Answer Button (Right)
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(88.dp)
+                Spacer(modifier = Modifier.height(26.dp))
+
+                // 3. Pixel-Perfect Symmetric Action Buttons Row (Decline & Answer)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 32.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Deep Luminous Saturated Emerald Glow Aura
-                    Box(
-                        modifier = Modifier
-                            .size(86.dp)
-                            .scale(answerAuraScale)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.radialGradient(
-                                    listOf(
-                                        Color(0xFF34C759).copy(alpha = answerPulse * 0.85f),
-                                        Color(0xFF30D158).copy(alpha = answerPulse * 0.40f),
-                                        Color.Transparent
-                                    )
-                                )
-                            )
-                    )
-
-                    // Pure Saturated Liquid Emerald Glass Disc
-                    Box(
-                        modifier = Modifier
-                            .size(76.dp)
-                            .scale(answerScale)
-                            .shadow(
-                                elevation = 16.dp,
-                                shape = CircleShape,
-                                spotColor = Color(0x9034C759),
-                                ambientColor = Color(0x5030D158)
-                            )
-                            .clip(CircleShape)
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(
-                                        Color(0xFF38E568), // Brilliant luminous emerald crown
-                                        Color(0xFF34C759), // Saturated vivid Apple green core
-                                        Color(0xFF28A745), // Deep jewel-toned emerald
-                                        Color(0xFF13732B)  // Rich optical base
-                                    )
-                                )
-                            )
-                            .border(
-                                1.6.dp,
-                                Brush.verticalGradient(
-                                    listOf(
-                                        Color(0xF5FFFFFF), // Razor-sharp crystalline specular top
-                                        Color(0x95A8FFC2), // Luminous mint refraction
-                                        Color(0x40FFFFFF), // Mid transmission
-                                        Color(0x8034C759)  // Bottom caustic return rim
-                                    )
-                                ),
-                                CircleShape
-                            )
-                            .clickable(
-                                interactionSource = answerSource,
-                                indication = null
-                            ) {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onAnswer()
-                            },
-                        contentAlignment = Alignment.Center
+                    // DECLINE (Left)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.width(84.dp)
                     ) {
-                        // Inner Caustic Lens Contour Bevel
                         Box(
-                            modifier = Modifier
-                                .matchParentSize()
-                                .padding(1.5.dp)
-                                .border(
-                                    0.8.dp,
-                                    Brush.verticalGradient(
-                                        listOf(
-                                            Color(0x95FFFFFF),
-                                            Color(0x20FFFFFF),
-                                            Color(0x509EFFA8)
+                            modifier = Modifier.size(72.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (!isDeclineHandledExternally) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(72.dp)
+                                        .graphicsLayer {
+                                            scaleX = declineScale
+                                            scaleY = declineScale
+                                        }
+                                        .shadow(
+                                            elevation = if (isDeclinePressed) 2.dp else 6.dp,
+                                            shape = CircleShape,
+                                            spotColor = Color(0xFFD32F2F).copy(alpha = 0.45f)
                                         )
-                                    ),
-                                    CircleShape
-                                )
-                        )
+                                        .clip(CircleShape)
+                                        .background(
+                                            Brush.verticalGradient(
+                                                listOf(
+                                                    Color(0xFFE53935), // Google Dialer Decline Red
+                                                    Color(0xFFD32F2F),
+                                                    Color(0xFFC62828)
+                                                )
+                                            )
+                                        )
+                                        .border(1.dp, Color.White.copy(alpha = 0.25f), CircleShape)
+                                        .clickable(
+                                            interactionSource = declineSource,
+                                            indication = null
+                                        ) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            onDecline()
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.CallEnd,
+                                        contentDescription = "Decline call",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                }
+                            } else {
+                                // Keep exact 72.dp placeholder so layout remains 100% stable during transitions
+                                Spacer(modifier = Modifier.size(72.dp))
+                            }
+                        }
 
-                        // Top Optical Glass Specular Dome Sheen
+                        Text(
+                            text = "Decline",
+                            color = monetColors.onSurfaceVariant,
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            letterSpacing = 0.2.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    // ANSWER (Right - Supports tap & swipe up)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.width(84.dp)
+                    ) {
                         Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(38.dp)
-                                .align(Alignment.TopCenter)
-                                .clip(RoundedCornerShape(topStart = 38.dp, topEnd = 38.dp))
-                                .background(
-                                    Brush.verticalGradient(
-                                        listOf(
-                                            Color(0x75FFFFFF),
-                                            Color(0x24FFFFFF),
-                                            Color.Transparent
+                            modifier = Modifier.size(72.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // Ambient glowing pulse ring behind answer button
+                            Box(
+                                modifier = Modifier
+                                    .size(72.dp)
+                                    .scale(answerPulse)
+                                    .background(
+                                        Brush.radialGradient(
+                                            listOf(
+                                                Color(0xFF00E676).copy(alpha = 0.40f),
+                                                Color(0xFF00C853).copy(alpha = 0.15f),
+                                                Color.Transparent
+                                            )
+                                        ),
+                                        CircleShape
+                                    )
+                            )
+
+                            // Answer Button with Upward Drag Offset & Tap Support
+                            Box(
+                                modifier = Modifier
+                                    .offset { IntOffset(0, animatedOffsetY.roundToInt()) }
+                                    .size(72.dp)
+                                    .graphicsLayer {
+                                        scaleX = answerScale
+                                        scaleY = answerScale
+                                    }
+                                    .shadow(
+                                        elevation = (if (isAnswerPressed) 2f else 6f + dragProgress * 6f).dp,
+                                        shape = CircleShape,
+                                        spotColor = Color(0xFF00E676).copy(alpha = 0.65f)
+                                    )
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.verticalGradient(
+                                            listOf(
+                                                Color(0xFF00E676), // Vibrant Neon Emerald Highlight
+                                                Color(0xFF00C853), // Punchy Saturated Google Green
+                                                Color(0xFF00963E)  // Deep Saturated Emerald Base
+                                            )
                                         )
                                     )
+                                    .border(
+                                        1.3.dp,
+                                        Brush.linearGradient(
+                                            listOf(
+                                                Color.White.copy(alpha = 0.65f),
+                                                Color.White.copy(alpha = 0.20f),
+                                                Color.White.copy(alpha = 0.35f)
+                                            )
+                                        ),
+                                        CircleShape
+                                    )
+                                    .pointerInput(Unit) {
+                                        awaitEachGesture {
+                                            val down = awaitFirstDown(requireUnconsumed = false)
+                                            isAnswerPressed = true
+                                            var isDragged = false
+                                            while (true) {
+                                                val event = awaitPointerEvent()
+                                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                                if (!change.pressed) {
+                                                    isAnswerPressed = false
+                                                    if (dragOffsetY <= -50f || !isDragged) {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                        onAnswer()
+                                                    }
+                                                    dragOffsetY = 0f
+                                                    break
+                                                }
+                                                val dy = change.position.y - down.position.y
+                                                if (dy < -10f) {
+                                                    isDragged = true
+                                                    dragOffsetY = dy.coerceIn(-140f, 0f)
+                                                    change.consume()
+                                                }
+                                            }
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                // Top specular glass highlight
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(30.dp)
+                                        .align(Alignment.TopCenter)
+                                        .clip(RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp))
+                                        .background(
+                                            Brush.verticalGradient(
+                                                listOf(
+                                                    Color.White.copy(alpha = 0.35f),
+                                                    Color.Transparent
+                                                )
+                                            )
+                                        )
                                 )
-                        )
 
-                        // Bottom Caustic Reflection Bounce
+                                Icon(
+                                    imageVector = Icons.Filled.Call,
+                                    contentDescription = "Answer call",
+                                    tint = Color.White,
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .rotate(if (dragOffsetY == 0f) phoneWiggleAngle else 0f)
+                                )
+                            }
+                        }
+
+                        Text(
+                            text = "Answer",
+                            color = monetColors.onSurfaceVariant,
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            letterSpacing = 0.2.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
+        }
+
+        // Material 3 Quick Reply Bottom Sheet Modal
+        AnimatedVisibility(
+            visible = effectiveQuickReplyOpen,
+            enter = fadeIn(tween(200)) + slideInVertically(tween(300)) { it },
+            exit = fadeOut(tween(150)) + slideOutVertically(tween(250)) { it }
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0x80000000))
+                    .clickable {
+                        if (onToggleQuickReply != null) onToggleQuickReply(false) else localQuickReplySheet = false
+                    },
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = false) {} // Prevent click-through
+                        .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                        .background(monetColors.surfaceContainerHigh)
+                        .border(1.dp, monetColors.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                        .navigationBarsPadding()
+                        .padding(20.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        // Drag Handle
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(16.dp)
-                                .align(Alignment.BottomCenter)
-                                .background(
-                                    Brush.verticalGradient(
-                                        listOf(
-                                            Color.Transparent,
-                                            Color(0x35FFFFFF)
-                                        )
-                                    )
-                                )
+                                .size(36.dp, 4.dp)
+                                .clip(CircleShape)
+                                .background(monetColors.outlineVariant)
+                                .align(Alignment.CenterHorizontally)
                         )
 
-                        Icon(
-                            imageVector = Icons.Filled.Call,
-                            contentDescription = "Answer",
-                            tint = Color.White,
-                            modifier = Modifier
-                                .size(34.dp)
-                                .rotate(phoneWiggleAngle)
+                        // Sheet Header
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Quick response",
+                                color = monetColors.onSurface,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(monetColors.surfaceContainerHighest)
+                                    .clickable {
+                                        if (onToggleQuickReply != null) onToggleQuickReply(false) else localQuickReplySheet = false
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Close,
+                                    contentDescription = "Close",
+                                    tint = monetColors.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+
+                        // Canned Quick Reply Options
+                        val quickMessages = listOf(
+                            "Can't talk now. What's up?",
+                            "I'll call you right back.",
+                            "Please text me instead.",
+                            "On my way, will call you soon."
                         )
+
+                        quickMessages.forEach { msg ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(monetColors.surfaceContainer)
+                                    .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.25f), RoundedCornerShape(16.dp))
+                                    .clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        if (onToggleQuickReply != null) onToggleQuickReply(false) else localQuickReplySheet = false
+                                        onDecline()
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 14.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = msg,
+                                        color = monetColors.onSurface,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Rounded.Message,
+                                        contentDescription = null,
+                                        tint = monetColors.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -2578,6 +3966,10 @@ fun OemIncomingCallScreen(
  *   6. Screen with AI (Hand over to assistant screening anytime)
  * - Large Red End Call Button
  */
+/**
+ * Authentic Material You / Google Pixel In-Call Screen
+ * Minimal, modern, Monet-themed active call screen.
+ */
 @Composable
 fun StandardInCallScreen(
     callerName: String?,
@@ -2597,7 +3989,9 @@ fun StandardInCallScreen(
     onToggleSpeechJammer: () -> Unit = {},
     onScreenWithAi: () -> Unit,
     onDtmfDigit: (Char) -> Unit,
-    onHangUp: () -> Unit
+    onHangUp: () -> Unit,
+    monetColors: ColorScheme = getPixelMonetDarkColorScheme(),
+    isEndCallHandledExternally: Boolean = false
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -2614,158 +4008,235 @@ fun StandardInCallScreen(
         "Unknown Caller"
     }
 
-    val initials = if (!callerName.isNullOrBlank() && callerName != "Unknown Caller") {
-        callerName.split(" ").filter { it.isNotBlank() }.take(2).map { it.first().uppercase() }.joinToString("")
+    val displayCallerNumber = if (isNumberHidden) {
+        "Private / Hidden Number"
     } else {
-        "#"
+        callerNumber
     }
+
+    val initials = remember(callerName, callerNumber) {
+        val name = callerName?.trim()
+        if (!name.isNullOrBlank() && name != "Unknown Caller") {
+            val parts = name.split(" ").filter { it.isNotBlank() }
+            if (parts.size >= 2) {
+                "${parts[0].first().uppercaseChar()}${parts[1].first().uppercaseChar()}"
+            } else {
+                name.take(2).uppercase()
+            }
+        } else {
+            ""
+        }
+    }
+
+    val photoPath = remember(callerNumber) {
+        CallerProfileManager.getCustomPhotoPath(context, callerNumber)
+    }
+    val contactBitmap = rememberContactPhotoBitmap(photoPath)
+
+    val bgInfiniteTransition = rememberInfiniteTransition(label = "inCallBgPulse")
+    val pulseScale by bgInfiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.10f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(4500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "bgPulseScale"
+    )
+    val pulseAlpha by bgInfiniteTransition.animateFloat(
+        initialValue = 0.28f,
+        targetValue = 0.40f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(4500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "bgPulseAlpha"
+    )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        monetColors.surface,
+                        Color(0xFF0E1117),
+                        monetColors.surfaceContainerLowest,
+                        Color(0xFF080A0E)
+                    )
+                )
+            )
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
+        // Atmospheric Material You Monet Ambient Depth Canvas (Pixel Organic Living Blooms)
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val width = size.width
+            val height = size.height
+
+            // Top Monet Primary Dispersion (Living Aura behind Avatar)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        monetColors.primaryContainer.copy(alpha = pulseAlpha),
+                        monetColors.primary.copy(alpha = 0.14f),
+                        Color.Transparent
+                    ),
+                    center = Offset(width * 0.50f, height * 0.20f),
+                    radius = width * 0.78f * pulseScale
+                ),
+                radius = width * 0.78f * pulseScale,
+                center = Offset(width * 0.50f, height * 0.20f)
+            )
+
+            // Middle Secondary Accent Glow
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        monetColors.secondaryContainer.copy(alpha = 0.16f),
+                        Color.Transparent
+                    ),
+                    center = Offset(width * 0.85f, height * 0.45f),
+                    radius = width * 0.55f
+                ),
+                radius = width * 0.55f,
+                center = Offset(width * 0.85f, height * 0.45f)
+            )
+
+            // Bottom Monet Tertiary Bloom (Rich Atmospheric Depth under the Large Action Buttons)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        monetColors.tertiaryContainer.copy(alpha = 0.26f),
+                        monetColors.surfaceContainerHigh.copy(alpha = 0.10f),
+                        Color.Transparent
+                    ),
+                    center = Offset(width * 0.50f, height * 0.78f),
+                    radius = width * 0.72f * pulseScale
+                ),
+                radius = width * 0.72f * pulseScale,
+                center = Offset(width * 0.50f, height * 0.78f)
+            )
+        }
+
+        // Full Screen Content Column
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // Carrier / HD Tag
+            // 1. Android 17 Inspired Dynamic Live Call Capsule (Frosted Glass Floating Island)
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0x18FFFFFF))
-                    .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(12.dp))
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                    .shadow(
+                        elevation = 6.dp,
+                        shape = CircleShape,
+                        spotColor = monetColors.primary.copy(alpha = 0.18f)
+                    )
+                    .clip(CircleShape)
+                    .background(monetColors.surfaceContainerHigh.copy(alpha = 0.82f))
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(
+                            listOf(
+                                Color.White.copy(alpha = 0.25f),
+                                monetColors.outlineVariant.copy(alpha = 0.35f),
+                                Color.White.copy(alpha = 0.08f)
+                            )
+                        ),
+                        shape = CircleShape
+                    )
+                    .padding(horizontal = 14.dp, vertical = 6.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    // Pulsing Connection Status Beacon
+                    val dotColor = when (status) {
+                        CallStatus.ON_HOLD -> AppleAmber
+                        CallStatus.DIALING -> monetColors.primary
+                        else -> Color(0xFF34A853) // Active Google Green
+                    }
+                    val dotAlpha by rememberInfiniteTransition(label = "liveCallDot").animateFloat(
+                        initialValue = 0.50f,
+                        targetValue = 1.0f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(900, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "dotAlpha"
+                    )
+
                     Box(
                         modifier = Modifier
-                            .size(6.dp)
+                            .size(7.dp)
                             .clip(CircleShape)
                             .background(
-                                when (status) {
-                                    CallStatus.ON_HOLD -> AppleAmber
-                                    CallStatus.DIALING -> AppleBlue
-                                    else -> AppleGreen
-                                }
+                                dotColor.copy(alpha = if (status == CallStatus.ON_HOLD) 1f else dotAlpha)
                             )
                     )
+
+                    // Call Duration / State (Google Sans Monospace)
                     Text(
                         text = when (status) {
                             CallStatus.ON_HOLD -> "ON HOLD"
-                            CallStatus.DIALING -> "DIALING • CELLULAR"
-                            else -> "HD CALL • CELLULAR"
+                            CallStatus.DIALING -> "DIALING…"
+                            else -> formatDuration(durationSeconds)
                         },
                         color = when (status) {
                             CallStatus.ON_HOLD -> AppleAmber
-                            CallStatus.DIALING -> AppleBlue
-                            else -> TextSecondary
+                            CallStatus.DIALING -> monetColors.primary
+                            else -> monetColors.onSurface
                         },
-                        fontSize = 10.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 0.8.sp
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Large Contact Avatar with Ambient Aura
-            Box(
-                modifier = Modifier
-                    .size(92.dp)
-                    .shadow(elevation = 18.dp, shape = CircleShape, spotColor = AppleBlue.copy(alpha = 0.4f))
-                    .clip(CircleShape)
-                    .background(
-                        Brush.radialGradient(
-                            listOf(
-                                AppleBlue.copy(alpha = 0.35f),
-                                Color(0x28FFFFFF),
-                                Color(0x150D1426)
-                            )
-                        )
-                    )
-                    .border(1.5.dp, LiquidGlassBorder, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = initials,
-                    color = Color.White,
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
-                )
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Caller Name
-            Text(
-                text = displayCallerTitle,
-                color = Color.White,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.5).sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            // Caller Subtitle / Phone Number
-            if (callerNumber.isNotBlank() && callerName != callerNumber && !isNumberHidden) {
-                Spacer(modifier = Modifier.height(3.dp))
-                Text(
-                    text = callerNumber,
-                    color = TextSecondary,
-                    fontSize = 13.5.sp,
-                    fontFamily = FontFamily.Monospace
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Duration & Recording Status Badges
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Call Duration
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0x18FFFFFF))
-                        .border(0.8.dp, Color(0x22FFFFFF), RoundedCornerShape(10.dp))
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = if (status == CallStatus.DIALING) "Connecting..." else formatDuration(durationSeconds),
-                        color = Color.White,
                         fontSize = 12.sp,
                         fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.4.sp
                     )
-                }
 
-                // If recording active: Red pulsing REC pill
-                if (isRecording) {
+                    // Separator Bullet
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(AppleRed.copy(alpha = 0.2f))
-                            .border(0.8.dp, AppleRed.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .size(3.dp)
+                            .clip(CircleShape)
+                            .background(monetColors.onSurfaceVariant.copy(alpha = 0.40f))
+                    )
+
+                    // HD Voice Badge
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
+                        Icon(
+                            imageVector = Icons.Rounded.GraphicEq,
+                            contentDescription = "HD Voice",
+                            tint = monetColors.primary,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Text(
+                            text = "HD Voice",
+                            color = monetColors.onSurfaceVariant,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            letterSpacing = 0.2.sp
+                        )
+                    }
+
+                    // Pulsing Red REC Badge (when recording is active)
+                    if (isRecording) {
+                        Box(
+                            modifier = Modifier
+                                .size(3.dp)
+                                .clip(CircleShape)
+                                .background(monetColors.onSurfaceVariant.copy(alpha = 0.40f))
+                        )
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Box(
                                 modifier = Modifier
@@ -2785,391 +4256,685 @@ fun StandardInCallScreen(
                 }
             }
 
-            // Speech Jammer (DAF Disruption) Live Interactive Pill
-            if (status != CallStatus.ENDED) {
-                val jammerEngine = remember { com.callscreener.app.engine.SpeechJammerEngine.getInstance(context) }
-                if (jammerEngine.isEnabled) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.92f)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (isSpeechJammerActive) Color(0x359C27B0) else Color(0x14FFFFFF))
-                            .border(
-                                width = if (isSpeechJammerActive) 1.5.dp else 0.8.dp,
-                                color = if (isSpeechJammerActive) Color(0xFFBA68C8) else Color(0x22FFFFFF),
-                                shape = RoundedCornerShape(16.dp)
+            val morphSpec = spring<Dp>(dampingRatio = 0.85f, stiffness = Spring.StiffnessMedium)
+            val animatedAvatarSize by animateDpAsState(
+                targetValue = if (showKeypad) 46.dp else 100.dp,
+                animationSpec = morphSpec,
+                label = "avatarMorphSize"
+            )
+            val animatedAvatarCorner by animateDpAsState(
+                targetValue = if (showKeypad) 23.dp else 34.dp,
+                animationSpec = morphSpec,
+                label = "avatarMorphCorner"
+            )
+            val animatedAvatarSpacer by animateDpAsState(
+                targetValue = if (showKeypad) 8.dp else 18.dp,
+                animationSpec = morphSpec,
+                label = "avatarMorphSpacer"
+            )
+            val animatedTitleSpacer by animateDpAsState(
+                targetValue = if (showKeypad) 4.dp else 12.dp,
+                animationSpec = morphSpec,
+                label = "titleMorphSpacer"
+            )
+
+            Spacer(modifier = Modifier.height(animatedAvatarSpacer))
+
+            // 2. Pixel Expressive Hero Contact Avatar (Concentric Atmospheric Depth & Specular Sheen)
+            Box(
+                modifier = Modifier.size(animatedAvatarSize),
+                contentAlignment = Alignment.Center
+            ) {
+                // Soft Ambient Radial Gradient Depth Aura
+                Box(
+                    modifier = Modifier
+                        .size(animatedAvatarSize * 1.34f)
+                        .background(
+                            Brush.radialGradient(
+                                listOf(
+                                    monetColors.primary.copy(alpha = if (showKeypad) 0.16f else 0.36f),
+                                    monetColors.tertiary.copy(alpha = if (showKeypad) 0.08f else 0.18f),
+                                    Color.Transparent
+                                )
+                            ),
+                            CircleShape
+                        )
+                )
+
+                // Central Tactile Squircle Avatar Disc
+                Box(
+                    modifier = Modifier
+                        .size(animatedAvatarSize)
+                        .shadow(
+                            elevation = if (showKeypad) 4.dp else 14.dp,
+                            shape = RoundedCornerShape(animatedAvatarCorner),
+                            spotColor = monetColors.primary.copy(alpha = 0.35f)
+                        )
+                        .clip(RoundedCornerShape(animatedAvatarCorner))
+                        .background(
+                            Brush.radialGradient(
+                                listOf(
+                                    monetColors.primaryContainer.copy(alpha = 0.95f),
+                                    monetColors.surfaceContainerHigh
+                                )
                             )
-                            .clickable {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onToggleSpeechJammer()
-                            }
-                            .padding(horizontal = 14.dp, vertical = 9.dp)
+                        )
+                        .border(
+                            1.2.dp,
+                            Brush.linearGradient(
+                                listOf(
+                                    Color.White.copy(alpha = 0.70f),
+                                    monetColors.primary.copy(alpha = 0.85f),
+                                    monetColors.outlineVariant.copy(alpha = 0.30f)
+                                )
+                            ),
+                            RoundedCornerShape(animatedAvatarCorner)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (contactBitmap != null) {
+                        Image(
+                            bitmap = contactBitmap,
+                            contentDescription = displayCallerTitle,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(animatedAvatarCorner))
+                        )
+                    } else if (initials.isNotBlank()) {
+                        Text(
+                            text = initials,
+                            color = monetColors.onPrimaryContainer,
+                            fontSize = if (showKeypad) 18.sp else 34.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.5.sp
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Rounded.Person,
+                            contentDescription = null,
+                            tint = monetColors.onPrimaryContainer,
+                            modifier = Modifier.size(if (showKeypad) 22.dp else 48.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(animatedTitleSpacer))
+
+            // 3. Caller Title (Google Sans Display Typography)
+            Text(
+                text = displayCallerTitle,
+                color = monetColors.onSurface,
+                fontSize = if (showKeypad) 19.sp else 26.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = GoogleSans,
+                letterSpacing = (-0.4).sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
+
+            // 4. Caller Phone Number (Visible when keypad is closed)
+            if (!showKeypad && callerNumber.isNotBlank() && callerName != callerNumber && !isNumberHidden) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = displayCallerNumber,
+                    color = monetColors.onSurfaceVariant,
+                    fontSize = 14.5.sp,
+                    fontFamily = GoogleSans,
+                    fontWeight = FontWeight.Normal,
+                    letterSpacing = 0.25.sp
+                )
+            }
+
+            // Quick Save Contact pill if caller is an unsaved number
+            if (!showKeypad && !isNumberHidden && callerNumber.isNotBlank() &&
+                (callerName.isNullOrBlank() || callerName == callerNumber || callerName.equals("Unknown Caller", ignoreCase = true))
+            ) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(monetColors.surfaceContainerHigh.copy(alpha = 0.85f))
+                        .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.40f), CircleShape)
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            com.callscreener.app.data.DialerRepository.openSystemSaveContact(context, callerNumber)
+                        }
+                        .padding(horizontal = 12.dp, vertical = 5.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
+                        Icon(
+                            imageVector = Icons.Rounded.PersonAdd,
+                            contentDescription = "Save Contact",
+                            tint = monetColors.primary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = "Save Contact",
+                            color = monetColors.onSurface,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            // 5. Middle Section: Dynamic Keypad in Stable Flexible Spacer (Zero Jitter Fluid Spring Transition)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showKeypad,
+                    enter = fadeIn(animationSpec = tween(200, delayMillis = 40, easing = LinearOutSlowInEasing)) +
+                            scaleIn(initialScale = 0.90f, animationSpec = spring(dampingRatio = 0.80f, stiffness = Spring.StiffnessMediumLow)),
+                    exit = fadeOut(animationSpec = tween(120, easing = FastOutLinearInEasing)) +
+                            scaleOut(targetScale = 0.94f, animationSpec = tween(120, easing = FastOutLinearInEasing))
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        // Modern Frosted Glass DTMF Display Pill
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier
+                                .fillMaxWidth(0.88f)
+                                .height(46.dp)
+                                .shadow(
+                                    elevation = 6.dp,
+                                    shape = CircleShape,
+                                    spotColor = monetColors.primary.copy(alpha = 0.20f)
+                                )
+                                .clip(CircleShape)
+                                .background(monetColors.surfaceContainerHigh.copy(alpha = 0.90f))
+                                .border(1.dp, monetColors.outlineVariant.copy(alpha = 0.40f), CircleShape)
+                                .padding(start = 18.dp, end = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
+                            Text(
+                                text = dtmfDigits.ifBlank { "Touch dialpad to send tones" },
+                                color = if (dtmfDigits.isBlank()) monetColors.onSurfaceVariant.copy(alpha = 0.60f) else monetColors.onSurface,
+                                fontSize = if (dtmfDigits.isBlank()) 12.5.sp else 18.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = if (dtmfDigits.isBlank()) FontWeight.Normal else FontWeight.Bold,
+                                letterSpacing = if (dtmfDigits.isBlank()) 0.sp else 2.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (dtmfDigits.isNotBlank()) {
                                 Box(
                                     modifier = Modifier
-                                        .size(30.dp)
+                                        .size(34.dp)
                                         .clip(CircleShape)
-                                        .background(if (isSpeechJammerActive) Color(0xFFFF4081) else Color(0x28BA68C8)),
+                                        .background(monetColors.surfaceContainerHighest)
+                                        .clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            dtmfDigits = dtmfDigits.dropLast(1)
+                                        },
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Rounded.Psychology,
-                                        contentDescription = null,
-                                        tint = if (isSpeechJammerActive) Color.White else Color(0xFFE1BEE7),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                                Column {
-                                    Text(
-                                        text = if (isSpeechJammerActive) "JAMMING CALLER ACTIVE" else "Acoustic Speech Jammer (DAF)",
-                                        color = if (isSpeechJammerActive) Color(0xFFFF80AB) else Color.White,
-                                        fontSize = 12.5.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = if (isSpeechJammerActive)
-                                            "${jammerEngine.delayMs}ms delayed feedback • caller speech motor paralyzed"
-                                        else
-                                            "Tap to disrupt caller with 200ms delayed auditory feedback",
-                                        color = TextSecondary,
-                                        fontSize = 10.5.sp
+                                        imageVector = Icons.AutoMirrored.Filled.Backspace,
+                                        contentDescription = "Clear",
+                                        tint = monetColors.primary,
+                                        modifier = Modifier.size(17.dp)
                                     )
                                 }
                             }
+                        }
 
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isSpeechJammerActive) Color(0xFFFF4081) else Color(0x25BA68C8))
-                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // 3x4 DTMF Keypad Grid
+                        val keypadRows = remember {
+                            listOf(
+                                listOf('1' to "", '2' to "ABC", '3' to "DEF"),
+                                listOf('4' to "GHI", '5' to "JKL", '6' to "MNO"),
+                                listOf('7' to "PQRS", '8' to "TUV", '9' to "WXYZ"),
+                                listOf('*' to "", '0' to "+", '#' to "")
+                            )
+                        }
+
+                        keypadRows.forEach { row ->
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(22.dp),
+                                modifier = Modifier.padding(vertical = 3.5.dp)
                             ) {
-                                Text(
-                                    text = if (isSpeechJammerActive) "STOP" else "ENGAGE",
-                                    color = Color.White,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace
-                                )
+                                row.forEach { (digit, letters) ->
+                                    InCallDtmfKey(
+                                        digit = digit,
+                                        letters = letters,
+                                        monetColors = monetColors,
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            dtmfDigits += digit
+                                            onDtmfDigit(digit)
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
 
-            // Middle Dynamic Section: DTMF Dialpad OR Clean Spacer
-            if (showKeypad) {
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // DTMF Display & Keypad
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    // Digits Display
-                    Row(
+            // 6. Echo Chamber & Speech Jammer Capsule (Ergonomically aligned directly above in-call action buttons)
+            AnimatedVisibility(
+                visible = !showKeypad && status != CallStatus.ENDED,
+                enter = fadeIn(tween(160)) + expandVertically(tween(180)),
+                exit = fadeOut(tween(110)) + shrinkVertically(tween(120))
+            ) {
+                Column {
+                    SmartJammerControl(
+                        isActive = isSpeechJammerActive,
+                        onToggle = onToggleSpeechJammer,
                         modifier = Modifier
-                            .fillMaxWidth(0.85f)
-                            .height(36.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0x15FFFFFF))
-                            .padding(horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = dtmfDigits.ifBlank { "Touch dialpad to send tones" },
-                            color = if (dtmfDigits.isBlank()) TextTertiary else Color.White,
-                            fontSize = if (dtmfDigits.isBlank()) 12.sp else 16.sp,
-                            fontFamily = FontFamily.Monospace,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp),
+                        monetColors = monetColors
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+            }
+
+            // 7. Symmetrical Pixel Expressive Action Buttons (3 Columns, Perfect Vertical and Horizontal Alignment)
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp)
+            ) {
+                // Row 1: Mute | Keypad (Toggles open/close) | Speaker
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        InCallActionButton(
+                            icon = if (isMuted) Icons.Filled.MicOff else Icons.Filled.Mic,
+                            label = if (isMuted) "Unmute" else "Mute",
+                            isActive = isMuted,
+                            activeColor = AppleRed,
+                            monetColors = monetColors,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onToggleMute()
+                            }
                         )
-                        if (dtmfDigits.isNotBlank()) {
-                            Icon(
-                                imageVector = Icons.Filled.Backspace,
-                                contentDescription = "Clear",
-                                tint = TextSecondary,
-                                modifier = Modifier
-                                    .size(16.dp)
-                                    .clickable {
-                                        dtmfDigits = dtmfDigits.dropLast(1)
-                                    }
+                    }
+
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        InCallActionButton(
+                            icon = if (showKeypad) Icons.Rounded.KeyboardArrowDown else Icons.Rounded.Dialpad,
+                            label = if (showKeypad) "Hide" else "Keypad",
+                            isActive = showKeypad,
+                            activeColor = monetColors.primary,
+                            monetColors = monetColors,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                showKeypad = !showKeypad
+                            }
+                        )
+                    }
+
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        InCallActionButton(
+                            icon = Icons.AutoMirrored.Filled.VolumeUp,
+                            label = if (isSpeakerOn) "Speaker" else "Earpiece",
+                            isActive = isSpeakerOn,
+                            activeColor = monetColors.primary,
+                            monetColors = monetColors,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onToggleSpeaker()
+                            }
+                        )
+                    }
+                }
+
+                // Row 2: Record | Hold | Screen with AI (Only when Keypad is closed)
+                AnimatedVisibility(
+                    visible = !showKeypad,
+                    enter = fadeIn(tween(220)) + expandVertically(tween(220)),
+                    exit = fadeOut(tween(160)) + shrinkVertically(tween(160))
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                            InCallActionButton(
+                                icon = Icons.Rounded.GraphicEq,
+                                label = if (isRecording) "Recording" else "Record",
+                                isActive = isRecording,
+                                activeColor = AppleRed,
+                                monetColors = monetColors,
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onToggleRecording()
+                                }
+                            )
+                        }
+
+                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                            InCallActionButton(
+                                icon = if (status == CallStatus.ON_HOLD) Icons.Filled.PlayArrow else Icons.Filled.Pause,
+                                label = if (status == CallStatus.ON_HOLD) "Unhold" else "Hold",
+                                isActive = status == CallStatus.ON_HOLD,
+                                activeColor = AppleAmber,
+                                monetColors = monetColors,
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onToggleHold()
+                                }
+                            )
+                        }
+
+                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                            InCallActionButton(
+                                icon = Icons.Rounded.AutoAwesome,
+                                label = "Screen Call",
+                                isActive = false,
+                                isAssistantSpecial = true,
+                                activeColor = monetColors.primary,
+                                monetColors = monetColors,
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onScreenWithAi()
+                                }
                             )
                         }
                     }
+                }
+            }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-                    // 3x4 DTMF Keypad Grid
-                    val keypadRows = listOf(
-                        listOf('1' to "", '2' to "ABC", '3' to "DEF"),
-                        listOf('4' to "GHI", '5' to "JKL", '6' to "MNO"),
-                        listOf('7' to "PQRS", '8' to "TUV", '9' to "WXYZ"),
-                        listOf('*' to "", '0' to "+", '#' to "")
+            // 8. Symmetrical, Tactile Google Phone Red End Call Button with Liquid Morph & Living Aura
+            val endCallInfiniteTransition = rememberInfiniteTransition(label = "endCallInfinite")
+            val endCallAuraPulse by endCallInfiniteTransition.animateFloat(
+                initialValue = 1.0f,
+                targetValue = 1.18f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1500, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "endCallAuraPulse"
+            )
+            val endCallAuraAlpha by endCallInfiniteTransition.animateFloat(
+                initialValue = 0.32f,
+                targetValue = 0.12f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1500, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "endCallAuraAlpha"
+            )
+            val endCallGlintPhase by endCallInfiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(2600, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "endCallGlintPhase"
+            )
+
+            val endCallInteractionSource = remember { MutableInteractionSource() }
+            val isEndCallPressed by endCallInteractionSource.collectIsPressedAsState()
+
+            val endCallScaleX by animateFloatAsState(
+                targetValue = if (isEndCallPressed) 1.07f else 1.0f,
+                animationSpec = spring(dampingRatio = 0.54f, stiffness = Spring.StiffnessMediumLow),
+                label = "endCallScaleX"
+            )
+            val endCallScaleY by animateFloatAsState(
+                targetValue = if (isEndCallPressed) 0.85f else 1.0f,
+                animationSpec = spring(dampingRatio = 0.54f, stiffness = Spring.StiffnessMediumLow),
+                label = "endCallScaleY"
+            )
+            val endCallCornerRadius by animateDpAsState(
+                targetValue = if (isEndCallPressed) 24.dp else 38.dp,
+                animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow),
+                label = "endCallCornerRadius"
+            )
+            val endCallElevation by animateDpAsState(
+                targetValue = if (isEndCallPressed) 4.dp else 16.dp,
+                animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
+                label = "endCallElevation"
+            )
+            val endCallIconRotation by animateFloatAsState(
+                targetValue = if (isEndCallPressed) -14f else 0f,
+                animationSpec = spring(dampingRatio = 0.52f, stiffness = Spring.StiffnessMediumLow),
+                label = "endCallIconRotation"
+            )
+
+            if (!isEndCallHandledExternally) {
+                Box(
+                    modifier = Modifier.size(width = 84.dp, height = 76.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Living Breathing Ruby Aura Halo
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                val auraMult = if (isEndCallPressed) 1.25f else endCallAuraPulse
+                                scaleX = auraMult
+                                scaleY = auraMult
+                                alpha = if (isEndCallPressed) 0.50f else endCallAuraAlpha
+                            }
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        Color(0xFFFF2A4D).copy(alpha = 0.45f),
+                                        Color(0xFFD00826).copy(alpha = 0.15f),
+                                        Color.Transparent
+                                    )
+                                ),
+                                shape = RoundedCornerShape(endCallCornerRadius)
+                            )
                     )
 
-                    keypadRows.forEach { row ->
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            modifier = Modifier.padding(vertical = 4.dp)
-                        ) {
-                            row.forEach { (digit, letters) ->
-                                InCallDtmfKey(
-                                    digit = digit,
-                                    letters = letters,
-                                    onClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        dtmfDigits += digit
-                                        onDtmfDigit(digit)
-                                    }
-                                )
+                    // Morphing Liquid Button
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                scaleX = endCallScaleX
+                                scaleY = endCallScaleY
                             }
+                            .shadow(
+                                elevation = endCallElevation,
+                                shape = RoundedCornerShape(endCallCornerRadius),
+                                spotColor = Color(0x95FF2A4D)
+                            )
+                            .clip(RoundedCornerShape(endCallCornerRadius))
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color(0xFFFF334B), // Vibrant Saturated Ruby Red
+                                        Color(0xFFF01438),
+                                        Color(0xFFD00826)
+                                    )
+                                )
+                            )
+                            .border(
+                                1.5.dp,
+                                Brush.linearGradient(
+                                    colors = listOf(
+                                        Color.White.copy(alpha = if (isEndCallPressed) 0.65f else 0.50f),
+                                        Color.White.copy(alpha = 0.18f),
+                                        Color.White.copy(alpha = if (isEndCallPressed) 0.50f else 0.22f)
+                                    )
+                                ),
+                                RoundedCornerShape(endCallCornerRadius)
+                            )
+                            .clickable(
+                                interactionSource = endCallInteractionSource,
+                                indication = null
+                            ) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onHangUp()
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Morphing Top glass glint highlight
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(34.dp)
+                                .align(Alignment.TopCenter)
+                                .clip(RoundedCornerShape(topStart = endCallCornerRadius, topEnd = endCallCornerRadius))
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            Color.White.copy(alpha = 0.32f),
+                                            Color.Transparent
+                                        )
+                                    )
+                                )
+                        )
+
+                        // Specular Glint Shimmer Sweep
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val glintW = size.width * 0.45f
+                            val currentX = (size.width + glintW * 2) * endCallGlintPhase - glintW
+                            drawRect(
+                                brush = Brush.horizontalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        Color.White.copy(alpha = 0.22f),
+                                        Color.Transparent
+                                    ),
+                                    startX = currentX - glintW * 0.5f,
+                                    endX = currentX + glintW * 0.5f
+                                )
+                            )
                         }
+
+                        Icon(
+                            imageVector = Icons.Filled.CallEnd,
+                            contentDescription = "End Call",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .graphicsLayer {
+                                    rotationZ = endCallIconRotation
+                                }
+                        )
                     }
                 }
             } else {
-                Spacer(modifier = Modifier.weight(1f))
+                // Invisible placeholder keeping in-call layout spacing identical while Morphing button renders smoothly on top
+                Spacer(modifier = Modifier.size(width = 84.dp, height = 76.dp))
             }
 
-            // 6-Button In-Call Actions Grid (Prominent, Spacious ColorOS / MIUI / iOS Flagship Style)
-            Column(
-                verticalArrangement = Arrangement.spacedBy(20.dp),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp)
-            ) {
-                // Row 1: Mute | Keypad | Speaker
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    InCallActionButton(
-                        icon = if (isMuted) Icons.Filled.MicOff else Icons.Filled.Mic,
-                        label = if (isMuted) "Unmute" else "Mute",
-                        isActive = isMuted,
-                        activeColor = AppleRed,
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onToggleMute()
-                        }
-                    )
-
-                    InCallActionButton(
-                        icon = Icons.Rounded.Dialpad,
-                        label = if (showKeypad) "Hide" else "Keypad",
-                        isActive = showKeypad,
-                        activeColor = AppleBlue,
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            showKeypad = !showKeypad
-                        }
-                    )
-
-                    InCallActionButton(
-                        icon = Icons.AutoMirrored.Filled.VolumeUp,
-                        label = if (isSpeakerOn) "Speaker On" else "Speaker",
-                        isActive = isSpeakerOn,
-                        activeColor = AppleTeal,
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onToggleSpeaker()
-                        }
-                    )
-                }
-
-                // Row 2: Record | Hold | Screen with AI
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    InCallActionButton(
-                        icon = Icons.Rounded.GraphicEq,
-                        label = if (isRecording) "Recording" else "Record",
-                        isActive = isRecording,
-                        activeColor = AppleRed,
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onToggleRecording()
-                        }
-                    )
-
-                    InCallActionButton(
-                        icon = if (status == CallStatus.ON_HOLD) Icons.Filled.PlayArrow else Icons.Filled.Pause,
-                        label = if (status == CallStatus.ON_HOLD) "Unhold" else "Hold",
-                        isActive = status == CallStatus.ON_HOLD,
-                        activeColor = AppleAmber,
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onToggleHold()
-                        }
-                    )
-
-                    InCallActionButton(
-                        icon = Icons.Rounded.RecordVoiceOver,
-                        label = "Screen Call",
-                        isActive = false,
-                        activeColor = AppleIndigo,
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onScreenWithAi()
-                        }
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(26.dp))
-
-            // Large Red End Call Button with Tactile Spring Physics & Specular Bevel
-            val endCallInteractionSource = remember { MutableInteractionSource() }
-            val isEndCallPressed by endCallInteractionSource.collectIsPressedAsState()
-            val endCallScale by animateFloatAsState(
-                targetValue = if (isEndCallPressed) 0.85f else 1.0f,
-                animationSpec = spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessMediumLow),
-                label = "endCallScale"
-            )
-
-            Box(
-                modifier = Modifier
-                    .size(76.dp)
-                    .scale(endCallScale)
-                    .shadow(
-                        elevation = 22.dp,
-                        shape = CircleShape,
-                        spotColor = Color(0xDDFF3B30),
-                        ambientColor = Color(0x50FF3B30)
-                    )
-                    .clip(CircleShape)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0xFFFF453A),
-                                Color(0xFFD70015),
-                                Color(0xFF9E0B07)
-                            )
-                        )
-                    )
-                    .border(
-                        1.6.dp,
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0xAAFFFFFF),
-                                Color(0x30FFFFFF),
-                                Color(0x50FF453A)
-                            )
-                        ),
-                        CircleShape
-                    )
-                    .clickable(
-                        interactionSource = endCallInteractionSource,
-                        indication = null
-                    ) {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onHangUp()
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                // Top crescent sheen
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(38.dp)
-                        .align(Alignment.TopCenter)
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color(0x40FFFFFF),
-                                    Color.Transparent
-                                )
-                            )
-                        )
-                )
-
-                Icon(
-                    imageVector = Icons.Filled.CallEnd,
-                    contentDescription = "End Call",
-                    tint = Color.White,
-                    modifier = Modifier.size(34.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(26.dp))
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
 
+/**
+ * Material You / Pixel Expressive ("Expresso") In-Call Action Tile Button.
+ * Tactile squircle tile with smooth corner radius morphing, dynamic Monet container depth,
+ * top specular glass glint, and perfectly aligned typography.
+ */
 @Composable
 fun InCallActionButton(
     icon: ImageVector,
     label: String,
     isActive: Boolean,
-    activeColor: Color,
+    activeColor: Color = Color.Unspecified,
+    monetColors: ColorScheme = getPixelMonetDarkColorScheme(),
+    isAssistantSpecial: Boolean = false,
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
+
     val btnScale by animateFloatAsState(
-        targetValue = if (isPressed) 0.88f else 1f,
-        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
+        targetValue = if (isPressed) 0.91f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.58f, stiffness = Spring.StiffnessMediumLow),
         label = "btnScale"
+    )
+
+    val cornerRadius by animateDpAsState(
+        targetValue = if (isPressed) 20.dp else 28.dp,
+        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
+        label = "btnCorner"
+    )
+
+    val effectiveActiveColor = if (activeColor != Color.Unspecified) activeColor else monetColors.primary
+
+    val animatedBg by animateColorAsState(
+        targetValue = when {
+            isActive && activeColor == AppleRed -> Color(0xFF4A1018)
+            isActive && activeColor == AppleAmber -> Color(0xFF422800)
+            isActive -> monetColors.primaryContainer
+            isAssistantSpecial -> monetColors.surfaceContainerHighest
+            else -> monetColors.surfaceContainerHigh
+        },
+        animationSpec = tween(durationMillis = 140),
+        label = "btnBg"
+    )
+
+    val animatedBorderColor by animateColorAsState(
+        targetValue = when {
+            isActive && activeColor == AppleRed -> Color(0xFFFF5466).copy(alpha = 0.85f)
+            isActive && activeColor == AppleAmber -> AppleAmber.copy(alpha = 0.85f)
+            isActive -> monetColors.primary.copy(alpha = 0.85f)
+            isAssistantSpecial -> monetColors.primary.copy(alpha = 0.50f)
+            else -> monetColors.outlineVariant.copy(alpha = 0.28f)
+        },
+        animationSpec = tween(durationMillis = 140),
+        label = "btnBorder"
+    )
+
+    val animatedTint by animateColorAsState(
+        targetValue = when {
+            isActive && activeColor == AppleRed -> Color(0xFFFF5466)
+            isActive && activeColor == AppleAmber -> AppleAmber
+            isActive -> monetColors.onPrimaryContainer
+            isAssistantSpecial -> monetColors.primary
+            else -> monetColors.onSurface
+        },
+        animationSpec = tween(durationMillis = 140),
+        label = "btnTint"
     )
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier
-            .width(84.dp)
-            .scale(btnScale)
+        modifier = Modifier.scale(btnScale)
     ) {
         Box(
             modifier = Modifier
-                .size(72.dp)
-                .clip(CircleShape)
-                .background(
-                    if (isActive) {
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0xFFFFFFFF),
-                                Color(0xFFEFF3F8)
-                            )
-                        )
-                    } else {
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0x2AFFFFFF),
-                                Color(0x14FFFFFF)
-                            )
-                        )
-                    }
+                .size(width = 76.dp, height = 70.dp)
+                .shadow(
+                    elevation = if (isPressed) 2.dp else if (isActive) 6.dp else 2.dp,
+                    shape = RoundedCornerShape(cornerRadius),
+                    spotColor = if (isActive) effectiveActiveColor.copy(alpha = 0.40f) else Color.Transparent,
+                    ambientColor = Color.Transparent
                 )
+                .clip(RoundedCornerShape(cornerRadius))
+                .background(animatedBg)
                 .border(
-                    1.4.dp,
-                    if (isActive) {
-                        Brush.verticalGradient(
-                            listOf(
-                                Color.White,
-                                Color(0xE0FFFFFF)
-                            )
-                        )
-                    } else {
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0x4DFFFFFF),
-                                Color(0x18FFFFFF)
-                            )
-                        )
-                    },
-                    CircleShape
+                    width = if (isActive) 1.5.dp else 1.dp,
+                    color = animatedBorderColor,
+                    shape = RoundedCornerShape(cornerRadius)
                 )
                 .clickable(
                     interactionSource = interactionSource,
@@ -3177,149 +4942,132 @@ fun InCallActionButton(
                 ) { onClick() },
             contentAlignment = Alignment.Center
         ) {
+            // Top specular glass highlight
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(30.dp)
+                    .align(Alignment.TopCenter)
+                    .clip(RoundedCornerShape(topStart = cornerRadius, topEnd = cornerRadius))
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.White.copy(alpha = if (isPressed) 0.08f else 0.16f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = if (isActive) Color(0xFF0F141C) else Color.White,
-                modifier = Modifier.size(29.dp)
+                tint = animatedTint,
+                modifier = Modifier.size(30.dp)
             )
         }
 
         Text(
             text = label,
-            color = if (isActive) Color.White else Color(0xDDFFFFFF),
+            color = if (isActive) monetColors.onSurface else monetColors.onSurfaceVariant,
             fontSize = 12.5.sp,
+            fontFamily = GoogleSans,
             fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Medium,
-            letterSpacing = (-0.1).sp,
+            letterSpacing = 0.15.sp,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center
         )
     }
 }
 
+/**
+ * Material You / Pixel Expressive ("Expresso") In-Call DTMF Key.
+ * Tactile squircle key with bold typography and instant haptic spring response.
+ */
 @Composable
 fun InCallDtmfKey(
     digit: Char,
     letters: String,
+    monetColors: ColorScheme = getPixelMonetDarkColorScheme(),
     onClick: () -> Unit
 ) {
-    Box(
-        modifier = Modifier
-            .size(width = 64.dp, height = 48.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(Color(0x1AFFFFFF))
-            .border(0.8.dp, Color(0x25FFFFFF), RoundedCornerShape(14.dp))
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = digit.toString(),
-                color = Color.White,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
-            if (letters.isNotBlank()) {
-                Text(
-                    text = letters,
-                    color = TextTertiary,
-                    fontSize = 8.sp,
-                    letterSpacing = 0.5.sp
-                )
-            }
-        }
-    }
-}
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
 
-/**
- * Apple iOS Liquid Glass Mode Toggle Pill:
- * Fluid pill that allows the user to expand or collapse the quick replies, soundboard presets,
- * and command tiles into a full-screen chat transcript view with voice relay mic & inline decline button.
- */
-@Composable
-fun LiquidGlassModeTogglePill(
-    isFocusChatMode: Boolean,
-    onToggle: () -> Unit
-) {
-    val haptic = LocalHapticFeedback.current
-    val chevronRotation by animateFloatAsState(
-        targetValue = if (isFocusChatMode) 180f else 0f,
-        animationSpec = spring(dampingRatio = 0.76f, stiffness = Spring.StiffnessMediumLow),
-        label = "chevronRotation"
+    val keyScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.90f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.60f, stiffness = Spring.StiffnessMediumLow),
+        label = "dtmfKeyScale"
+    )
+    val keyCorner by animateDpAsState(
+        targetValue = if (isPressed) 16.dp else 22.dp,
+        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
+        label = "dtmfKeyCorner"
+    )
+    val keyBg by animateColorAsState(
+        targetValue = if (isPressed) monetColors.primaryContainer.copy(alpha = 0.90f) else monetColors.surfaceContainerHigh.copy(alpha = 0.85f),
+        animationSpec = tween(durationMillis = 110),
+        label = "dtmfKeyBg"
+    )
+    val keyBorder by animateColorAsState(
+        targetValue = if (isPressed) monetColors.primary.copy(alpha = 0.65f) else monetColors.outlineVariant.copy(alpha = 0.35f),
+        animationSpec = tween(durationMillis = 110),
+        label = "dtmfKeyBorder"
     )
 
     Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp),
+            .size(64.dp)
+            .scale(keyScale)
+            .shadow(
+                elevation = if (isPressed) 2.dp else 5.dp,
+                shape = RoundedCornerShape(keyCorner),
+                spotColor = monetColors.primary.copy(alpha = 0.22f)
+            )
+            .clip(RoundedCornerShape(keyCorner))
+            .background(keyBg)
+            .border(
+                width = 1.dp,
+                brush = Brush.linearGradient(
+                    listOf(
+                        Color.White.copy(alpha = 0.35f),
+                        keyBorder
+                    )
+                ),
+                shape = RoundedCornerShape(keyCorner)
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null
+            ) { onClick() },
         contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier
-                .shadow(
-                    elevation = 12.dp,
-                    shape = RoundedCornerShape(22.dp),
-                    spotColor = Color(0x40000000),
-                    ambientColor = Color(0x20000000)
-                )
-                .clip(RoundedCornerShape(22.dp))
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color(0x28FFFFFF),
-                            Color(0x12FFFFFF)
-                        )
-                    )
-                )
-                .border(
-                    width = 1.dp,
-                    brush = Brush.verticalGradient(
-                        listOf(
-                            Color(0x60FFFFFF),
-                            Color(0x18FFFFFF)
-                        )
-                    ),
-                    shape = RoundedCornerShape(22.dp)
-                )
-                .clickable {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onToggle()
-                }
-                .padding(horizontal = 16.dp, vertical = 7.dp)
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Subtle Mode Indicator Icon
-                Icon(
-                    imageVector = if (isFocusChatMode) Icons.Rounded.GridView else Icons.Rounded.ChatBubbleOutline,
-                    contentDescription = null,
-                    tint = if (isFocusChatMode) AppleGreen else Color(0xDDFFFFFF),
-                    modifier = Modifier.size(14.dp)
-                )
-
+            Text(
+                text = digit.toString(),
+                color = if (isPressed) monetColors.onPrimaryContainer else monetColors.onSurface,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.SemiBold,
+                lineHeight = 24.sp
+            )
+            if (letters.isNotBlank()) {
                 Text(
-                    text = if (isFocusChatMode) "Expand Controls & Sounds" else "Focus Chat Screen",
-                    color = Color.White,
-                    fontSize = 11.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 0.3.sp
-                )
-
-                // Smoothly Rotating Animated Chevron
-                Icon(
-                    imageVector = Icons.Rounded.KeyboardArrowDown,
-                    contentDescription = "Toggle Expand/Collapse",
-                    tint = Color(0xCCFFFFFF),
-                    modifier = Modifier
-                        .size(16.dp)
-                        .rotate(chevronRotation)
+                    text = letters,
+                    color = if (isPressed) monetColors.onPrimaryContainer.copy(alpha = 0.85f) else monetColors.onSurfaceVariant.copy(alpha = 0.75f),
+                    fontSize = 9.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp,
+                    lineHeight = 11.sp
                 )
             }
         }
     }
 }
+
 
 private fun formatDuration(seconds: Long): String {
     val mins = seconds / 60

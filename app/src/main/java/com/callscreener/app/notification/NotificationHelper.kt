@@ -14,7 +14,10 @@ import android.os.Build
 import android.telecom.TelecomManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.Person
+import androidx.core.graphics.drawable.IconCompat
 import com.callscreener.app.R
+import com.callscreener.app.data.CallerProfileManager
 import com.callscreener.app.data.DialerRepository
 import com.callscreener.app.receiver.CallNotificationReceiver
 import com.callscreener.app.ui.MainActivity
@@ -155,10 +158,10 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val largeAvatar = createAvatarBitmap(displayName)
+        val largeAvatar = createAvatarBitmap(context, cleanNumber, displayName, isMissed = true)
 
         val builder = NotificationCompat.Builder(context, CHANNEL_MISSED_CALLS)
-            .setSmallIcon(android.R.drawable.sym_call_missed)
+            .setSmallIcon(R.drawable.ic_stat_call_missed)
             .setLargeIcon(largeAvatar)
             .setContentTitle("Missed Call")
             .setContentText(displayName)
@@ -167,20 +170,20 @@ object NotificationHelper {
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_MISSED_CALL)
-            .setColor(0xFFD70015.toInt()) // Carmine red
+            .setColor(0xFFE22B45.toInt()) // Pixel Expressive Vibrant Ruby Red
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .addAction(
-                android.R.drawable.ic_menu_call,
+                R.drawable.ic_notification_call_back,
                 "Call Back",
                 callBackPendingIntent
             )
             .addAction(
-                android.R.drawable.ic_dialog_email,
+                R.drawable.ic_notification_message,
                 "Message",
                 smsPendingIntent
             )
             .addAction(
-                android.R.drawable.ic_btn_speak_now,
+                R.drawable.ic_notification_screen_ai,
                 "Screen with AI",
                 screenPendingIntent
             )
@@ -204,12 +207,18 @@ object NotificationHelper {
     }
 
     /**
-     * Post a high-priority Heads-Up Notification for Incoming Calls with Decline, Answer, and Screen actions.
+     * Post an authentic Google Dialer / Android 12+ CallStyle Heads-Up Notification for Incoming Calls.
+     * When the user is actively using the phone (interactive & keyguard unlocked), Android OS automatically
+     * displays the minimal heads-up call banner at the top of the screen with Decline and Answer buttons.
+     * When the phone is locked or screen is off, fullScreenIntent presents the full-screen caller screen.
+     * ZERO special overlay permissions (SYSTEM_ALERT_WINDOW) required.
      */
     fun postIncomingCallNotification(
         context: Context,
         callerNumber: String,
-        callerName: String? = null
+        callerName: String? = null,
+        hasCapsule: Boolean = false,
+        isUserUsingPhone: Boolean = false
     ) {
         initNotificationChannels(context)
 
@@ -267,32 +276,36 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val largeAvatar = createAvatarBitmap(displayName)
+        val largeAvatar = createAvatarBitmap(context, cleanNumber, displayName, isMissed = false)
+
+        val person = Person.Builder()
+            .setName(displayName)
+            .setIcon(IconCompat.createWithBitmap(largeAvatar))
+            .setUri("tel:$cleanNumber")
+            .setImportant(true)
+            .build()
+
+        // Authentic Google Dialer & OEM CallStyle banner
+        val callStyle = NotificationCompat.CallStyle.forIncomingCall(
+            person,
+            declinePendingIntent,
+            answerPendingIntent
+        )
 
         val builder = NotificationCompat.Builder(context, CHANNEL_INCOMING_CALLS)
-            .setSmallIcon(android.R.drawable.sym_call_incoming)
-            .setLargeIcon(largeAvatar)
+            .setSmallIcon(R.drawable.ic_stat_call_incoming)
             .setContentTitle(displayName)
-            .setContentText("Incoming phone call...")
+            .setContentText("Incoming call • $cleanNumber")
+            .setStyle(callStyle)
             .setContentIntent(contentPendingIntent)
             .setFullScreenIntent(contentPendingIntent, true)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setColor(0xFF34C759.toInt()) // Apple Green
+            .setColor(0xFF1A73E8.toInt()) // Google Blue
             .addAction(
-                android.R.drawable.ic_menu_close_clear_cancel,
-                "Decline",
-                declinePendingIntent
-            )
-            .addAction(
-                android.R.drawable.ic_menu_call,
-                "Answer",
-                answerPendingIntent
-            )
-            .addAction(
-                android.R.drawable.ic_btn_speak_now,
+                R.drawable.ic_notification_screen_ai,
                 "Screen with AI",
                 screenPendingIntent
             )
@@ -345,24 +358,31 @@ object NotificationHelper {
         )
 
         val statusText = if (isScreening) "AI Screening in progress..." else "Active phone call"
-        val largeAvatar = createAvatarBitmap(displayName)
+        val largeAvatar = createAvatarBitmap(context, cleanNumber, displayName, isMissed = false)
+
+        val person = Person.Builder()
+            .setName(displayName)
+            .setIcon(IconCompat.createWithBitmap(largeAvatar))
+            .setUri("tel:$cleanNumber")
+            .setImportant(true)
+            .build()
+
+        val callStyle = NotificationCompat.CallStyle.forOngoingCall(
+            person,
+            hangupPendingIntent
+        )
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ONGOING_CALLS)
-            .setSmallIcon(android.R.drawable.sym_action_call)
-            .setLargeIcon(largeAvatar)
+            .setSmallIcon(R.drawable.ic_stat_call_ongoing)
             .setContentTitle(displayName)
             .setContentText(statusText)
+            .setStyle(callStyle)
             .setContentIntent(contentPendingIntent)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setColor(0xFF007AFF.toInt())
-            .addAction(
-                android.R.drawable.ic_menu_close_clear_cancel,
-                "End Call",
-                hangupPendingIntent
-            )
+            .setColor(0xFF1A73E8.toInt())
 
         try {
             val notificationManager = NotificationManagerCompat.from(context)
@@ -379,27 +399,121 @@ object NotificationHelper {
         } catch (_: Exception) {}
     }
 
-    private fun createAvatarBitmap(name: String): Bitmap {
-        val size = 120
-        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
+    /**
+     * Resolves the contact profile photo for a phone number if available.
+     */
+    private fun getContactPhotoBitmap(context: Context, number: String): Bitmap? {
+        if (number.isBlank()) return null
+        // 1. User-customized avatar profile photo
+        try {
+            val customPath = CallerProfileManager.getCustomPhotoPath(context, number)
+            if (!customPath.isNullOrBlank()) {
+                val file = java.io.File(customPath)
+                if (file.exists()) {
+                    val bmp = android.graphics.BitmapFactory.decodeFile(customPath)
+                    if (bmp != null) return bmp
+                }
+            }
+        } catch (_: Throwable) {}
 
-        val circlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xFFD70015.toInt() // Carmine accent
+        // 2. Android system contacts provider photo
+        try {
+            val uri = Uri.withAppendedPath(
+                android.provider.ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                Uri.encode(number)
+            )
+            context.contentResolver.query(
+                uri,
+                arrayOf(android.provider.ContactsContract.PhoneLookup.PHOTO_URI),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val photoUriString = cursor.getString(0)
+                    if (!photoUriString.isNullOrBlank()) {
+                        context.contentResolver.openInputStream(Uri.parse(photoUriString))?.use { stream ->
+                            return android.graphics.BitmapFactory.decodeStream(stream)
+                        }
+                    }
+                }
+            }
+        } catch (_: Throwable) {}
+        return null
+    }
+
+    /**
+     * Creates a high-DPI (192x192) Pixel Expressive circular notification avatar bitmap.
+     * Incorporates custom contact photo if available, or renders a dynamic Material You gradient disc.
+     */
+    private fun createAvatarBitmap(
+        context: Context,
+        callerNumber: String,
+        name: String,
+        isMissed: Boolean
+    ): Bitmap {
+        val size = 192
+        val sourceBitmap = getContactPhotoBitmap(context, callerNumber)
+        val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(output)
+
+        if (sourceBitmap != null) {
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+            canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+            paint.xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN)
+
+            val srcSize = Math.min(sourceBitmap.width, sourceBitmap.height)
+            val srcX = (sourceBitmap.width - srcSize) / 2
+            val srcY = (sourceBitmap.height - srcSize) / 2
+            val srcRect = android.graphics.Rect(srcX, srcY, srcX + srcSize, srcY + srcSize)
+            val dstRect = android.graphics.Rect(0, 0, size, size)
+            canvas.drawBitmap(sourceBitmap, srcRect, dstRect, paint)
+
+            val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = 3f
+                color = 0x30FFFFFF.toInt()
+            }
+            canvas.drawCircle(size / 2f, size / 2f, (size / 2f) - 1.5f, borderPaint)
+        } else {
+            val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = if (isMissed) {
+                    android.graphics.LinearGradient(
+                        0f, 0f, 0f, size.toFloat(),
+                        0xFFE22B45.toInt(), // Saturated Pixel Ruby Red
+                        0xFFBA1A30.toInt(), // Deep Carmine
+                        android.graphics.Shader.TileMode.CLAMP
+                    )
+                } else {
+                    android.graphics.LinearGradient(
+                        0f, 0f, 0f, size.toFloat(),
+                        0xFF1A73E8.toInt(), // Google Blue
+                        0xFF1557B0.toInt(), // Deep Monet Blue
+                        android.graphics.Shader.TileMode.CLAMP
+                    )
+                }
+            }
+            canvas.drawCircle(size / 2f, size / 2f, size / 2f, bgPaint)
+
+            val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = 3f
+                color = 0x35FFFFFF.toInt()
+            }
+            canvas.drawCircle(size / 2f, size / 2f, (size / 2f) - 1.5f, borderPaint)
+
+            val initial = if (name.isNotBlank()) name.first().uppercase() else "#"
+            val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0xFFFFFFFF.toInt()
+                textSize = 76f
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                textAlign = Paint.Align.CENTER
+            }
+
+            val yPos = (size / 2f) - ((textPaint.descent() + textPaint.ascent()) / 2f)
+            canvas.drawText(initial, size / 2f, yPos, textPaint)
         }
-        canvas.drawCircle(size / 2f, size / 2f, size / 2f, circlePaint)
 
-        val initial = if (name.isNotBlank()) name.first().uppercase() else "#"
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xFFFFFFFF.toInt()
-            textSize = 50f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            textAlign = Paint.Align.CENTER
-        }
-
-        val yPos = (size / 2f - (textPaint.descent() + textPaint.ascent()) / 2)
-        canvas.drawText(initial, size / 2f, yPos, textPaint)
-
-        return bitmap
+        return output
     }
 }

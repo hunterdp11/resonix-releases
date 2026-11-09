@@ -5,8 +5,11 @@ import android.media.AudioAttributes
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.media.MediaPlayer
+import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.telecom.Call
+import android.telecom.TelecomManager
 import android.telecom.VideoProfile
 import android.util.Log
 import com.callscreener.app.data.DialerRepository
@@ -41,6 +44,8 @@ class CallSessionManager private constructor(private val appContext: Context) {
 
     private val scope = CoroutineScope(Dispatchers.Default + Job())
     private var activeTelecomCall: Call? = null
+    val currentCall: Call?
+        get() = activeTelecomCall
     private var durationJob: Job? = null
     private var pendingGreeting: String? = null
 
@@ -83,7 +88,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
                 if (speaking) {
                     aiVoiceRelayManager.stopListening()
                 } else {
-                    // TTS finished speaking: resume listening to user if Auto-Relay is active
+                    // TTS finished speaking: resume manual dictation ONLY if user explicitly enabled it
                     if (_sessionState.value.status == CallStatus.SCREENING_ACTIVE &&
                         _sessionState.value.audioCallMode == AudioCallMode.AI_TYPE_SPEAK &&
                         _sessionState.value.isAutoRelayEnabled
@@ -127,12 +132,12 @@ class CallSessionManager private constructor(private val appContext: Context) {
             }
         }
 
-        // When user speaks into mic, AI Voice Relay captures it and immediately synthesizes it in AI female voice!
+        // When user speaks into mic (manual dictation), relay their spoken message to caller
         scope.launch {
-            aiVoiceRelayManager.speechEvents.collect { userSpokenText ->
-                if (userSpokenText.isNotBlank()) {
-                    Log.i(TAG, "AI Voice Relay captured speech: '$userSpokenText'. Relaying to caller in female AI voice!")
-                    sendUserReply(userSpokenText)
+            aiVoiceRelayManager.speechEvents.collect { spokenText ->
+                if (spokenText.isNotBlank()) {
+                    Log.i(TAG, "Manual user dictation captured: '$spokenText'. Relaying to caller!")
+                    sendUserReply(spokenText)
                 }
             }
         }
@@ -202,7 +207,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
     /**
      * Answer the call and initiate the AI voice screening loop.
      */
-    fun startScreening(greeting: String? = "Hello. The person you have reached is using an automated assistant. Please state your name and reason for calling.") {
+    fun startScreening(greeting: String? = "Hello! How can I help you today?") {
         com.callscreener.app.telephony.RingtonePlayer.stop(appContext)
         pendingGreeting = if (_sessionState.value.isGreetingEnabled) greeting else null
 
@@ -212,20 +217,23 @@ class CallSessionManager private constructor(private val appContext: Context) {
         val isPrivileged = (RootPrivilegeManager.isPrivilegedApp(appContext) || RootPrivilegeManager.isRootAvailable()) && !isSim
         speechManager.useDirectRootInjection = isPrivileged
 
-        // CRITICAL PRIVACY FIX: Mute Telecom in-call uplink so user's natural microphone voice NEVER leaks to the caller!
-        CallScreeningInCallService.setCallMute(true)
-        audioManager.isMicrophoneMute = false // Unmuted ONLY for local SpeechRecognizer capture
+        // Isolate physical mic from caller uplink while keeping OS microphone active for SpeechRecognizer
+        CallScreeningInCallService.isolateMicForAiRelay(true)
+        audioManager.mode = AudioManager.MODE_NORMAL
+        audioManager.isMicrophoneMute = false // Unmuted for local SpeechRecognizer capture
 
         _sessionState.update {
             it.copy(
                 status = CallStatus.SCREENING_ACTIVE,
                 audioCallMode = AudioCallMode.AI_TYPE_SPEAK,
-                isSpeakerOn = true
+                isSpeakerOn = false
             )
         }
 
+        aiVoiceRelayManager.isAutoRelayActive = _sessionState.value.isAutoRelayEnabled
+
         if (!isSim) {
-            setSpeakerphone(true)
+            setSpeakerphone(false)
         }
         startDurationTimer()
 
@@ -295,25 +303,25 @@ class CallSessionManager private constructor(private val appContext: Context) {
     }
 
     /**
-     * Toggle call hold during active call.
+     * Toggle call hold during active call (instant UI state response + async telephony call.hold).
      */
     fun toggleHold() {
         val call = activeTelecomCall
+        val newHold = _sessionState.value.status != CallStatus.ON_HOLD
+        _sessionState.update {
+            it.copy(status = if (newHold) CallStatus.ON_HOLD else CallStatus.USER_TALKING)
+        }
         if (call != null) {
-            try {
-                if (_sessionState.value.status == CallStatus.ON_HOLD) {
-                    call.unhold()
-                    _sessionState.update { it.copy(status = CallStatus.USER_TALKING) }
-                } else {
-                    call.hold()
-                    _sessionState.update { it.copy(status = CallStatus.ON_HOLD) }
+            scope.launch(Dispatchers.IO) {
+                try {
+                    if (newHold) {
+                        call.hold()
+                    } else {
+                        call.unhold()
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error toggling call hold", e)
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error toggling call hold", e)
-            }
-        } else {
-            _sessionState.update {
-                it.copy(status = if (it.status == CallStatus.ON_HOLD) CallStatus.USER_TALKING else CallStatus.ON_HOLD)
             }
         }
     }
@@ -410,35 +418,15 @@ class CallSessionManager private constructor(private val appContext: Context) {
 
             if (!isSim) {
                 delay(500L) // Wait for hardware audio channel to settle
-                if (isPrivileged) {
-                    setSpeakerphone(false) // Direct silent injection
-                } else {
-                    setSpeakerphone(true)
-                }
+                setSpeakerphone(_sessionState.value.isSpeakerOn)
 
                 // If in AI Relay or Screening mode, isolate physical mic from carrier uplink immediately
                 if (_sessionState.value.audioCallMode != AudioCallMode.DIRECT_MIC) {
-                    CallScreeningInCallService.setCallMute(true)
-                    RootPrivilegeManager.executeAsync {
-                        val script = """
-                            cmd telecom set-call-muted true 2>/dev/null || true
-                            tinymix 'Voice_Tx Mixer MultiMedia1' 1 2>/dev/null || true
-                            tinymix 'Incall_Music Audio Mixer MultiMedia1' 1 2>/dev/null || true
-                            tinymix 'Incall_Music Audio Mixer MultiMedia2' 1 2>/dev/null || true
-                            tinymix 'Voice_Tx Mixer TX_Voice' 0 2>/dev/null || true
-                            tinymix 'Voice_Tx Mixer SLIM_0_TX_Voice' 0 2>/dev/null || true
-                            tinymix 'Voice_Tx Mixer PRI_TX_Voice' 0 2>/dev/null || true
-                            tinymix 'Voice_Tx Mixer TERT_MI2S_TX_Voice' 0 2>/dev/null || true
-                            tinymix 'Voice_Tx Mixer TX_CDC_DMA_TX_3' 0 2>/dev/null || true
-                            tinymix 'Voice_Tx Mixer SLIM_0_TX' 0 2>/dev/null || true
-                            tinymix 'Voice_Tx Mixer AFE_PCM_TX' 0 2>/dev/null || true
-                            tinymix 'Voice Tx Mute' 1 2>/dev/null || true
-                            tinymix 'Voice Tx Device Mute' 0 2>/dev/null || true
-                        """.trimIndent()
-                        RootPrivilegeManager.executeSuCommand(script)
-                    }
+                    CallScreeningInCallService.isolateMicForAiRelay(true)
+                    audioManager.mode = AudioManager.MODE_NORMAL
+                    audioManager.isMicrophoneMute = false
                 } else {
-                    CallScreeningInCallService.setCallMute(false)
+                    CallScreeningInCallService.isolateMicForAiRelay(false)
                 }
             } else {
                 delay(200L)
@@ -464,6 +452,16 @@ class CallSessionManager private constructor(private val appContext: Context) {
                 aiVoiceRelayManager.startListening()
             }
 
+            if (isSim) {
+                scope.launch {
+                    delay(2200L)
+                    if (_sessionState.value.status == CallStatus.SCREENING_ACTIVE &&
+                        _sessionState.value.messages.none { it.sender == MessageSender.CALLER }) {
+                        addMessage(MessageSender.CALLER, "Hello, this is Dave from Express Logistics, calling about package #4829.")
+                    }
+                }
+            }
+
             if (_sessionState.value.isAutoRecordEnabled && !_sessionState.value.isRecording) {
                 delay(300L)
                 startRecording()
@@ -485,28 +483,15 @@ class CallSessionManager private constructor(private val appContext: Context) {
         val isPrivileged = (RootPrivilegeManager.isPrivilegedApp(appContext) || RootPrivilegeManager.isRootAvailable()) && !isSim
         speechManager.useDirectRootInjection = isPrivileged
 
-        // Ensure physical mic is unrouted from caller uplink so natural voice never leaks to caller
+        // Ensure physical mic is unrouted from caller uplink while keeping OS mic active for SpeechRecognizer
         if (!isSim) {
-            scope.launch {
-                try {
-                    val script = """
-                        tinymix 'Voice_Tx Mixer MultiMedia1' 1 2>/dev/null || true
-                        tinymix 'Incall_Music Audio Mixer MultiMedia1' 1 2>/dev/null || true
-                        tinymix 'Voice_Tx Mixer TX_Voice' 0 2>/dev/null || true
-                        tinymix 'Voice_Tx Mixer SLIM_0_TX_Voice' 0 2>/dev/null || true
-                        tinymix 'Voice_Tx Mixer PRI_TX_Voice' 0 2>/dev/null || true
-                        tinymix 'Voice_Tx Mixer TERT_MI2S_TX_Voice' 0 2>/dev/null || true
-                        tinymix 'Voice_Tx Mixer TX_CDC_DMA_TX_3' 0 2>/dev/null || true
-                        tinymix 'Voice_Tx Mixer SLIM_0_TX' 0 2>/dev/null || true
-                        tinymix 'Voice_Tx Mixer AFE_PCM_TX' 0 2>/dev/null || true
-                    """.trimIndent()
-                    RootPrivilegeManager.executeSuCommand(script)
-                } catch (_: Exception) {}
-            }
+            CallScreeningInCallService.isolateMicForAiRelay(true)
         }
 
+        // Switch to MODE_NORMAL so Android SpeechRecognizer captures user speech cleanly
+        audioManager.mode = AudioManager.MODE_NORMAL
         audioManager.isMicrophoneMute = false
-        CallScreeningInCallService.setCallMute(true) // Carrier uplink MUST be muted so caller cannot hear user's real voice!
+        CallScreeningInCallService.setCallMute(false)
 
         _sessionState.update {
             it.copy(
@@ -529,7 +514,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
      */
     fun switchToDirectMicMode() {
         speechManager.stop()
-        aiVoiceRelayManager.release()
+        aiVoiceRelayManager.stopListening()
 
         audioManager.mode = AudioManager.MODE_IN_CALL
 
@@ -561,6 +546,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
 
         // Unmute telephony uplink so your natural voice transmits directly
         audioManager.isMicrophoneMute = false
+        CallScreeningInCallService.isolateMicForAiRelay(false)
         CallScreeningInCallService.setCallMute(false)
 
         _sessionState.update {
@@ -703,6 +689,8 @@ class CallSessionManager private constructor(private val appContext: Context) {
         if (aiVoiceRelayManager.isListening.value) {
             aiVoiceRelayManager.stopListening()
         } else {
+            audioManager.mode = AudioManager.MODE_NORMAL
+            audioManager.isMicrophoneMute = false
             aiVoiceRelayManager.startListening()
         }
     }
@@ -783,39 +771,55 @@ class CallSessionManager private constructor(private val appContext: Context) {
     }
 
     /**
-     * Toggle Mute.
+     * Toggle Mute (Instant UI feedback + asynchronous Telecom/AudioPolicy execution).
      */
     fun toggleMute() {
         val newMute = !_sessionState.value.isMuted
-        audioManager.isMicrophoneMute = newMute
-        if (_sessionState.value.audioCallMode == AudioCallMode.DIRECT_MIC) {
-            CallScreeningInCallService.setCallMute(newMute)
-        } else {
-            // In Screening / AI Voice Relay mode, call uplink remains muted to protect user privacy
-            CallScreeningInCallService.setCallMute(true)
-            if (newMute) {
-                aiVoiceRelayManager.stopListening()
-            } else if (_sessionState.value.isAutoRelayEnabled && !_sessionState.value.isTtsSpeaking) {
-                aiVoiceRelayManager.startListening()
+        _sessionState.update { it.copy(isMuted = newMute) }
+        scope.launch(Dispatchers.IO) {
+            try {
+                audioManager.isMicrophoneMute = newMute
+                if (newMute) {
+                    CallScreeningInCallService.setCallMute(true)
+                    aiVoiceRelayManager.stopListening()
+                } else {
+                    if (_sessionState.value.audioCallMode == AudioCallMode.DIRECT_MIC) {
+                        CallScreeningInCallService.setCallMute(false)
+                    } else {
+                        CallScreeningInCallService.isolateMicForAiRelay(true)
+                        if (_sessionState.value.isAutoRelayEnabled && !_sessionState.value.isTtsSpeaking) {
+                            aiVoiceRelayManager.startListening()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error applying mute state", e)
             }
         }
-        _sessionState.update { it.copy(isMuted = newMute) }
     }
 
     /**
-     * Toggle Speakerphone
+     * Toggle Speakerphone (Instant UI feedback + asynchronous hardware/device routing).
      */
     fun toggleSpeaker() {
         val newSpeaker = !_sessionState.value.isSpeakerOn
-        setSpeakerphone(newSpeaker)
         _sessionState.update { it.copy(isSpeakerOn = newSpeaker) }
+        scope.launch(Dispatchers.IO) {
+            setSpeakerphone(newSpeaker)
+        }
     }
 
     private fun setSpeakerphone(on: Boolean) {
         try {
             CallScreeningInCallService.setSpeaker(on)
+            @Suppress("DEPRECATION")
+            audioManager.isSpeakerphoneOn = on
 
-            audioManager.mode = AudioManager.MODE_IN_CALL
+            if (_sessionState.value.audioCallMode != AudioCallMode.AI_TYPE_SPEAK) {
+                audioManager.mode = AudioManager.MODE_IN_CALL
+            } else {
+                audioManager.mode = AudioManager.MODE_NORMAL
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (on) {
                     val speaker = audioManager.availableCommunicationDevices.firstOrNull {
@@ -867,8 +871,15 @@ class CallSessionManager private constructor(private val appContext: Context) {
     fun toggleSpeechJammer() {
         if (speechJammerEngine.isJammerActive.value) {
             speechJammerEngine.stopJammer()
+            if (_sessionState.value.audioCallMode == AudioCallMode.AI_TYPE_SPEAK) {
+                CallScreeningInCallService.isolateMicForAiRelay(true)
+            }
         } else {
-            speechJammerEngine.startJammer(forTestLab = _sessionState.value.isSimulated)
+            audioManager.mode = AudioManager.MODE_IN_CALL
+            audioManager.isMicrophoneMute = false
+            CallScreeningInCallService.setCallMute(false)
+            CallScreeningInCallService.isolateMicForAiRelay(false)
+            speechJammerEngine.startJammer(forTestLab = false)
         }
     }
 
@@ -879,6 +890,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
             }
             CallScreeningInCallService.setSpeaker(false)
             CallScreeningInCallService.setCallMute(false)
+            CallScreeningInCallService.isolateMicForAiRelay(false)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 audioManager.clearCommunicationDevice()
             } else {
@@ -887,6 +899,28 @@ class CallSessionManager private constructor(private val appContext: Context) {
             }
             audioManager.isMicrophoneMute = false
             audioManager.mode = AudioManager.MODE_NORMAL
+
+            if (RootPrivilegeManager.isRootAvailable()) {
+                scope.launch {
+                    try {
+                        RootPrivilegeManager.executeSuCommand("""
+                            tinymix 'Voice_Tx Mixer MultiMedia1' 0 2>/dev/null || true
+                            tinymix 'Voice_Tx Mixer MultiMedia2' 0 2>/dev/null || true
+                            tinymix 'Incall_Music Audio Mixer MultiMedia1' 0 2>/dev/null || true
+                            tinymix 'Incall_Music Audio Mixer MultiMedia2' 0 2>/dev/null || true
+                            tinymix 'Incall_Music_2 Audio Mixer MultiMedia1' 0 2>/dev/null || true
+                            tinymix 'Voice_Rx Mixer MultiMedia1' 0 2>/dev/null || true
+                            tinymix 'AFE_PCM_RX Audio Mixer MultiMedia1' 0 2>/dev/null || true
+                            tinymix 'PRI_MI2S_RX Audio Mixer MultiMedia1' 0 2>/dev/null || true
+                            tinymix 'TERT_MI2S_RX Audio Mixer MultiMedia1' 0 2>/dev/null || true
+                            tinymix 'SLIM_0_RX Audio Mixer MultiMedia1' 0 2>/dev/null || true
+                            tinymix 'Voice_Tx Mixer TX_Voice' 1 2>/dev/null || true
+                            tinymix 'Voice Tx Mute' 0 2>/dev/null || true
+                            tinymix 'Voice Tx Device Mute' 0 2>/dev/null || true
+                        """.trimIndent())
+                    } catch (_: Exception) {}
+                }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to reset audio mode", e)
         }

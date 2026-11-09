@@ -10,7 +10,6 @@ import android.media.AudioRecord
 import android.media.AudioTrack
 import android.media.MediaRecorder
 import android.media.audiofx.AcousticEchoCanceler
-import android.media.audiofx.AutomaticGainControl
 import android.os.Process
 import android.util.Log
 import com.callscreener.app.root.RootPrivilegeManager
@@ -21,21 +20,44 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.tanh
+import kotlin.math.sqrt
+
+enum class JammerMode(val displayName: String, val badge: String, val subtitle: String) {
+    DAF_JAMMER(
+        "Speech Jammer (DAF)",
+        "STUTTER DAF",
+        "200ms timing collision — induces speech motor stutter & arrest"
+    ),
+    INFINITE_ECHO(
+        "Infinite Echo Chamber",
+        "ECHO CHAMBER",
+        "Multi-tap noise-free recursive acoustic reflections with warm low-pass damping"
+    )
+}
 
 /**
- * Acoustic Speech Jammer Engine using Delayed Auditory Feedback (DAF).
+ * Acoustic Speech Jammer & Infinite Echo Chamber Engine.
  *
- * Disrupts the caller's brain speech-motor synchronization by capturing their incoming
- * vocal stream and feeding it back into the call uplink with a precise 180ms - 220ms delay.
+ * Mode 1 (DAF Jammer):
+ * Captures in-call vocal audio (remote caller + local microphone via VOICE_CALL / VOICE_DOWNLINK)
+ * and feeds it back into the call uplink with a precise 180ms - 240ms delay,
+ * inducing psychoacoustic speech-motor collision and stutter arrest in the caller.
  *
- * Neurological basis:
- * Human speech production requires bone/auditory feedback within <20ms.
- * When delayed by ~200ms, the brain's auditory cortex detects an artificial timing collision,
- * inducing involuntary stuttering, syllable repetition, severe slurring, or total speech arrest.
+ * Mode 2 (Infinite Echo Chamber):
+ * Multi-tap recursive feedback loop with warm 1st-order IIR low-pass damping,
+ * projecting cathedral/stadium echoes into the cellular uplink.
+ *
+ * Audio Routing Architecture:
+ * - Telephony Uplink Track: AudioTrack with USAGE_VOICE_COMMUNICATION explicitly routed
+ *   to AudioDeviceInfo.TYPE_TELEPHONY for baseband cellular modem Voice Tx injection.
+ * - Media Mixer Track: AudioTrack with USAGE_MEDIA & FLAG_AUDIBILITY_ENFORCED for Qualcomm /
+ *   MediaTek ALSA in-call hardware music mixers (Incall_Music MultiMedia1/2).
+ * - Monitor Track: AudioTrack with USAGE_VOICE_COMMUNICATION @ 16kHz for active real-time
+ *   local ear/speaker monitoring so the user clearly hears the delayed audio and acoustic reflections.
  */
 class SpeechJammerEngine private constructor(private val appContext: Context) {
 
@@ -44,9 +66,11 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
 
     companion object {
         private const val TAG = "SpeechJammerEngine"
-        const val SAMPLE_RATE = 16000
+        const val DSP_SAMPLE_RATE = 16000
+        const val UPLINK_SAMPLE_RATE = 48000
         const val DEFAULT_DELAY_MS = 200
-        const val DEFAULT_INTENSITY_GAIN = 1.6f
+        const val DEFAULT_INTENSITY_GAIN = 1.35f
+        const val DEFAULT_ECHO_DECAY = 0.68f
 
         @Volatile
         private var instance: SpeechJammerEngine? = null
@@ -71,6 +95,31 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
         get() = prefs.getBoolean("jammer_enabled", true)
         set(value) { prefs.edit().putBoolean("jammer_enabled", value).apply() }
 
+    var mode: JammerMode
+        get() {
+            val saved = prefs.getString("jammer_mode", JammerMode.DAF_JAMMER.name)
+            return try {
+                JammerMode.valueOf(saved ?: JammerMode.DAF_JAMMER.name)
+            } catch (_: Exception) {
+                JammerMode.DAF_JAMMER
+            }
+        }
+        set(value) {
+            prefs.edit().putString("jammer_mode", value.name).apply()
+            _activeModeFlow.value = value
+            Log.i(TAG, "Jammer operational mode set to: ${value.name}")
+        }
+
+    private val _activeModeFlow = MutableStateFlow(mode)
+    val activeModeFlow: StateFlow<JammerMode> = _activeModeFlow.asStateFlow()
+
+    var echoDecay: Float
+        get() = prefs.getFloat("jammer_echo_decay", DEFAULT_ECHO_DECAY)
+        set(value) {
+            val clamped = value.coerceIn(0.30f, 0.88f)
+            prefs.edit().putFloat("jammer_echo_decay", clamped).apply()
+        }
+
     var delayMs: Int
         get() = prefs.getInt("jammer_delay_ms", DEFAULT_DELAY_MS)
         set(value) {
@@ -82,7 +131,7 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
     var intensityGain: Float
         get() = prefs.getFloat("jammer_intensity", DEFAULT_INTENSITY_GAIN)
         set(value) {
-            val clamped = value.coerceIn(1.0f, 2.8f)
+            val clamped = value.coerceIn(0.8f, 2.5f)
             prefs.edit().putFloat("jammer_intensity", clamped).apply()
         }
 
@@ -92,10 +141,10 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
 
     // Audio Pipeline State
     private var audioRecord: AudioRecord? = null
-    private var audioTrack: AudioTrack? = null
-    private var localMonitorTrack: AudioTrack? = null
+    private var telephonyUplinkTrack: AudioTrack? = null
+    private var mediaMixerTrack: AudioTrack? = null
+    private var monitorAudioTrack: AudioTrack? = null
     private var echoCanceler: AcousticEchoCanceler? = null
-    private var gainControl: AutomaticGainControl? = null
     private var processingThread: Thread? = null
 
     @Volatile
@@ -104,6 +153,9 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
     @Volatile
     private var isTestMode = false
 
+    private var originalMediaVolume = -1
+    private var originalVoiceVolume = -1
+
     // DAF Circular Buffer: 32,768 samples @ 16kHz = ~2.04 seconds capacity
     private val ringBufferSize = 32768
     private val ringBufferMask = ringBufferSize - 1
@@ -111,22 +163,23 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
     private var writePos = 0
 
     @Volatile
-    private var delaySamples = (DEFAULT_DELAY_MS * SAMPLE_RATE) / 1000
+    private var delaySamples = (DEFAULT_DELAY_MS * DSP_SAMPLE_RATE) / 1000
 
     init {
         updateDelaySamples(delayMs)
     }
 
     private fun updateDelaySamples(ms: Int) {
-        delaySamples = (ms * SAMPLE_RATE) / 1000
-        Log.i(TAG, "Speech Jammer delay calibrated: ${ms}ms ($delaySamples samples @ ${SAMPLE_RATE}Hz)")
+        delaySamples = (ms * DSP_SAMPLE_RATE) / 1000
+        Log.i(TAG, "Speech Jammer delay calibrated: ${ms}ms ($delaySamples samples @ ${DSP_SAMPLE_RATE}Hz)")
     }
 
     /**
      * Start the real-time Speech Jammer during a live phone call or test lab.
      *
-     * @param forTestLab If true, captures local mic for testing in headphones;
-     *                   If false, captures telephony downlink (caller's voice) via root mixer.
+     * @param forTestLab If true, captures local mic for testing in headphones/speaker;
+     *                   If false, captures telephony voice and injects into call uplink via multi-destination
+     *                   routing (telephony track, ALSA mixers, in-call monitor).
      */
     @Synchronized
     fun startJammer(forTestLab: Boolean = false): Boolean {
@@ -136,122 +189,191 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
         }
 
         isTestMode = forTestLab
-        Log.i(TAG, "Starting Speech Jammer (TestMode=$forTestLab, Delay=${delayMs}ms, Intensity=${intensityGain}x)")
+        Log.i(TAG, "Starting Speech Jammer (TestMode=$forTestLab, Delay=${delayMs}ms, Intensity=${intensityGain}x, Mode=${mode.name})")
 
-        // 1. Unmask hardware in-call mixers via root if on active call
+        val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+
+        // 1. Unmask hardware in-call mixers synchronously via root if on active call and boost in-call & media stream volumes
         if (!forTestLab) {
-            unmaskInCallHardwareMixers()
+            unmaskInCallHardwareMixersSync()
+            try {
+                originalMediaVolume = audioManager?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: -1
+                val maxMediaVol = audioManager?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 15
+                audioManager?.setStreamVolume(AudioManager.STREAM_MUSIC, maxMediaVol, 0)
+                Log.i(TAG, "Boosted STREAM_MUSIC volume to $maxMediaVol for in-call injection")
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not set STREAM_MUSIC volume: ${e.message}")
+            }
+            try {
+                originalVoiceVolume = audioManager?.getStreamVolume(AudioManager.STREAM_VOICE_CALL) ?: -1
+                val maxVoiceVol = audioManager?.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL) ?: 7
+                audioManager?.setStreamVolume(AudioManager.STREAM_VOICE_CALL, maxVoiceVol, 0)
+                Log.i(TAG, "Boosted STREAM_VOICE_CALL volume to $maxVoiceVol for in-call feedback")
+            } catch (_: Exception) {}
         }
 
-        // 2. Initialize AudioRecord
-        val channelIn = AudioFormat.CHANNEL_IN_MONO
-        val encoding = AudioFormat.ENCODING_PCM_16BIT
-        val minRecordBuf = AudioRecord.getMinBufferSize(SAMPLE_RATE, channelIn, encoding)
-        val recordBufSize = max(minRecordBuf * 4, 4096)
+        // 2. Initialize AudioRecord (prioritizing VOICE_CALL and VOICE_DOWNLINK for remote caller audio capture)
+        val recordBufSize = max(
+            AudioRecord.getMinBufferSize(DSP_SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT) * 4,
+            8192
+        )
 
-        val recordSource = if (forTestLab) {
-            MediaRecorder.AudioSource.VOICE_COMMUNICATION
-        } else {
-            MediaRecorder.AudioSource.VOICE_DOWNLINK // Source 3: strictly caller's incoming voice!
-        }
-
-        val record = tryCreateAudioRecord(recordSource, recordBufSize)
+        val record = createAudioRecord(recordBufSize)
         if (record == null) {
             Log.e(TAG, "Failed to initialize AudioRecord for Speech Jammer")
             return false
         }
         audioRecord = record
 
-        // Hardware Echo Canceler on device
-        try {
-            if (AcousticEchoCanceler.isAvailable()) {
-                echoCanceler = AcousticEchoCanceler.create(record.audioSessionId)?.apply {
-                    enabled = true
-                }
-            }
-        } catch (_: Exception) {}
-
-        // 3. Initialize AudioTrack for real-time delayed injection
-        val channelOut = AudioFormat.CHANNEL_OUT_MONO
-        val minTrackBuf = AudioTrack.getMinBufferSize(SAMPLE_RATE, channelOut, encoding)
-        val trackBufSize = max(minTrackBuf * 4, 4096)
-
-        val audioAttributes = AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-            .setFlags(AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
-            .build()
-
-        val audioFormat = AudioFormat.Builder()
-            .setSampleRate(SAMPLE_RATE)
-            .setChannelMask(channelOut)
-            .setEncoding(encoding)
-            .build()
-
-        val track = try {
-            AudioTrack.Builder()
-                .setAudioAttributes(audioAttributes)
-                .setAudioFormat(audioFormat)
-                .setBufferSizeInBytes(trackBufSize)
-                .setTransferMode(AudioTrack.MODE_STREAM)
-                .build()
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to build AudioTrack", e)
-            record.release()
-            return false
-        }
-
-        if (track.state != AudioTrack.STATE_INITIALIZED) {
-            Log.e(TAG, "AudioTrack not initialized")
-            record.release()
-            track.release()
-            return false
-        }
-        audioTrack = track
-
-        // Route AudioTrack directly to TELEPHONY uplink so the CALLER receives the feedback!
-        if (!forTestLab) {
+        // Explicitly disable AcousticEchoCanceler:
+        // AEC actively detects 180-240ms delayed auditory feedback & echo reflections
+        // and subtracts/mutes them. Disabling AEC allows the full echo to reach the caller unhindered.
+        if (AcousticEchoCanceler.isAvailable()) {
             try {
-                val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-                val outputs = audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-                val telephonyDevice = outputs?.firstOrNull { it.type == AudioDeviceInfo.TYPE_TELEPHONY }
-                if (telephonyDevice != null) {
-                    track.setPreferredDevice(telephonyDevice)
-                    Log.i(TAG, "Speech Jammer AudioTrack routed to TYPE_TELEPHONY (Uplink to caller)")
+                echoCanceler = AcousticEchoCanceler.create(record.audioSessionId)?.apply {
+                    enabled = false
+                    Log.i(TAG, "AcousticEchoCanceler explicitly disabled for Speech Jammer")
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "Could not set telephony device route", e)
+                Log.w(TAG, "AcousticEchoCanceler disable notice: ${e.message}")
             }
         }
 
-        try {
-            track.setVolume(AudioTrack.getMaxVolume())
-        } catch (_: Exception) {}
+        // 3. Initialize AudioTracks for playback / injection
+        val outChannelConfig = AudioFormat.CHANNEL_OUT_MONO
+        val outEncoding = AudioFormat.ENCODING_PCM_16BIT
+        val minTrackBuf = AudioTrack.getMinBufferSize(DSP_SAMPLE_RATE, outChannelConfig, outEncoding)
+        val trackBufSize = max(minTrackBuf * 4, 16384)
 
-        // Setup local monitor track so the USER hears the caller's real-time voice in their earpiece/speaker!
-        if (!forTestLab) {
-            try {
-                val localAttributes = AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                    .build()
+        val audioFormat = AudioFormat.Builder()
+            .setSampleRate(DSP_SAMPLE_RATE)
+            .setChannelMask(outChannelConfig)
+            .setEncoding(outEncoding)
+            .build()
 
-                val localTrack = AudioTrack.Builder()
-                    .setAudioAttributes(localAttributes)
+        if (forTestLab) {
+            // Local monitor track ONLY for Test Lab preview
+            val testAttrs = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build()
+
+            val mTrack = try {
+                AudioTrack.Builder()
+                    .setAudioAttributes(testAttrs)
                     .setAudioFormat(audioFormat)
                     .setBufferSizeInBytes(trackBufSize)
                     .setTransferMode(AudioTrack.MODE_STREAM)
                     .build()
-
-                if (localTrack.state == AudioTrack.STATE_INITIALIZED) {
-                    localTrack.setVolume(AudioTrack.getMaxVolume())
-                    localTrack.play()
-                    localMonitorTrack = localTrack
-                    Log.i(TAG, "Speech Jammer local monitor AudioTrack active (Caller voice -> User ear)")
-                }
             } catch (e: Exception) {
-                Log.w(TAG, "Could not initialize local monitor AudioTrack: ${e.message}")
+                Log.w(TAG, "Failed to build test lab monitor AudioTrack", e)
+                null
             }
+
+            if (mTrack != null && mTrack.state == AudioTrack.STATE_INITIALIZED) {
+                try { mTrack.setVolume(1.0f) } catch (_: Exception) {}
+                monitorAudioTrack = mTrack
+                Log.i(TAG, "Test Lab monitor AudioTrack initialized @ 16kHz")
+            }
+            telephonyUplinkTrack = null
+            mediaMixerTrack = null
+        } else {
+            // Live In-Call Mode: Multi-Destination Audio Pipeline
+            val outputs = try {
+                audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS) ?: emptyArray()
+            } catch (_: Exception) {
+                emptyArray<AudioDeviceInfo>()
+            }
+            val telephonyDevice = outputs.firstOrNull { it.type == AudioDeviceInfo.TYPE_TELEPHONY }
+
+            // A) Direct Telephony Modem Uplink Track (USAGE_VOICE_COMMUNICATION + TYPE_TELEPHONY device routing)
+            val telephonyAttrs = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .setFlags(AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
+                .build()
+
+            val tTrack = try {
+                AudioTrack.Builder()
+                    .setAudioAttributes(telephonyAttrs)
+                    .setAudioFormat(audioFormat)
+                    .setBufferSizeInBytes(trackBufSize)
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .build()
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to build telephony uplink AudioTrack", e)
+                null
+            }
+
+            if (tTrack != null && tTrack.state == AudioTrack.STATE_INITIALIZED) {
+                if (telephonyDevice != null) {
+                    try {
+                        val routed = tTrack.setPreferredDevice(telephonyDevice)
+                        Log.i(TAG, "Speech Jammer telephony track routed to TYPE_TELEPHONY: $routed")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "setPreferredDevice(TYPE_TELEPHONY) error: ${e.message}")
+                    }
+                } else {
+                    Log.i(TAG, "telephonyDevice not found; operating on USAGE_VOICE_COMMUNICATION")
+                }
+                try { tTrack.setVolume(AudioTrack.getMaxVolume()) } catch (_: Exception) {}
+                telephonyUplinkTrack = tTrack
+            }
+
+            // B) Qualcomm / MediaTek ALSA Incall_Music Track (USAGE_MEDIA with FLAG_AUDIBILITY_ENFORCED)
+            val mediaAttrs = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .setFlags(AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
+                .build()
+
+            val mmTrack = try {
+                AudioTrack.Builder()
+                    .setAudioAttributes(mediaAttrs)
+                    .setAudioFormat(audioFormat)
+                    .setBufferSizeInBytes(trackBufSize)
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .build()
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to build media mixer AudioTrack", e)
+                null
+            }
+
+            if (mmTrack != null && mmTrack.state == AudioTrack.STATE_INITIALIZED) {
+                try { mmTrack.setVolume(AudioTrack.getMaxVolume()) } catch (_: Exception) {}
+                mediaMixerTrack = mmTrack
+                Log.i(TAG, "Speech Jammer media mixer track initialized @ 16kHz for ALSA Incall_Music")
+            }
+
+            // C) In-Call Communication Monitor Track (earpiece / speakerphone real-time feedback for local user)
+            val commAttrs = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build()
+
+            val monTrack = try {
+                AudioTrack.Builder()
+                    .setAudioAttributes(commAttrs)
+                    .setAudioFormat(audioFormat)
+                    .setBufferSizeInBytes(trackBufSize)
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .build()
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to build in-call monitor AudioTrack", e)
+                null
+            }
+
+            if (monTrack != null && monTrack.state == AudioTrack.STATE_INITIALIZED) {
+                try { monTrack.setVolume(0.92f) } catch (_: Exception) {}
+                monitorAudioTrack = monTrack
+                Log.i(TAG, "Speech Jammer in-call monitor track initialized @ 16kHz for local earpiece/speaker")
+            }
+        }
+
+        if (telephonyUplinkTrack == null && mediaMixerTrack == null && monitorAudioTrack == null) {
+            Log.e(TAG, "All AudioTracks failed to initialize")
+            record.release()
+            return false
         }
 
         // Reset buffer
@@ -260,10 +382,25 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
             writePos = 0
         }
 
-        // Start I/O
+        // Start I/O with pre-roll
+        val preRoll = ShortArray(512)
         try {
-            record.startRecording()
-            track.play()
+            telephonyUplinkTrack?.apply {
+                write(preRoll, 0, preRoll.size, AudioTrack.WRITE_NON_BLOCKING)
+                play()
+            }
+            mediaMixerTrack?.apply {
+                write(preRoll, 0, preRoll.size, AudioTrack.WRITE_NON_BLOCKING)
+                play()
+            }
+            monitorAudioTrack?.apply {
+                write(preRoll, 0, preRoll.size, AudioTrack.WRITE_NON_BLOCKING)
+                play()
+            }
+
+            if (record.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
+                record.startRecording()
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error starting AudioRecord/AudioTrack", e)
             stopJammer()
@@ -273,15 +410,15 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
         isRunning = true
         _isJammerActive.value = true
 
-        // Launch real-time DSP worker thread with realtime audio priority
+        // Launch real-time DSP worker thread with urgent audio priority
         processingThread = Thread({
             Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
-            runDafDspLoop(record, track)
+            runDafDspLoop(record)
         }, "SpeechJammerDspThread").apply {
             start()
         }
 
-        Log.i(TAG, "Speech Jammer running with real-time DSP thread")
+        Log.i(TAG, "Speech Jammer running with active multi-destination real-time DSP pipeline")
         return true
     }
 
@@ -311,25 +448,49 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
         audioRecord = null
 
         try {
-            audioTrack?.apply {
+            telephonyUplinkTrack?.apply {
                 stop()
                 release()
             }
         } catch (_: Exception) {}
-        audioTrack = null
+        telephonyUplinkTrack = null
 
         try {
-            localMonitorTrack?.apply {
+            mediaMixerTrack?.apply {
                 stop()
                 release()
             }
         } catch (_: Exception) {}
-        localMonitorTrack = null
+        mediaMixerTrack = null
+
+        try {
+            monitorAudioTrack?.apply {
+                stop()
+                release()
+            }
+        } catch (_: Exception) {}
+        monitorAudioTrack = null
 
         try {
             echoCanceler?.release()
         } catch (_: Exception) {}
         echoCanceler = null
+
+        if (originalMediaVolume >= 0) {
+            try {
+                val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                audioManager?.setStreamVolume(AudioManager.STREAM_MUSIC, originalMediaVolume, 0)
+            } catch (_: Exception) {}
+            originalMediaVolume = -1
+        }
+
+        if (originalVoiceVolume >= 0) {
+            try {
+                val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                audioManager?.setStreamVolume(AudioManager.STREAM_VOICE_CALL, originalVoiceVolume, 0)
+            } catch (_: Exception) {}
+            originalVoiceVolume = -1
+        }
 
         if (!isTestMode) {
             restoreInCallHardwareMixers()
@@ -337,144 +498,359 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
     }
 
     /**
-     * Real-time DSP audio loop: reads caller audio, buffers with DAF delay,
-     * amplifies formants, and writes directly into uplink.
+     * Real-time DSP audio loop: reads audio (remote caller + mic), applies DAF delay
+     * or recursive multi-tap cathedral echo, bandpass filters to isolate vocal formants,
+     * and streams boosted audio into in-call uplink (telephony & ALSA) and local monitor.
      */
-    private fun runDafDspLoop(record: AudioRecord, track: AudioTrack) {
+    private fun runDafDspLoop(record: AudioRecord) {
         val chunkSize = 256 // 16ms chunk size @ 16kHz
         val inShorts = ShortArray(chunkSize)
         val outShorts = ShortArray(chunkSize)
+        val inFloats = FloatArray(chunkSize)
+        val outFloats = FloatArray(chunkSize)
 
+        // Bandpass Filter States:
+        // 1. High-Pass Filter @ ~80 Hz: removes DC bias, handling thumps, AC mains hum
+        var hpfPrevIn = 0.0f
+        var hpfPrevOut = 0.0f
+        val hpfAlpha = 0.968f
+
+        // 2. Low-Pass Filter @ ~4200 Hz: keeps speech crisp while eliminating ultrasonic quantization noise
+        var lpfPrevOut = 0.0f
+        val lpfAlpha = 0.62f
+
+        // Echo feedback damping filter state (1st-order IIR warm low-pass)
+        var prevEchoDamped = 0.0f
+
+        // VAD & AGC
+        var rollingSpeechPeak = 0.25f
         var smoothLevel = 0.0f
 
         while (isRunning && !Thread.currentThread().isInterrupted) {
             val readCount = record.read(inShorts, 0, chunkSize)
-            if (readCount <= 0) continue
-
-            // 0. Stream real-time caller voice (0ms latency) directly to user's local ear/speaker!
-            if (!isTestMode) {
-                localMonitorTrack?.write(inShorts, 0, readCount)
+            if (readCount <= 0) {
+                if (readCount < 0) {
+                    try { Thread.sleep(10) } catch (_: InterruptedException) { break }
+                }
+                continue
             }
 
+            val currentMode = mode
             val gain = intensityGain
             val currentDelay = delaySamples
-            var chunkEnergy = 0.0f
+            val decay = echoDecay
+
+            // -----------------------------------------------------------------
+            // Step 1: Bandpass Filter (80Hz HPF + 4200Hz LPF) & Energy Calculation
+            // -----------------------------------------------------------------
+            var chunkEnergySum = 0.0f
+            var chunkMaxAbs = 0.0f
 
             for (i in 0 until readCount) {
-                val inputSample = inShorts[i].toFloat() / 32768.0f
-                val absVal = abs(inputSample)
-                if (absVal > chunkEnergy) chunkEnergy = absVal
+                val rawSample = inShorts[i].toFloat() / 32768.0f
 
-                // 1. Write current input into circular delay line
-                ringBuffer[writePos] = inputSample
+                // 1st-order High-Pass Filter @ ~80 Hz
+                val hpfOut = hpfAlpha * (hpfPrevOut + rawSample - hpfPrevIn)
+                hpfPrevIn = rawSample
+                hpfPrevOut = hpfOut
 
-                // 2. Read delayed sample from DAF delay tap
-                val readPos = (writePos - currentDelay) and ringBufferMask
-                val delayedSample = ringBuffer[readPos]
+                // 1st-order Low-Pass Filter @ ~4200 Hz
+                val lpfOut = lpfPrevOut + lpfAlpha * (hpfOut - lpfPrevOut)
+                lpfPrevOut = lpfOut
 
-                // Advance write head
-                writePos = (writePos + 1) and ringBufferMask
-
-                // 3. Nonlinear Soft-Limiter / Acoustic Amplification (tanh curve)
-                // Boost caller's voice so it penetrates bone conduction without harsh digital clipping
-                val amplified = delayedSample * gain
-                val compressed = tanh(amplified.toDouble()).toFloat()
-
-                outShorts[i] = (compressed * 32767.0f).toInt().coerceIn(-32768, 32767).toShort()
+                inFloats[i] = lpfOut
+                val absVal = abs(lpfOut)
+                chunkEnergySum += lpfOut * lpfOut
+                if (absVal > chunkMaxAbs) chunkMaxAbs = absVal
             }
 
-            // Write delayed audio to output stream
-            track.write(outShorts, 0, readCount)
+            val chunkRms = sqrt(chunkEnergySum / readCount)
 
-            // Update live UI disruption level
-            smoothLevel = smoothLevel * 0.75f + chunkEnergy * 0.25f
+            // Dynamic AGC tracking for speech peaks
+            if (chunkMaxAbs > 0.015f) {
+                rollingSpeechPeak = rollingSpeechPeak * 0.90f + chunkMaxAbs * 0.10f
+                rollingSpeechPeak = rollingSpeechPeak.coerceIn(0.10f, 0.90f)
+            } else {
+                rollingSpeechPeak = max(rollingSpeechPeak * 0.999f, 0.12f)
+            }
+
+            // Studio AGC makeup gain clamped to [1.0f, 2.5f]
+            val agcGain = (0.78f / rollingSpeechPeak).coerceIn(1.0f, 2.5f)
+
+            // -----------------------------------------------------------------
+            // Step 2: DSP Processing per Mode
+            // -----------------------------------------------------------------
+            var outEnergySum = 0.0f
+
+            for (i in 0 until readCount) {
+                val sampleIn = inFloats[i]
+
+                if (currentMode == JammerMode.INFINITE_ECHO) {
+                    // INFINITE ECHO CHAMBER: Multi-tap recursive feedback
+                    val tap1Delay = currentDelay.coerceIn(800, 4800)
+                    val tap2Delay = (currentDelay * 1.65f).toInt().coerceIn(1300, 8000)
+                    val tap3Delay = (currentDelay * 2.35f).toInt().coerceIn(1850, 11500)
+
+                    val s1 = ringBuffer[(writePos - tap1Delay) and ringBufferMask]
+                    val s2 = ringBuffer[(writePos - tap2Delay) and ringBufferMask]
+                    val s3 = ringBuffer[(writePos - tap3Delay) and ringBufferMask]
+
+                    // Weighted multi-tap reflections
+                    val rawEcho = (s1 * 0.75f + s2 * 0.50f + s3 * 0.35f) * decay
+
+                    // 1st-order warm low-pass damping filter (simulates air absorption)
+                    prevEchoDamped = 0.80f * rawEcho + 0.20f * prevEchoDamped
+
+                    // Feedback into circular buffer: input + damped reflections
+                    val feedbackCoeff = (decay * 0.80f).coerceIn(0.35f, 0.85f)
+                    ringBuffer[writePos] = (sampleIn + prevEchoDamped * feedbackCoeff).coerceIn(-1.0f, 1.0f)
+                    writePos = (writePos + 1) and ringBufferMask
+
+                    // High-gain output amplification so caller hears every reflection crystal clear
+                    val outEcho = prevEchoDamped * (gain * 1.85f)
+                    val clampedOut = softKneeLimit(outEcho)
+
+                    outFloats[i] = clampedOut
+                    outShorts[i] = (clampedOut * 32767.0f).toInt().coerceIn(-32768, 32767).toShort()
+                    outEnergySum += clampedOut * clampedOut
+
+                } else {
+                    // DAF JAMMER: PUNCHY DELAYED AUDITORY FEEDBACK
+                    // Store input sample continuously in circular ring buffer
+                    ringBuffer[writePos] = sampleIn
+
+                    // Read from currentDelay samples ago
+                    val readPos = (writePos - currentDelay) and ringBufferMask
+                    val delayedSample = ringBuffer[readPos]
+                    writePos = (writePos + 1) and ringBufferMask
+
+                    // Dynamic amplification with AGC and user intensity gain
+                    val amplified = delayedSample * agcGain * (gain * 1.85f)
+                    val clampedOut = softKneeLimit(amplified)
+
+                    outFloats[i] = clampedOut
+                    outShorts[i] = (clampedOut * 32767.0f).toInt().coerceIn(-32768, 32767).toShort()
+                    outEnergySum += clampedOut * clampedOut
+                }
+            }
+
+            val chunkOutRms = sqrt(outEnergySum / readCount)
+
+            // -----------------------------------------------------------------
+            // Step 3: Non-Blocking Audio Output Stream to all active destination tracks
+            // -----------------------------------------------------------------
+            try {
+                telephonyUplinkTrack?.write(outShorts, 0, readCount, AudioTrack.WRITE_NON_BLOCKING)
+            } catch (_: Exception) {}
+
+            try {
+                mediaMixerTrack?.write(outShorts, 0, readCount, AudioTrack.WRITE_NON_BLOCKING)
+            } catch (_: Exception) {}
+
+            try {
+                monitorAudioTrack?.write(outShorts, 0, readCount, AudioTrack.WRITE_NON_BLOCKING)
+            } catch (_: Exception) {}
+
+            // Update live UI disruption level for visual pulsating rings
+            val liveLevel = max(chunkRms, chunkOutRms)
+            smoothLevel = smoothLevel * 0.70f + liveLevel * 0.30f
             _liveDisruptionLevel.value = smoothLevel.coerceIn(0.0f, 1.0f)
         }
     }
 
-    private fun tryCreateAudioRecord(preferredSource: Int, bufferSize: Int): AudioRecord? {
-        val sources = intArrayOf(
-            preferredSource,
-            MediaRecorder.AudioSource.VOICE_DOWNLINK,
-            MediaRecorder.AudioSource.VOICE_CALL,
-            MediaRecorder.AudioSource.VOICE_COMMUNICATION,
-            MediaRecorder.AudioSource.MIC
-        )
+    /**
+     * Professional broadcast soft-knee limiter.
+     * Preserves linear transparency up to 0.65 full scale, smoothly compressing
+     * louder peaks above 0.65 to prevent harsh digital clipping.
+     */
+    private fun softKneeLimit(x: Float): Float {
+        val absX = abs(x)
+        val knee = 0.65f
+        val limit = 0.95f
+        if (absX <= knee) return x
+        val excess = absX - knee
+        val compressed = knee + (excess * (limit - knee)) / (excess + (limit - knee))
+        return if (x >= 0.0f) compressed.coerceAtMost(limit) else -compressed.coerceAtMost(limit)
+    }
 
-        for (src in sources.distinct()) {
+    /**
+     * Initializes AudioRecord cleanly, prioritizing VOICE_CALL and VOICE_DOWNLINK for true two-way capture.
+     * Does NOT stop or break the AudioRecord instance prior to active streaming.
+     */
+    private fun createAudioRecord(bufferSize: Int): AudioRecord? {
+        val channelIn = AudioFormat.CHANNEL_IN_MONO
+        val encoding = AudioFormat.ENCODING_PCM_16BIT
+
+        val candidateSources = if (isTestMode) {
+            intArrayOf(
+                MediaRecorder.AudioSource.MIC,
+                MediaRecorder.AudioSource.VOICE_COMMUNICATION,
+                MediaRecorder.AudioSource.DEFAULT
+            )
+        } else {
+            intArrayOf(
+                MediaRecorder.AudioSource.VOICE_CALL,          // 1st: Both caller + user voice on cellular calls
+                MediaRecorder.AudioSource.VOICE_DOWNLINK,      // 2nd: Remote caller voice
+                MediaRecorder.AudioSource.VOICE_COMMUNICATION, // 3rd: Telecom voice communication
+                MediaRecorder.AudioSource.MIC,                  // 4th: Physical mic
+                MediaRecorder.AudioSource.DEFAULT              // 5th: Default mic
+            )
+        }
+
+        for (src in candidateSources) {
             try {
                 @SuppressLint("MissingPermission")
                 val record = AudioRecord(
                     src,
-                    SAMPLE_RATE,
-                    AudioFormat.CHANNEL_IN_MONO,
-                    AudioFormat.ENCODING_PCM_16BIT,
+                    DSP_SAMPLE_RATE,
+                    channelIn,
+                    encoding,
                     bufferSize
                 )
                 if (record.state == AudioRecord.STATE_INITIALIZED) {
-                    Log.i(TAG, "AudioRecord initialized using source=$src")
-                    return record
+                    try {
+                        if (record.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
+                            record.startRecording()
+                        }
+                        val testBuf = ShortArray(64)
+                        var testRead = -1
+                        for (attempt in 0..3) {
+                            testRead = record.read(testBuf, 0, testBuf.size)
+                            if (testRead > 0) break
+                            try { Thread.sleep(25) } catch (_: Exception) {}
+                        }
+                        if (testRead >= 0) {
+                            Log.i(TAG, "AudioRecord successfully verified & initialized with source=$src (readCount=$testRead)")
+                            return record
+                        } else {
+                            Log.w(TAG, "AudioRecord source=$src test read returned error $testRead")
+                            try { record.stop() } catch (_: Exception) {}
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "AudioRecord source=$src start test failed: ${e.message}")
+                    }
                 }
                 record.release()
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to initialize source=$src: ${e.message}")
+                Log.w(TAG, "AudioRecord source=$src failed initialization: ${e.message}")
             }
         }
+
+        Log.e(TAG, "Could not initialize any AudioRecord source for Speech Jammer")
         return null
     }
 
-    private fun unmaskInCallHardwareMixers() {
-        if (!RootPrivilegeManager.isRootAvailable()) return
-        scope.launch {
-            try {
-                val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-                audioManager?.setParameters("incall_music_enable=true")
-                audioManager?.setParameters("audio_capability=call_recording=1")
-                audioManager?.setParameters("voice_tx_mute=0")
-                audioManager?.setParameters("voice_tx_mute=false")
-                audioManager?.setParameters("voice_rx_mute=0")
-                audioManager?.setParameters("voice_rx_mute=false")
+    private fun unmaskInCallHardwareMixersSync() {
+        try {
+            val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            audioManager?.mode = AudioManager.MODE_IN_CALL
+            audioManager?.setParameters("incall_music_enable=true")
+            audioManager?.setParameters("incall_music_enable=1")
+            audioManager?.setParameters("audio_capability=call_recording=1")
+            audioManager?.setParameters("voice_tx_mute=0")
+            audioManager?.setParameters("voice_tx_mute=false")
+            audioManager?.setParameters("voice_rx_mute=0")
+            audioManager?.setParameters("voice_rx_mute=false")
+        } catch (_: Exception) {}
 
+        if (!RootPrivilegeManager.isRootAvailable()) return
+        try {
+            runBlocking(Dispatchers.IO) {
                 RootPrivilegeManager.executeSuCommand("""
-                    # 1. Route MultiMedia1 directly to Voice_Tx so the CALLER receives the delayed feedback!
-                    tinymix 'Voice_Tx Mixer MultiMedia1' 1 2>/dev/null || true
-                    tinymix 'Voice_Tx Mixer MultiMedia2' 1 2>/dev/null || true
+                    # 1. System permissions via root
+                    pm grant com.callscreener.app android.permission.CAPTURE_AUDIO_OUTPUT 2>/dev/null || true
+                    pm grant com.callscreener.app android.permission.MODIFY_AUDIO_ROUTING 2>/dev/null || true
+                    appops set com.callscreener.app RECORD_AUDIO allow 2>/dev/null || true
+                    appops set com.callscreener.app CAPTURE_AUDIO_OUTPUT allow 2>/dev/null || true
+
+                    # 2. Unmute cellular modem uplink completely across 4G/5G/VoLTE/VoWiFi
+                    cmd telecom set-call-muted false 2>/dev/null || true
+                    tinymix 'Voice Tx Mute' 0 2>/dev/null || true
+                    tinymix 'Voice Tx Device Mute' 0 2>/dev/null || true
+                    tinymix 'Voice Tx Volume' 100 2>/dev/null || true
+                    tinymix 'Voip Tx Mute' 0 2>/dev/null || true
+                    tinymix 'VoiceMMode1 Tx Mute' 0 2>/dev/null || true
+                    tinymix 'VoiceMMode2 Tx Mute' 0 2>/dev/null || true
+                    tinymix 'VoLTE Tx Mute' 0 2>/dev/null || true
+                    tinymix 'VoWIFI Tx Mute' 0 2>/dev/null || true
+
+                    # 3. Ensure physical mic is connected to Voice Tx (reversing any prior AI relay isolation)
+                    tinymix 'Voice_Tx Mixer TX_Voice' 1 2>/dev/null || true
+                    tinymix 'Voice_Tx Mixer SLIM_0_TX_Voice' 1 2>/dev/null || true
+                    tinymix 'Voice_Tx Mixer PRI_TX_Voice' 1 2>/dev/null || true
+                    tinymix 'Voice_Tx Mixer TERT_MI2S_TX_Voice' 1 2>/dev/null || true
+                    tinymix 'Voice_Tx Mixer TX_CDC_DMA_TX_3' 1 2>/dev/null || true
+                    tinymix 'Voice_Tx Mixer SLIM_0_TX' 1 2>/dev/null || true
+                    tinymix 'Voice_Tx Mixer AFE_PCM_TX' 1 2>/dev/null || true
+
+                    # 4. Route Qualcomm audio streams into modem uplink (Voice_Tx, VoLTE, VoWIFI, VoiceMMode1/2)
                     tinymix 'Incall_Music Audio Mixer MultiMedia1' 1 2>/dev/null || true
                     tinymix 'Incall_Music Audio Mixer MultiMedia2' 1 2>/dev/null || true
                     tinymix 'Incall_Music_2 Audio Mixer MultiMedia1' 1 2>/dev/null || true
+                    tinymix 'Incall_Music_2 Audio Mixer MultiMedia2' 1 2>/dev/null || true
+                    tinymix 'Incall_Music Audio Mixer MultiMedia1 Volume' 100 2>/dev/null || true
+                    tinymix 'Incall_Music Audio Mixer MultiMedia2 Volume' 100 2>/dev/null || true
+                    tinymix 'Voice_Tx Mixer MultiMedia1' 1 2>/dev/null || true
+                    tinymix 'Voice_Tx Mixer MultiMedia2' 1 2>/dev/null || true
+                    tinymix 'VoiceMMode1_Tx Mixer MultiMedia1' 1 2>/dev/null || true
+                    tinymix 'VoiceMMode1_Tx Mixer MultiMedia2' 1 2>/dev/null || true
+                    tinymix 'VoiceMMode2_Tx Mixer MultiMedia1' 1 2>/dev/null || true
+                    tinymix 'VoiceMMode2_Tx Mixer MultiMedia2' 1 2>/dev/null || true
+                    tinymix 'VoLTE_Tx Mixer MultiMedia1' 1 2>/dev/null || true
+                    tinymix 'VoLTE_Tx Mixer MultiMedia2' 1 2>/dev/null || true
+                    tinymix 'VoWIFI_Tx Mixer MultiMedia1' 1 2>/dev/null || true
+                    tinymix 'VoWIFI_Tx Mixer MultiMedia2' 1 2>/dev/null || true
 
-                    # 2. Block MultiMedia1 from Voice_Rx so the USER does not hear the echo in their ear!
-                    tinymix 'Voice_Rx Audio Mixer MultiMedia1' 0 2>/dev/null || true
-                    tinymix 'Voice_Rx Audio Mixer MultiMedia2' 0 2>/dev/null || true
+                    # 5. MediaTek Dimensity in-call playback routing
+                    tinymix 'Audio_Incall_Playback' 1 2>/dev/null || true
+                    tinymix 'Incall_Playback' 1 2>/dev/null || true
+                    tinymix 'Speech_MD_Tx' 1 2>/dev/null || true
+                    tinymix 'Speech_Tx' 1 2>/dev/null || true
+                    tinymix 'Audio_Incall_Playback_DL' 1 2>/dev/null || true
 
-                    # 3. Ensure Voice_Tx is completely unmuted for uplink to caller
-                    tinymix 'Voice Tx Mute' 0 2>/dev/null || true
-                    tinymix 'Voice Tx Device Mute' 0 2>/dev/null || true
-
-                    # 4. Ensure Voice_Rx is unmuted so user hears caller voice
-                    tinymix 'Voice Rx Mute' 0 2>/dev/null || true
-                    tinymix 'Voice Rx Device Mute' 0 2>/dev/null || true
+                    # 6. Google Tensor / Samsung Exynos modem in-call uplink
+                    tinymix 'Voice Call Uplink' 1 2>/dev/null || true
+                    tinymix 'Voice Tx' 1 2>/dev/null || true
+                    tinymix 'Uplink Mute' 0 2>/dev/null || true
+                    tinymix 'Playback Incall Music' 1 2>/dev/null || true
+                    tinymix 'Incall Playback' 1 2>/dev/null || true
+                    tinymix 'Incall_Music' 1 2>/dev/null || true
+                    tinymix 'Media_Tx' 1 2>/dev/null || true
                 """.trimIndent())
-                Log.i(TAG, "Unmasked Voice_Tx ALSA mixers for Speech Jammer uplink and unmuted Voice_Rx")
-            } catch (e: Exception) {
-                Log.w(TAG, "Root hardware mixer unmask notice: ${e.message}")
             }
+            Log.i(TAG, "Unmasked modem uplink ALSA mixers synchronously for Speech Jammer")
+        } catch (e: Exception) {
+            Log.w(TAG, "Root hardware mixer unmask notice: ${e.message}")
         }
     }
 
     private fun restoreInCallHardwareMixers() {
         if (!RootPrivilegeManager.isRootAvailable()) return
-        scope.launch {
+        scope.launch(Dispatchers.IO) {
             try {
                 RootPrivilegeManager.executeSuCommand("""
                     tinymix 'Voice_Tx Mixer MultiMedia1' 0 2>/dev/null || true
                     tinymix 'Voice_Tx Mixer MultiMedia2' 0 2>/dev/null || true
+                    tinymix 'VoiceMMode1_Tx Mixer MultiMedia1' 0 2>/dev/null || true
+                    tinymix 'VoiceMMode1_Tx Mixer MultiMedia2' 0 2>/dev/null || true
+                    tinymix 'VoiceMMode2_Tx Mixer MultiMedia1' 0 2>/dev/null || true
+                    tinymix 'VoiceMMode2_Tx Mixer MultiMedia2' 0 2>/dev/null || true
+                    tinymix 'VoLTE_Tx Mixer MultiMedia1' 0 2>/dev/null || true
+                    tinymix 'VoLTE_Tx Mixer MultiMedia2' 0 2>/dev/null || true
+                    tinymix 'VoWIFI_Tx Mixer MultiMedia1' 0 2>/dev/null || true
+                    tinymix 'VoWIFI_Tx Mixer MultiMedia2' 0 2>/dev/null || true
                     tinymix 'Incall_Music Audio Mixer MultiMedia1' 0 2>/dev/null || true
                     tinymix 'Incall_Music Audio Mixer MultiMedia2' 0 2>/dev/null || true
+                    tinymix 'Incall_Music_2 Audio Mixer MultiMedia1' 0 2>/dev/null || true
+                    tinymix 'Audio_Incall_Playback' 0 2>/dev/null || true
+                    tinymix 'Incall_Playback' 0 2>/dev/null || true
+                    tinymix 'Audio_Incall_Playback_DL' 0 2>/dev/null || true
+                    tinymix 'Voice Call Uplink' 0 2>/dev/null || true
+                    tinymix 'Playback Incall Music' 0 2>/dev/null || true
+                    tinymix 'Media_Tx' 0 2>/dev/null || true
                 """.trimIndent())
                 Log.i(TAG, "Restored normal in-call ALSA mixers")
             } catch (_: Exception) {}
         }
     }
 }
-

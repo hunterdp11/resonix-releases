@@ -17,8 +17,9 @@ class CallNotificationReceiver : BroadcastReceiver() {
 
         val sessionManager = CallSessionManager.getInstance(context.applicationContext)
 
-        // Always stop ringtone on explicit user interaction from notification
+        // Always stop ringtone and dismiss any active floating capsule on explicit user interaction
         RingtonePlayer.stop(context.applicationContext)
+        com.callscreener.app.ui.overlay.DynamicCallCapsuleManager.dismissCapsule()
 
         when (action) {
             ACTION_DECLINE -> {

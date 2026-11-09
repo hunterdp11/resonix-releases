@@ -79,6 +79,44 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
         applyVoiceForPersona(persona)
     }
 
+    private fun applyVoiceForText(text: String, persona: VoicePersona) {
+        val tts = textToSpeech ?: return
+        tts.setPitch(persona.pitch)
+        tts.setSpeechRate(persona.speed)
+
+        try {
+            val hasDevanagari = text.any { it in '\u0900'..'\u097F' }
+            val hasBengaliAssamese = text.any { it in '\u0980'..'\u09FF' }
+
+            if (hasDevanagari) {
+                tts.setLanguage(Locale("hi", "IN"))
+                val available = tts.voices
+                val hindiVoice = available?.filter { it.locale.language.equals("hi", ignoreCase = true) }
+                    ?.firstOrNull { isFemaleVoiceName(it.name.lowercase()) }
+                    ?: available?.firstOrNull { it.locale.language.equals("hi", ignoreCase = true) }
+                if (hindiVoice != null) tts.voice = hindiVoice
+                return
+            } else if (hasBengaliAssamese) {
+                var res = tts.setLanguage(Locale("as", "IN"))
+                if (res == TextToSpeech.LANG_MISSING_DATA || res == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    res = tts.setLanguage(Locale("bn", "IN"))
+                }
+                if (res != TextToSpeech.LANG_MISSING_DATA && res != TextToSpeech.LANG_NOT_SUPPORTED) {
+                    val available = tts.voices
+                    val indicVoice = available?.firstOrNull { it.locale.language.equals("as", ignoreCase = true) || it.locale.language.equals("bn", ignoreCase = true) }
+                    if (indicVoice != null) tts.voice = indicVoice
+                    return
+                }
+            }
+
+            // Default to configured persona
+            applyVoiceForPersona(persona)
+        } catch (e: Exception) {
+            Log.w(TAG, "Error in applyVoiceForText", e)
+            applyVoiceForPersona(persona)
+        }
+    }
+
     private fun applyVoiceForPersona(persona: VoicePersona) {
         val tts = textToSpeech ?: return
         tts.setPitch(persona.pitch) // 1.0f for natural, human sound
@@ -246,11 +284,6 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
                             return
                         }
                         _isSpeaking.value = true
-                        if (!isSimulatorMode) {
-                            try {
-                                CallScreeningInCallService.setCallMute(true)
-                            } catch (_: Exception) {}
-                        }
                     }
 
                     override fun onDone(utteranceId: String?) {
@@ -329,7 +362,7 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
         _isSpeaking.value = true
         scope.launch {
             try {
-                applyVoiceForPersona(_activePersona.value)
+                applyVoiceForText(processedText, _activePersona.value)
 
                 val tts = textToSpeech
                 if (tts == null) {
@@ -549,7 +582,7 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
         }
 
         // Re-apply persona voice and calibrated masculine/feminine pitch so it is never overridden
-        applyVoiceForPersona(_activePersona.value)
+        applyVoiceForText(text, _activePersona.value)
 
         val result = textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
         Log.i(TAG, "TTS speakInternal() isSimulated=$isSimulated, stream=$stream, result=$result for text: '$text'")

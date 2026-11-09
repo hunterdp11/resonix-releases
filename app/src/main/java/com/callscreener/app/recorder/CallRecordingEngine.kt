@@ -163,8 +163,8 @@ class CallRecordingEngine(private val context: Context) {
     }
 
     /**
-     * Unmask hardware in-call mixer controls via root for Qualcomm & MediaTek chipsets
-     * so that the call's audio downlink (remote party) routes directly to the recording buffer!
+     * Configure hardware in-call parameters via root for Qualcomm & MediaTek chipsets
+     * so that the call's audio downlink (remote party) routes directly to the recording buffer.
      */
     private suspend fun unmaskRootAudioMixer(isSimulated: Boolean) {
         if (isSimulated) return
@@ -174,21 +174,9 @@ class CallRecordingEngine(private val context: Context) {
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
             audioManager?.setParameters("audio_capability=call_recording=1")
             audioManager?.setParameters("incall_music_enable=true")
-
-            val script = """
-                # Unmask in-call RX and TX mixers for clear 2-way call audio capture
-                tinymix 'Incall_Music Audio Mixer MultiMedia1' 1 2>/dev/null || true
-                tinymix 'Voice_Tx Mixer MultiMedia1' 1 2>/dev/null || true
-                tinymix 'Voice_Rx Mixer MultiMedia1' 1 2>/dev/null || true
-                tinymix 'AFE_PCM_RX Audio Mixer MultiMedia1' 1 2>/dev/null || true
-                tinymix 'PRI_MI2S_RX Audio Mixer MultiMedia1' 1 2>/dev/null || true
-                tinymix 'TERT_MI2S_RX Audio Mixer MultiMedia1' 1 2>/dev/null || true
-                tinymix 'SLIM_0_RX Audio Mixer MultiMedia1' 1 2>/dev/null || true
-            """.trimIndent()
-            RootPrivilegeManager.executeSuCommand(script)
-            Log.i(TAG, "Root dual-side audio mixer routing enabled")
+            Log.i(TAG, "Root dual-side audio parameters configured")
         } catch (e: Exception) {
-            Log.w(TAG, "Could not unmask root audio mixer controls", e)
+            Log.w(TAG, "Could not set root audio recording parameters", e)
         }
     }
 

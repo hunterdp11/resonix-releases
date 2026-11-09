@@ -22,7 +22,7 @@ data class CallSessionState(
     val callerName: String? = null,
     val isIncoming: Boolean = true,
     val durationSeconds: Long = 0L,
-    val isSpeakerOn: Boolean = true,
+    val isSpeakerOn: Boolean = false,
     val isMuted: Boolean = false,
     val isTtsSpeaking: Boolean = false,
     val currentPersona: VoicePersona = VoicePersona.DEFAULT,

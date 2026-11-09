@@ -37,6 +37,7 @@ class ScreeningCallActivity : ComponentActivity() {
         insets.isAppearanceLightNavigationBars = false
 
         sessionManager = CallSessionManager.getInstance(this)
+        com.callscreener.app.ui.overlay.DynamicCallCapsuleManager.dismissCapsule()
 
         configureLockScreenDisplay()
 

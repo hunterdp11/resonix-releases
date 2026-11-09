@@ -4,6 +4,8 @@ import android.Manifest
 import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -19,6 +21,7 @@ import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -51,15 +54,27 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.material.icons.rounded.AddAPhoto
+import androidx.compose.material.icons.rounded.CameraAlt
+import com.callscreener.app.data.rememberContactPhotoBitmap
+import com.callscreener.app.data.CallerProfileManager
+import com.callscreener.app.data.CallerProfile
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -96,13 +111,16 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.Backspace
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallMade
@@ -119,7 +137,9 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.Chat
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
@@ -168,10 +188,22 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.People
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Voicemail
+import kotlin.math.absoluteValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
@@ -221,6 +253,9 @@ import com.callscreener.app.ui.theme.TextPrimary
 import com.callscreener.app.ui.theme.TextSecondary
 import com.callscreener.app.ui.theme.TextTertiary
 import com.callscreener.app.ui.theme.GlassBackground
+import com.callscreener.app.ui.theme.GoogleSans
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -229,6 +264,8 @@ import com.callscreener.app.data.ContactItem
 import com.callscreener.app.data.DialerRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
 
@@ -429,8 +466,8 @@ fun MainDashboard(
     var selectedPersona by remember { mutableStateOf(VoicePersona.DEFAULT) }
     var isLiveMicActive by remember { mutableStateOf(false) }
 
-    var contacts by remember { mutableStateOf<List<ContactItem>>(emptyList()) }
-    var callLogs by remember { mutableStateOf<List<CallLogItem>>(emptyList()) }
+    var contacts by remember { mutableStateOf(DialerRepository.getCachedContacts(context)) }
+    var callLogs by remember { mutableStateOf(DialerRepository.getCachedCallLogs(context)) }
     var isLoadingContacts by remember { mutableStateOf(false) }
     var isLoadingLogs by remember { mutableStateOf(false) }
     var permissionTrigger by remember { mutableStateOf(0) }
@@ -452,17 +489,23 @@ fun MainDashboard(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             requiredPerms.add(Manifest.permission.POST_NOTIFICATIONS)
         }
-        permissionLauncher.launch(requiredPerms.toTypedArray())
+        val allGranted = requiredPerms.all {
+            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+        }
+        if (!allGranted) {
+            permissionLauncher.launch(requiredPerms.toTypedArray())
+        }
     }
 
     LaunchedEffect(permissionTrigger) {
-        isLoadingContacts = true
-        contacts = DialerRepository.loadContacts(context)
-        isLoadingContacts = false
-
-        isLoadingLogs = true
-        callLogs = DialerRepository.loadCallLogs(context, contacts)
-        isLoadingLogs = false
+        withContext(Dispatchers.IO) {
+            val freshContacts = DialerRepository.loadContacts(context)
+            val freshLogs = DialerRepository.loadCallLogs(context, freshContacts)
+            withContext(Dispatchers.Main) {
+                contacts = freshContacts
+                callLogs = freshLogs
+            }
+        }
     }
 
     var selectedContactForDetails by remember { mutableStateOf<ContactItem?>(null) }
@@ -470,13 +513,25 @@ fun MainDashboard(
     var isPresetManagerOpen by remember { mutableStateOf(false) }
     val presets by sessionManager.presetManager.presets.collectAsState()
 
+    val monetColors: ColorScheme = remember(context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                dynamicDarkColorScheme(context)
+            } catch (_: Exception) {
+                getPixelMonetDarkColorScheme()
+            }
+        } else {
+            getPixelMonetDarkColorScheme()
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF000000))
+            .background(monetColors.surface)
     ) {
-        // Pure Static Minimalist Obsidian Backdrop
-        AppleLiquidBackdrop()
+        // Material You Dynamic Backdrop
+        PixelLiquidBackdrop(monetColors = monetColors)
 
         // Tab Content extending full edge-to-edge behind floating dock
         Box(
@@ -485,74 +540,30 @@ fun MainDashboard(
             AnimatedContent(
                 targetState = currentTab,
                 transitionSpec = {
-                    val fromIndex = initialState.ordinal
-                    val toIndex = targetState.ordinal
-                    val isForward = toIndex > fromIndex
-                    if (isForward) {
-                        (slideInHorizontally(
+                    val isForward = targetState.ordinal > initialState.ordinal
+                    (fadeIn(
+                        animationSpec = tween(durationMillis = 180)
+                    ) + slideInHorizontally(
+                        animationSpec = spring(
+                            dampingRatio = 0.85f,
+                            stiffness = Spring.StiffnessMediumLow
+                        ),
+                        initialOffsetX = { fullWidth ->
+                            if (isForward) fullWidth / 8 else -fullWidth / 8
+                        }
+                    )).togetherWith(
+                        fadeOut(
+                            animationSpec = tween(durationMillis = 100)
+                        ) + slideOutHorizontally(
                             animationSpec = spring(
                                 dampingRatio = 0.85f,
                                 stiffness = Spring.StiffnessMediumLow
                             ),
-                            initialOffsetX = { fullWidth -> (fullWidth * 0.16f).toInt() }
-                        ) + fadeIn(
-                            animationSpec = tween(220, easing = LinearOutSlowInEasing)
-                        ) + scaleIn(
-                            initialScale = 0.97f,
-                            animationSpec = spring(
-                                dampingRatio = 0.85f,
-                                stiffness = Spring.StiffnessMediumLow
-                            )
-                        )).togetherWith(
-                            slideOutHorizontally(
-                                animationSpec = spring(
-                                    dampingRatio = 0.85f,
-                                    stiffness = Spring.StiffnessMediumLow
-                                ),
-                                targetOffsetX = { fullWidth -> (-fullWidth * 0.16f).toInt() }
-                            ) + fadeOut(
-                                animationSpec = tween(180, easing = FastOutLinearInEasing)
-                            ) + scaleOut(
-                                targetScale = 0.97f,
-                                animationSpec = spring(
-                                    dampingRatio = 0.85f,
-                                    stiffness = Spring.StiffnessMediumLow
-                                )
-                            )
+                            targetOffsetX = { fullWidth ->
+                                if (isForward) -fullWidth / 8 else fullWidth / 8
+                            }
                         )
-                    } else {
-                        (slideInHorizontally(
-                            animationSpec = spring(
-                                dampingRatio = 0.85f,
-                                stiffness = Spring.StiffnessMediumLow
-                            ),
-                            initialOffsetX = { fullWidth -> (-fullWidth * 0.16f).toInt() }
-                        ) + fadeIn(
-                            animationSpec = tween(220, easing = LinearOutSlowInEasing)
-                        ) + scaleIn(
-                            initialScale = 0.97f,
-                            animationSpec = spring(
-                                dampingRatio = 0.85f,
-                                stiffness = Spring.StiffnessMediumLow
-                            )
-                        )).togetherWith(
-                            slideOutHorizontally(
-                                animationSpec = spring(
-                                    dampingRatio = 0.85f,
-                                    stiffness = Spring.StiffnessMediumLow
-                                ),
-                                targetOffsetX = { fullWidth -> (fullWidth * 0.16f).toInt() }
-                            ) + fadeOut(
-                                animationSpec = tween(180, easing = FastOutLinearInEasing)
-                            ) + scaleOut(
-                                targetScale = 0.97f,
-                                animationSpec = spring(
-                                    dampingRatio = 0.85f,
-                                    stiffness = Spring.StiffnessMediumLow
-                                )
-                            )
-                        )
-                    }
+                    )
                 },
                 label = "MainTabTransition",
                 modifier = Modifier.fillMaxSize()
@@ -577,6 +588,7 @@ fun MainDashboard(
                     )
                     DialerTab.CONTACTS -> ContactsScreen(
                         contacts = contacts,
+                        callLogs = callLogs,
                         isLoading = isLoadingContacts,
                         onCall = { number -> DialerRepository.placeCall(context, number) },
                         onOpenDetails = { contact -> selectedContactForDetails = contact },
@@ -607,10 +619,11 @@ fun MainDashboard(
             }
         }
 
-        // Static Premium Minimalist Floating Navigation Bar
+        // Google Pixel Material You Dynamic Floating Dock Bar
         LiquidGlassBottomBar(
             currentTab = currentTab,
             onTabSelected = { currentTab = it },
+            monetColors = monetColors,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
@@ -665,6 +678,7 @@ fun MainDashboard(
                 onToggleHideNumber = { sessionManager.setHideNumberEnabled(it) },
                 isAutoRecordEnabled = sessionState.isAutoRecordEnabled,
                 onToggleAutoRecord = { sessionManager.setAutoRecordEnabled(it) },
+                callLogs = callLogs,
                 onDismiss = { isSettingsOpen = false }
             )
         }
@@ -681,67 +695,59 @@ fun MainDashboard(
 }
 
 /**
- * Static Minimalist Obsidian Backdrop:
- * Deep, pure OLED black (#000000) with a whisper-soft static titanium gradient at the top.
- * Completely static, zero animated blur/waves, 100% minimalist luxury.
+ * Google Pixel Material You Dynamic Backdrop:
+ * Cohesive dynamic Monet surface with subtle ambient top radiance.
+ * Edge-to-edge, seamlessly unified with no black voids or harsh cutoffs.
  */
 @Composable
-fun AppleLiquidBackdrop() {
+fun PixelLiquidBackdrop(monetColors: ColorScheme) {
     Canvas(modifier = Modifier.fillMaxSize()) {
-        val width = size.width
         val height = size.height
 
-        // 1. Pure OLED Obsidian Black Base
-        drawRect(color = Color(0xFF000000))
+        // 1. Dynamic Monet Surface Base
+        drawRect(color = monetColors.surface)
 
-        // 2. Subtle Static Top Status Bar Titanium Sheen
+        // 2. Subtle Static Top Status Bar Ambient Sheen
         drawRect(
             brush = Brush.verticalGradient(
                 listOf(
-                    Color(0xFF141822),
-                    Color(0xFF090C10),
-                    Color(0xFF000000)
-                ),
-                startY = 0f,
-                endY = height * 0.28f
-            )
-        )
-
-        // 3. Subtle Static Top Radiance
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    Color(0x101E293B),
+                    monetColors.surfaceContainerHigh.copy(alpha = 0.45f),
+                    monetColors.surfaceContainer.copy(alpha = 0.2f),
                     Color.Transparent
                 ),
-                center = Offset(width * 0.5f, height * 0.08f),
-                radius = width * 0.85f
+                startY = 0f,
+                endY = height * 0.25f
             )
         )
     }
 }
 
 /**
- * Static Premium Minimalist Floating Navigation Bar:
- * - Completely static, zero runtime blur/haze overhead
- * - Clean obsidian titanium finish with hairline border and soft depth shadow
- * - Sleek, quiet sliding active indicator pill with spring physics
- * - Minimalist luxury icons and typography
+ * Google Pixel Expressive / Material You Floating Dock Navigation Bar:
+ * - Authentic Pixel Material 3 Expressive design inspired by Google Phone (dial)
+ * - Dynamic Material You Monet colors (surfaceContainer, secondaryContainer, onSecondaryContainer)
+ * - Active pill indicator (58dp x 32dp capsule) behind the active tab icon
+ * - Expressive iconography (History, People, Dialpad, AutoAwesome Gemini Sparkles)
+ * - Fluid gestural swipe/scrubbing across tabs with real-time finger tracking, dynamic liquid pill expansion,
+ *   crisp boundary-crossing haptics, and seamless release commitment
+ * - Concentric, mathematically balanced layout with Google Sans typography
  */
 @Composable
 fun LiquidGlassBottomBar(
     currentTab: DialerTab,
     onTabSelected: (DialerTab) -> Unit,
+    monetColors: ColorScheme,
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
+    val density = LocalDensity.current
 
     val tabs = remember {
         listOf(
-            Triple(DialerTab.RECENTS, Icons.Rounded.Schedule, "Recents"),
-            Triple(DialerTab.CONTACTS, Icons.Rounded.Person, "Contacts"),
+            Triple(DialerTab.RECENTS, Icons.Rounded.History, "Recents"),
+            Triple(DialerTab.CONTACTS, Icons.Rounded.People, "Contacts"),
             Triple(DialerTab.KEYPAD, Icons.Rounded.Dialpad, "Keypad"),
-            Triple(DialerTab.ASSISTANT, Icons.Rounded.GraphicEq, "Assistant")
+            Triple(DialerTab.ASSISTANT, Icons.Rounded.AutoAwesome, "Assistant")
         )
     }
 
@@ -752,39 +758,44 @@ fun LiquidGlassBottomBar(
         DialerTab.ASSISTANT -> 3
     }
 
-    // Static Obsidian Titanium Capsule
+    var isSwiping by remember { mutableStateOf(false) }
+    var swipeOffsetPx by remember { mutableFloatStateOf(0f) }
+    var hoveredIndex by remember { mutableIntStateOf(selectedIndex) }
+
+    LaunchedEffect(selectedIndex) {
+        if (!isSwiping) {
+            hoveredIndex = selectedIndex
+        }
+    }
+
+    // Outer Floating Material You Capsule Dock Container
     Box(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp)
+            .widthIn(max = 410.dp)
             .shadow(
-                elevation = 16.dp,
+                elevation = 12.dp,
                 shape = RoundedCornerShape(32.dp),
-                spotColor = Color(0x90000000),
-                ambientColor = Color(0x40000000)
+                spotColor = Color(0x55000000),
+                ambientColor = Color(0x22000000)
             )
             .clip(RoundedCornerShape(32.dp))
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        Color(0xF51A1F2C),
-                        Color(0xFA11141E)
+                        monetColors.surfaceContainerHigh.copy(alpha = 0.94f),
+                        monetColors.surfaceContainer.copy(alpha = 0.98f)
                     )
                 )
             )
             .border(
                 width = 1.dp,
-                brush = Brush.verticalGradient(
-                    listOf(
-                        Color(0x35FFFFFF),
-                        Color(0x10FFFFFF),
-                        Color(0x20FFFFFF)
-                    )
-                ),
+                color = monetColors.outlineVariant.copy(alpha = 0.35f),
                 shape = RoundedCornerShape(32.dp)
             )
     ) {
-        // Subtle top highlight hairline
+        // Subtle top specular hairline
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -793,95 +804,201 @@ fun LiquidGlassBottomBar(
                     Brush.horizontalGradient(
                         listOf(
                             Color.Transparent,
-                            Color(0x30FFFFFF),
+                            monetColors.primary.copy(alpha = 0.28f),
                             Color.Transparent
                         )
                     )
                 )
         )
 
-        // Interactive Layer: Sliding Indicator Pill + Minimalist Tab Items
+        // Interactive Layer: Sliding Indicator Pill + Expressive Tab Items + Swipe/Scrub Gesture
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(66.dp)
-                .padding(horizontal = 4.dp, vertical = 5.dp)
+                .height(72.dp)
+                .padding(horizontal = 6.dp, vertical = 6.dp)
         ) {
-            val totalWidth = maxWidth
-            val tabWidth = totalWidth / 4
+            val totalWidthPx = constraints.maxWidth.toFloat()
+            val totalTabs = tabs.size
+            val tabWidthPx = totalWidthPx / totalTabs.toFloat()
 
-            val indicatorOffset by animateDpAsState(
-                targetValue = tabWidth * selectedIndex,
+            val standardPillWidthDp = 58.dp
+
+            val widthExpansion by animateDpAsState(
+                targetValue = if (isSwiping) 8.dp else 0.dp,
                 animationSpec = spring(
-                    dampingRatio = 0.85f,
+                    dampingRatio = 0.80f,
                     stiffness = Spring.StiffnessMediumLow
                 ),
+                label = "dockPillWidthExpansion"
+            )
+
+            val pillWidthDp = standardPillWidthDp + widthExpansion
+
+            // Center of the active tab
+            val targetCenterPx = if (isSwiping) {
+                swipeOffsetPx
+            } else {
+                tabWidthPx * (selectedIndex + 0.5f)
+            }
+
+            val targetLeftDp = with(density) {
+                (targetCenterPx - (with(density) { pillWidthDp.toPx() } / 2f)).toDp()
+            }
+
+            val indicatorOffset by animateDpAsState(
+                targetValue = targetLeftDp,
+                animationSpec = if (isSwiping) {
+                    spring(dampingRatio = 0.92f, stiffness = Spring.StiffnessHigh)
+                } else {
+                    spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
+                },
                 label = "dockIndicatorOffset"
             )
 
-            // Sleek Static Active Indicator Pill
+            // Sleek Material 3 Expressive Active Indicator Pill (centered behind the icon)
             Box(
                 modifier = Modifier
-                    .offset(x = indicatorOffset)
-                    .width(tabWidth)
-                    .fillMaxHeight()
-                    .padding(horizontal = 4.dp, vertical = 2.dp)
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(Color(0x1AFFFFFF))
-                    .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(22.dp))
+                    .offset {
+                        IntOffset(
+                            x = indicatorOffset.roundToPx(),
+                            y = with(density) { 5.dp.roundToPx() }
+                        )
+                    }
+                    .width(pillWidthDp)
+                    .height(32.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(monetColors.secondaryContainer)
+                    .border(
+                        width = 0.8.dp,
+                        color = monetColors.outlineVariant.copy(alpha = 0.25f),
+                        shape = RoundedCornerShape(16.dp)
+                    )
             )
 
-            // Tab Icons & Text centered in equal 4ths
+            // Tab Items Row (Concentric icons and typography with unified pointer gesture)
             Row(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(tabs) {
+                        val slop = viewConfiguration.touchSlop
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            var isDragging = false
+                            var currentX = down.position.x
+                            var currentHover = (currentX / tabWidthPx).toInt().coerceIn(0, totalTabs - 1)
+
+                            try {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+
+                                    if (change.pressed) {
+                                        val totalMovement = (change.position.x - down.position.x).absoluteValue
+                                        if (!isDragging && totalMovement > slop) {
+                                            isDragging = true
+                                            isSwiping = true
+                                        }
+
+                                        if (isDragging) {
+                                            change.consume()
+                                            currentX = change.position.x
+                                            swipeOffsetPx = currentX.coerceIn(
+                                                tabWidthPx * 0.5f,
+                                                totalWidthPx - tabWidthPx * 0.5f
+                                            )
+
+                                            val newHover = (currentX / tabWidthPx).toInt().coerceIn(0, totalTabs - 1)
+                                            if (newHover != currentHover) {
+                                                currentHover = newHover
+                                                hoveredIndex = newHover
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            }
+                                        }
+                                    } else {
+                                        // Pointer released
+                                        change.consume()
+                                        if (isDragging) {
+                                            isSwiping = false
+                                            val finalIndex = (currentX / tabWidthPx).toInt().coerceIn(0, totalTabs - 1)
+                                            hoveredIndex = finalIndex
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            onTabSelected(tabs[finalIndex].first)
+                                        } else {
+                                            // Quick tap
+                                            val tapIndex = (down.position.x / tabWidthPx).toInt().coerceIn(0, totalTabs - 1)
+                                            hoveredIndex = tapIndex
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            onTabSelected(tabs[tapIndex].first)
+                                        }
+                                        break
+                                    }
+                                }
+                            } finally {
+                                isSwiping = false
+                            }
+                        }
+                    },
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                tabs.forEach { (tab, icon, label) ->
-                    val isSelected = currentTab == tab
+                tabs.forEachIndexed { index, (_, icon, label) ->
+                    val isTargetActive = if (isSwiping) (hoveredIndex == index) else (selectedIndex == index)
+
                     val iconScale by animateFloatAsState(
-                        targetValue = if (isSelected) 1.05f else 0.94f,
-                        animationSpec = spring(dampingRatio = 0.75f),
-                        label = "tabIconScale"
+                        targetValue = if (isTargetActive) 1.08f else 0.94f,
+                        animationSpec = spring(
+                            dampingRatio = 0.78f,
+                            stiffness = Spring.StiffnessMediumLow
+                        ),
+                        label = "tabIconScale_$index"
                     )
-                    val contentColor by animateColorAsState(
-                        targetValue = if (isSelected) Color.White else Color(0x65FFFFFF),
-                        animationSpec = tween(durationMillis = 160),
-                        label = "tabContentColor"
+
+                    val iconTint by animateColorAsState(
+                        targetValue = if (isTargetActive) monetColors.onSecondaryContainer else monetColors.onSurfaceVariant.copy(alpha = 0.8f),
+                        animationSpec = tween(durationMillis = 150),
+                        label = "tabIconTint_$index"
                     )
+
+                    val labelColor by animateColorAsState(
+                        targetValue = if (isTargetActive) monetColors.onSurface else monetColors.onSurfaceVariant.copy(alpha = 0.75f),
+                        animationSpec = tween(durationMillis = 150),
+                        label = "tabLabelColor_$index"
+                    )
+
+                    val labelWeight = if (isTargetActive) FontWeight.SemiBold else FontWeight.Medium
 
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(18.dp))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onTabSelected(tab)
-                            },
+                            .fillMaxHeight(),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxHeight()
                         ) {
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = label,
-                                tint = contentColor,
-                                modifier = Modifier
-                                    .size(16.5.dp)
-                                    .scale(iconScale)
-                            )
-                            Spacer(modifier = Modifier.height(1.5.dp))
+                            Box(
+                                modifier = Modifier.size(width = 58.dp, height = 32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = label,
+                                    tint = iconTint,
+                                    modifier = Modifier
+                                        .size(22.dp)
+                                        .scale(iconScale)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(3.dp))
                             Text(
                                 text = label,
-                                color = contentColor,
-                                fontSize = 8.5.sp,
-                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                letterSpacing = (-0.1).sp,
+                                color = labelColor,
+                                fontSize = 11.5.sp,
+                                fontFamily = GoogleSans,
+                                fontWeight = labelWeight,
+                                letterSpacing = if (isTargetActive) 0.1.sp else 0.sp,
                                 maxLines = 1
                             )
                         }
@@ -893,7 +1010,50 @@ fun LiquidGlassBottomBar(
 }
 
 /**
- * Screen 1: Recents (Clean OEM Frosted Glass Call History, Edge-to-Edge Status Bar Scroll)
+ * Helper to format call duration into human-readable string (e.g. "3m 12s", "45s")
+ */
+private fun formatCallDuration(seconds: Long): String {
+    return if (seconds >= 3600) {
+        val h = seconds / 3600
+        val m = (seconds % 3600) / 60
+        "${h}h ${m}m"
+    } else if (seconds >= 60) {
+        val m = seconds / 60
+        val s = seconds % 60
+        if (s > 0) "${m}m ${s}s" else "${m}m"
+    } else {
+        "${seconds}s"
+    }
+}
+
+/**
+ * Helper to compute authentic Material You dynamic Monet pastel avatar colors
+ */
+private fun getMonetAvatarColors(name: String, monetColors: ColorScheme): Pair<Color, Color> {
+    val hash = kotlin.math.abs(name.hashCode()) % 3
+    return when (hash) {
+        0 -> monetColors.primaryContainer to monetColors.onPrimaryContainer
+        1 -> monetColors.secondaryContainer to monetColors.onSecondaryContainer
+        else -> monetColors.tertiaryContainer to monetColors.onTertiaryContainer
+    }
+}
+
+/**
+ * Helper to compute 1-2 character initials for contact avatars
+ */
+private fun getContactInitials(name: String): String {
+    val parts = name.trim().split(" ").filter { it.isNotBlank() }
+    return if (parts.size >= 2) {
+        "${parts[0].first().uppercaseChar()}${parts[1].first().uppercaseChar()}"
+    } else if (name.isNotBlank()) {
+        name.take(2).uppercase()
+    } else {
+        "?"
+    }
+}
+
+/**
+ * Screen 1: Recents (Material You / Expressive Pixel Call History, Dynamic Monet Squircles & Direction Badges)
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -908,14 +1068,47 @@ fun RecentsScreen(
     onOpenSettings: () -> Unit = {},
     onOpenPresetManager: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     var selectedFilter by remember { mutableStateOf("All") }
+    var searchQuery by remember { mutableStateOf("") }
     var selectedLogForDetails by remember { mutableStateOf<CallLogItem?>(null) }
+    var isMenuExpanded by remember { mutableStateOf(false) }
+    val menuRotation by animateFloatAsState(
+        targetValue = if (isMenuExpanded) 90f else 0f,
+        animationSpec = spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow),
+        label = "recentsMenuRotate"
+    )
 
-    val filteredLogs = remember(callLogs, selectedFilter) {
-        if (selectedFilter == "Missed") {
+    val monetColors: ColorScheme = remember(context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                dynamicDarkColorScheme(context)
+            } catch (_: Exception) {
+                getPixelMonetDarkColorScheme()
+            }
+        } else {
+            getPixelMonetDarkColorScheme()
+        }
+    }
+
+    val filteredLogs = remember(callLogs, selectedFilter, searchQuery) {
+        val base = if (selectedFilter == "Missed") {
             callLogs.filter { it.type == CallLog.Calls.MISSED_TYPE || it.type == CallLog.Calls.REJECTED_TYPE }
         } else {
             callLogs
+        }
+        if (searchQuery.isBlank()) {
+            base
+        } else {
+            val q = searchQuery.trim().lowercase()
+            val digits = q.filter { it.isDigit() || it == '+' }
+            base.filter { log ->
+                val nameMatch = log.name?.lowercase()?.contains(q) == true
+                val numMatch = log.number.lowercase().contains(q) ||
+                        (digits.isNotEmpty() && log.number.filter { it.isDigit() || it == '+' }.contains(digits))
+                nameMatch || numMatch
+            }
         }
     }
 
@@ -928,7 +1121,13 @@ fun RecentsScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         if (isLoading && callLogs.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "Loading call logs...", color = TextSecondary, fontSize = 14.sp)
+                Text(
+                    text = "Loading call history...",
+                    color = monetColors.onSurfaceVariant,
+                    fontSize = 15.sp,
+                    fontFamily = GoogleSans,
+                    fontWeight = FontWeight.Medium
+                )
             }
         } else if (filteredLogs.isEmpty()) {
             Box(
@@ -937,34 +1136,47 @@ fun RecentsScreen(
                     .padding(bottom = 40.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(horizontal = 32.dp)
+                ) {
                     Box(
                         modifier = Modifier
-                            .size(60.dp)
+                            .size(72.dp)
                             .clip(CircleShape)
-                            .background(Color(0x14FFFFFF))
-                            .border(1.dp, Color(0x25FFFFFF), CircleShape),
+                            .background(monetColors.primaryContainer.copy(alpha = 0.6f))
+                            .border(1.dp, monetColors.primary.copy(alpha = 0.4f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.Schedule,
+                            imageVector = if (searchQuery.isNotEmpty()) Icons.Filled.Search else Icons.Rounded.Schedule,
                             contentDescription = null,
-                            tint = TextMuted,
-                            modifier = Modifier.size(26.dp)
+                            tint = monetColors.primary,
+                            modifier = Modifier.size(34.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = if (selectedFilter == "Missed") "No Missed Calls" else "No Recent Calls",
-                        color = Color.White,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.SemiBold
+                        text = if (searchQuery.isNotEmpty()) "No Matching Calls"
+                            else if (selectedFilter == "Missed") "No Missed Calls"
+                            else "No Recent Calls",
+                        color = monetColors.onSurface,
+                        fontSize = 18.sp,
+                        fontFamily = GoogleSans,
+                        fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Call history will appear here",
-                        color = TextTertiary,
-                        fontSize = 13.sp
+                        text = if (searchQuery.isNotEmpty())
+                            "No call logs found matching \"$searchQuery\""
+                        else if (selectedFilter == "Missed")
+                            "You don't have any missed or rejected calls"
+                        else
+                            "Calls you make and receive will show up here",
+                        color = monetColors.onSurfaceVariant,
+                        fontSize = 13.5.sp,
+                        fontFamily = GoogleSans,
+                        textAlign = TextAlign.Center
                     )
                 }
             }
@@ -972,97 +1184,170 @@ fun RecentsScreen(
             // LazyColumn extends edge-to-edge; items scroll fluidly underneath the transparent status bar!
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = statusBarTop + 78.dp, bottom = 120.dp, start = 20.dp, end = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                contentPadding = PaddingValues(top = statusBarTop + 162.dp, bottom = 120.dp, start = 18.dp, end = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 groupedLogs.forEach { (dateGroup, logsInGroup) ->
                     item(key = "header_$dateGroup") {
-                        Text(
-                            text = dateGroup,
-                            color = TextTertiary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(top = 10.dp, bottom = 4.dp, start = 4.dp)
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp, bottom = 4.dp, start = 4.dp, end = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(monetColors.primaryContainer.copy(alpha = 0.65f))
+                                    .padding(horizontal = 9.dp, vertical = 3.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = dateGroup,
+                                    color = monetColors.onPrimaryContainer,
+                                    fontFamily = GoogleSans,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.8.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Box(
+                                modifier = Modifier
+                                    .height(0.8.dp)
+                                    .weight(1f)
+                                    .background(monetColors.outlineVariant.copy(alpha = 0.25f))
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "${logsInGroup.size} calls",
+                                color = monetColors.onSurfaceVariant.copy(alpha = 0.7f),
+                                fontFamily = GoogleSans,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
 
-                    items(logsInGroup, key = { it.id }) { log ->
+                    itemsIndexed(logsInGroup, key = { index, log -> "log_${dateGroup}_${log.id}_${log.timestamp}_$index" }) { _, log ->
                         val isMissed = log.type == CallLog.Calls.MISSED_TYPE || log.type == CallLog.Calls.REJECTED_TYPE
                         val isOutgoing = log.type == CallLog.Calls.OUTGOING_TYPE
+                        val callerName = log.name ?: log.number
+
+                        val (avatarBg, avatarFg) = remember(callerName) {
+                            getMonetAvatarColors(callerName, monetColors)
+                        }
+                        val initials = remember(callerName) {
+                            getContactInitials(callerName)
+                        }
 
                         val rowInteraction = remember { MutableInteractionSource() }
                         val isRowPressed by rowInteraction.collectIsPressedAsState()
                         val rowScale by animateFloatAsState(
-                            targetValue = if (isRowPressed) 0.975f else 1.0f,
+                            targetValue = if (isRowPressed) 0.98f else 1.0f,
                             animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
                             label = "recentRowScale"
                         )
 
+                        // Material You / Expressive Squircle Call Log Card
                         Box(
                             modifier = Modifier
                                 .animateItemPlacement()
                                 .scale(rowScale)
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(if (isRowPressed) Color(0x22FFFFFF) else Color(0x14FFFFFF))
-                                .border(0.8.dp, if (isRowPressed) Color(0x40FFFFFF) else Color(0x22FFFFFF), RoundedCornerShape(18.dp))
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(
+                                    if (isRowPressed) monetColors.primaryContainer.copy(alpha = 0.35f)
+                                    else Color(0xFF191C23)
+                                )
+                                .border(
+                                    0.8.dp,
+                                    if (isRowPressed) monetColors.primary.copy(alpha = 0.5f)
+                                    else monetColors.outlineVariant.copy(alpha = 0.3f),
+                                    RoundedCornerShape(20.dp)
+                                )
                                 .clickable(
                                     interactionSource = rowInteraction,
                                     indication = null,
-                                    onClick = { onCall(log.number) }
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onCall(log.number)
+                                    }
                                 )
-                                .padding(horizontal = 14.dp, vertical = 11.dp)
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Direction Icon in subtle frosted glass circle
+                                // Dynamic Monet Pastel Avatar
                                 Box(
                                     modifier = Modifier
-                                        .size(36.dp)
+                                        .size(44.dp)
                                         .clip(CircleShape)
-                                        .background(Color(0x18FFFFFF))
-                                        .border(0.8.dp, Color(0x28FFFFFF), CircleShape),
+                                        .background(avatarBg),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(
-                                        imageVector = when {
-                                            isMissed -> Icons.Filled.CallMissed
-                                            isOutgoing -> Icons.Filled.CallMade
-                                            else -> Icons.Filled.CallReceived
-                                        },
-                                        contentDescription = null,
-                                        tint = when {
-                                            isMissed -> AppleRed
-                                            isOutgoing -> Color(0xCCFFFFFF)
-                                            else -> AppleGreen
-                                        },
-                                        modifier = Modifier.size(17.dp)
+                                    Text(
+                                        text = initials,
+                                        color = avatarFg,
+                                        fontSize = 15.sp,
+                                        fontFamily = GoogleSans,
+                                        fontWeight = FontWeight.Bold
                                     )
                                 }
 
                                 Spacer(modifier = Modifier.width(12.dp))
 
-                                // Caller info
+                                // Caller info & Call Subtitle
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = log.name ?: log.number,
-                                        color = if (isMissed) AppleRed else Color.White,
+                                        text = callerName,
+                                        color = if (isMissed) Color(0xFFFF6B6B) else monetColors.onSurface,
                                         fontSize = 15.sp,
-                                        fontWeight = FontWeight.SemiBold,
+                                        fontFamily = GoogleSans,
+                                        fontWeight = FontWeight.Bold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = if (log.name != null) DialerRepository.formatPhoneNumber(log.number) else "Mobile",
-                                        color = TextSecondary,
-                                        fontSize = 12.sp,
-                                        fontFamily = FontFamily.Monospace,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        // Direction Icon
+                                        val (directionIcon, directionColor) = when {
+                                            isMissed -> Icons.Filled.CallMissed to Color(0xFFFF5252)
+                                            isOutgoing -> Icons.Filled.CallMade to Color(0xFF2196F3)
+                                            else -> Icons.Filled.CallReceived to Color(0xFF4CAF50)
+                                        }
+                                        Icon(
+                                            imageVector = directionIcon,
+                                            contentDescription = null,
+                                            tint = directionColor,
+                                            modifier = Modifier.size(13.dp)
+                                        )
+
+                                        val subText = if (log.name != null)
+                                            DialerRepository.formatPhoneNumber(log.number)
+                                        else when {
+                                            isMissed -> "Missed call"
+                                            isOutgoing -> "Outgoing call"
+                                            else -> "Incoming call"
+                                        }
+
+                                        Text(
+                                            text = if (log.durationSeconds > 0)
+                                                "$subText • ${formatCallDuration(log.durationSeconds)}"
+                                            else
+                                                subText,
+                                            color = monetColors.onSurfaceVariant,
+                                            fontSize = 12.sp,
+                                            fontFamily = GoogleSans,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
 
                                 Row(
@@ -1071,10 +1356,45 @@ fun RecentsScreen(
                                 ) {
                                     Text(
                                         text = formatCallDate(log.timestamp),
-                                        color = TextTertiary,
-                                        fontSize = 12.sp
+                                        color = monetColors.onSurfaceVariant.copy(alpha = 0.8f),
+                                        fontSize = 12.sp,
+                                        fontFamily = GoogleSans
                                     )
 
+                                    // Quick Emerald Call Button
+                                    val callInteraction = remember { MutableInteractionSource() }
+                                    val isCallPressed by callInteraction.collectIsPressedAsState()
+                                    val callScale by animateFloatAsState(
+                                        targetValue = if (isCallPressed) 0.88f else 1.0f,
+                                        animationSpec = spring(dampingRatio = 0.65f),
+                                        label = "recentCallScale"
+                                    )
+
+                                    Box(
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .scale(callScale)
+                                            .clip(RoundedCornerShape(11.dp))
+                                            .background(Color(0xFF2EAA55))
+                                            .clickable(
+                                                interactionSource = callInteraction,
+                                                indication = null,
+                                                onClick = {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    onCall(log.number)
+                                                }
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Call,
+                                            contentDescription = "Call",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+
+                                    // Info Button (Details)
                                     val infoInteraction = remember { MutableInteractionSource() }
                                     val isInfoPressed by infoInteraction.collectIsPressedAsState()
                                     val infoScale by animateFloatAsState(
@@ -1083,14 +1403,13 @@ fun RecentsScreen(
                                         label = "infoBtnScale"
                                     )
 
-                                    // Info Sheet Button (i) -> Opens iOS 26 Details
                                     Box(
                                         modifier = Modifier
-                                            .size(32.dp)
+                                            .size(34.dp)
                                             .scale(infoScale)
-                                            .clip(CircleShape)
-                                            .background(Color(0x1AFFFFFF))
-                                            .border(0.8.dp, Color(0x30FFFFFF), CircleShape)
+                                            .clip(RoundedCornerShape(11.dp))
+                                            .background(monetColors.surfaceContainerHighest.copy(alpha = 0.7f))
+                                            .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(11.dp))
                                             .clickable(
                                                 interactionSource = infoInteraction,
                                                 indication = null,
@@ -1108,7 +1427,7 @@ fun RecentsScreen(
                                         Icon(
                                             imageVector = Icons.Rounded.Info,
                                             contentDescription = "Details",
-                                            tint = AppleBlue,
+                                            tint = monetColors.primary,
                                             modifier = Modifier.size(16.dp)
                                         )
                                     }
@@ -1120,137 +1439,146 @@ fun RecentsScreen(
             }
         }
 
-        // Pinned Top Header with Segmented Filter & 3-Dot Options Menu
-        Row(
+        // Pinned Top Header with Pixel Search Bar & Segmented Filter
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            Color(0xFF000000),
-                            Color(0xFF000000),
-                            Color(0xF5000000),
-                            Color(0xD0000000),
+                            Color(0xFF0F1116),
+                            Color(0xFF0F1116),
+                            Color(0xF50F1116),
+                            Color(0xD00F1116),
                             Color.Transparent
                         )
                     )
                 )
-                .padding(top = statusBarTop + 14.dp, start = 20.dp, end = 20.dp, bottom = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .statusBarsPadding()
+                .padding(top = 10.dp, bottom = 12.dp)
         ) {
-            Text(
-                text = "Recents",
-                color = Color.White,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.5).sp
-            )
-
+            // 1. Section Header: Big Title & Segmented Filter ("All" | "Missed")
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Minimalist Monochromatic Frosted Capsule: All | Missed
+                Text(
+                    text = "Recents",
+                    color = monetColors.onSurface,
+                    fontSize = 32.sp,
+                    fontFamily = GoogleSans,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.8).sp
+                )
+
+                // Material You Expressive Segmented Capsule: All | Missed
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(18.dp))
-                        .background(Color(0x18FFFFFF))
-                        .border(0.8.dp, Color(0x30FFFFFF), RoundedCornerShape(18.dp))
+                        .background(monetColors.surfaceContainerHigh.copy(alpha = 0.8f))
+                        .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(18.dp))
                         .padding(3.dp)
                 ) {
                     Row {
                         listOf("All", "Missed").forEach { filter ->
                             val isSel = selectedFilter == filter
+                            val pillBg by animateColorAsState(
+                                targetValue = if (isSel) monetColors.primaryContainer else Color.Transparent,
+                                animationSpec = tween(150),
+                                label = "filterPillBg"
+                            )
+                            val pillFg by animateColorAsState(
+                                targetValue = if (isSel) monetColors.onPrimaryContainer else monetColors.onSurfaceVariant,
+                                animationSpec = tween(150),
+                                label = "filterPillFg"
+                            )
+
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(15.dp))
-                                    .background(if (isSel) Color(0x35FFFFFF) else Color.Transparent)
-                                    .clickable { selectedFilter = filter }
-                                    .padding(horizontal = 12.dp, vertical = 5.dp)
+                                    .background(pillBg)
+                                    .clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        selectedFilter = filter
+                                    }
+                                    .padding(horizontal = 13.dp, vertical = 5.dp)
                             ) {
                                 Text(
                                     text = filter,
-                                    color = if (isSel) Color.White else TextSecondary,
+                                    color = pillFg,
                                     fontSize = 12.5.sp,
-                                    fontWeight = if (isSel) FontWeight.SemiBold else FontWeight.Normal
+                                    fontFamily = GoogleSans,
+                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium
                                 )
                             }
                         }
                     }
                 }
+            }
 
-                // 3-Dot Options Menu with dedicated spacing & touch container
-                var isMenuExpanded by remember { mutableStateOf(false) }
-                val menuRotation by animateFloatAsState(
-                    targetValue = if (isMenuExpanded) 90f else 0f,
-                    animationSpec = spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow),
-                    label = "recentsMenuRotate"
-                )
-
-                Box {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(Color(0x18FFFFFF))
-                            .border(0.8.dp, Color(0x30FFFFFF), CircleShape)
-                            .clickable {
-                                isMenuExpanded = !isMenuExpanded
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.MoreVert,
-                            contentDescription = "Options",
-                            tint = Color.White,
+            Spacer(modifier = Modifier.height(14.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp)
+            ) {
+                PixelDialerSearchBar(
+                    query = searchQuery,
+                    onQueryChange = { searchQuery = it },
+                    placeholder = "Search contacts & numbers...",
+                    monetColors = monetColors,
+                    onMenuClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        isMenuExpanded = !isMenuExpanded
+                    },
+                    menuRotation = menuRotation,
+                    menuContent = {
+                        DropdownMenu(
+                            expanded = isMenuExpanded,
+                            onDismissRequest = { isMenuExpanded = false },
+                            offset = androidx.compose.ui.unit.DpOffset(x = 0.dp, y = 6.dp),
                             modifier = Modifier
-                                .size(18.dp)
-                                .graphicsLayer { rotationZ = menuRotation }
-                        )
-                    }
-
-                    DropdownMenu(
-                        expanded = isMenuExpanded,
-                        onDismissRequest = { isMenuExpanded = false },
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(Color(0xF0151926))
-                            .border(1.dp, Color(0x30FFFFFF), RoundedCornerShape(18.dp))
-                            .padding(vertical = 4.dp)
-                    ) {
-                        DropdownMenuItem(
-                            text = {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Icon(Icons.Rounded.Settings, contentDescription = null, tint = AppleBlue, modifier = Modifier.size(18.dp))
-                                    Text("Call Settings", color = Color.White, fontSize = 14.sp)
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Color(0xF0181B22))
+                                .border(1.dp, monetColors.outlineVariant.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
+                                .padding(vertical = 4.dp)
+                        ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Icon(Icons.Rounded.Settings, contentDescription = null, tint = monetColors.primary, modifier = Modifier.size(18.dp))
+                                        Text("Call Settings", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = GoogleSans)
+                                    }
+                                },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    onOpenSettings()
                                 }
-                            },
-                            onClick = {
-                                isMenuExpanded = false
-                                onOpenSettings()
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Icon(Icons.Rounded.Tune, contentDescription = null, tint = AppleAmber, modifier = Modifier.size(18.dp))
-                                    Text("Audio Presets & Personas", color = Color.White, fontSize = 14.sp)
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Icon(Icons.Rounded.Tune, contentDescription = null, tint = AppleAmber, modifier = Modifier.size(18.dp))
+                                        Text("Audio Presets & Personas", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = GoogleSans)
+                                    }
+                                },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    onOpenPresetManager()
                                 }
-                            },
-                            onClick = {
-                                isMenuExpanded = false
-                                onOpenPresetManager()
-                            }
-                        )
+                            )
+                        }
                     }
-                }
+                )
             }
         }
     }
@@ -1269,7 +1597,7 @@ fun RecentsScreen(
 }
 
 /**
- * iOS 26 Full Liquid Glass Specular Contact Details Modal Sheet (Minimalist Monochrome Luxury)
+ * Pixel Expressive / Material You Minimalist Contact Info Modal Sheet
  */
 @Composable
 fun Ios26LiquidContactDetailsSheet(
@@ -1283,24 +1611,96 @@ fun Ios26LiquidContactDetailsSheet(
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    val coroutineScope = rememberCoroutineScope()
+
+    val monetColors: ColorScheme = remember(context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                dynamicDarkColorScheme(context)
+            } catch (_: Exception) {
+                getPixelMonetDarkColorScheme()
+            }
+        } else {
+            getPixelMonetDarkColorScheme()
+        }
+    }
+
+    val (avatarBg, avatarFg) = remember(contact.name) {
+        getMonetAvatarColors(contact.name, monetColors)
+    }
+    val initials = remember(contact.name) {
+        getContactInitials(contact.name)
+    }
     val formattedNum = remember(contact.number) {
         DialerRepository.formatPhoneNumber(contact.number)
     }
 
-    val initials = remember(contact.name) {
-        val parts = contact.name.trim().split(" ").filter { it.isNotBlank() }
-        if (parts.size >= 2) {
-            "${parts[0].first().uppercaseChar()}${parts[1].first().uppercaseChar()}"
+    val isUnknownNumber = remember(contact.number, contact.name) {
+        val cleanName = contact.name.trim()
+        val cleanNum = contact.number.trim()
+        val isNameNumber = cleanName == cleanNum || cleanName.isBlank() ||
+                cleanName.equals("Unknown Caller", ignoreCase = true) ||
+                cleanName.equals("Unknown", ignoreCase = true)
+        if (isNameNumber) {
+            !DialerRepository.isNumberInContacts(context, cleanNum)
         } else {
-            contact.name.take(2).uppercase()
+            false
         }
     }
 
-    var selectedPersona by remember { mutableStateOf(VoicePersona.DEFAULT) }
-    var autoScreenThisContact by remember { mutableStateOf(false) }
+    // Custom Profile Photo Management
+    var customPhotoPath by remember(contact.number) {
+        mutableStateOf(CallerProfileManager.getCustomPhotoPath(context, contact.number) ?: contact.photoUri)
+    }
+    val contactPhotoBitmap = rememberContactPhotoBitmap(customPhotoPath)
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            coroutineScope.launch {
+                val saved = CallerProfileManager.saveCustomPhotoFromUri(context, contact.number, uri)
+                if (saved != null) {
+                    customPhotoPath = saved
+                    Toast.makeText(context, "Custom photo updated", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "Failed to save photo", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    // Persistent Caller Profile Settings
+    val savedProfile = remember(contact.number) {
+        CallerProfileManager.getProfile(context, contact.number)
+    }
+    var autoScreenThisContact by remember(savedProfile) {
+        mutableStateOf(savedProfile?.autoScreen ?: false)
+    }
+    var isVipBypass by remember(savedProfile) {
+        mutableStateOf(savedProfile?.isVipBypass ?: false)
+    }
+    var selectedPersona by remember(savedProfile) {
+        mutableStateOf(
+            VoicePersona.ALL_PERSONAS.firstOrNull { it.name.equals(savedProfile?.assignedPersona, ignoreCase = true) }
+                ?: VoicePersona.DEFAULT
+        )
+    }
+
+    fun persistProfile(autoScreen: Boolean, vip: Boolean, persona: VoicePersona) {
+        val cur = CallerProfileManager.getProfile(context, contact.number) ?: CallerProfile()
+        CallerProfileManager.saveProfile(
+            context,
+            contact.number,
+            cur.copy(
+                autoScreen = autoScreen,
+                isVipBypass = vip,
+                assignedPersona = persona.name
+            )
+        )
+    }
 
     var isVisible by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         isVisible = true
@@ -1310,7 +1710,7 @@ fun Ios26LiquidContactDetailsSheet(
         if (!isVisible) return
         coroutineScope.launch {
             isVisible = false
-            delay(200)
+            delay(180)
             onDismiss()
         }
     }
@@ -1324,31 +1724,71 @@ fun Ios26LiquidContactDetailsSheet(
     ) {
         val view = LocalView.current
         SideEffect {
-            val dialogWindow = (view.parent as? DialogWindowProvider)?.window
+            var parent: Any? = view.parent
+            var dialogWindow: android.view.Window? = null
+            while (parent != null) {
+                if (parent is DialogWindowProvider) {
+                    dialogWindow = parent.window
+                    break
+                }
+                parent = (parent as? android.view.View)?.parent
+            }
+            if (dialogWindow == null) {
+                dialogWindow = (view.rootView.parent as? DialogWindowProvider)?.window
+            }
+
             dialogWindow?.let { win ->
                 win.setDimAmount(0f)
+                win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+                win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION)
+                win.addFlags(android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+                win.setLayout(
+                    android.view.WindowManager.LayoutParams.MATCH_PARENT,
+                    android.view.WindowManager.LayoutParams.MATCH_PARENT
+                )
+                win.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
                 WindowCompat.setDecorFitsSystemWindows(win, false)
-                win.navigationBarColor = android.graphics.Color.TRANSPARENT
                 win.statusBarColor = android.graphics.Color.TRANSPARENT
+                win.navigationBarColor = android.graphics.Color.TRANSPARENT
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     win.isNavigationBarContrastEnforced = false
+                    win.isStatusBarContrastEnforced = false
                 }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    win.attributes = win.attributes.apply {
+                        layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    }
+                }
+                val insets = WindowCompat.getInsetsController(win, win.decorView)
+                insets.isAppearanceLightStatusBars = false
+                insets.isAppearanceLightNavigationBars = false
+                win.decorView.fitsSystemWindows = false
+                (win.decorView as? android.view.ViewGroup)?.clipToPadding = false
             }
+            (view.parent as? android.view.View)?.fitsSystemWindows = false
+            (view as? android.view.View)?.fitsSystemWindows = false
         }
 
         val scrimAlpha by animateFloatAsState(
-            targetValue = if (isVisible) 0.65f else 0f,
-            animationSpec = tween(durationMillis = 240, easing = LinearOutSlowInEasing),
+            targetValue = if (isVisible) 0.60f else 0f,
+            animationSpec = tween(durationMillis = 200, easing = LinearOutSlowInEasing),
             label = "detailsScrimAlpha"
         )
 
-        Box(
+        BackHandler(enabled = isVisible) {
+            animateDismiss()
+        }
+
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = scrimAlpha))
                 .clickable { animateDismiss() },
             contentAlignment = Alignment.BottomCenter
         ) {
+            val maxSheetHeight = maxHeight * 0.92f
+
             AnimatedVisibility(
                 visible = isVisible,
                 enter = slideInVertically(
@@ -1360,76 +1800,52 @@ fun Ios26LiquidContactDetailsSheet(
                 ) + fadeIn(animationSpec = tween(180)),
                 exit = slideOutVertically(
                     targetOffsetY = { fullHeight -> fullHeight },
-                    animationSpec = tween(200, easing = FastOutLinearInEasing)
-                ) + fadeOut(animationSpec = tween(150))
+                    animationSpec = tween(180, easing = FastOutLinearInEasing)
+                ) + fadeOut(animationSpec = tween(140))
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .heightIn(max = maxSheetHeight)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
                         ) {}
-                        .shadow(
-                            elevation = 40.dp,
-                            shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp),
-                            spotColor = Color(0xD0000000),
-                            ambientColor = Color(0x99000000)
-                        )
-                        .clip(RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp))
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color(0xF2121722),
-                                    Color(0xF80A0E16),
-                                    Color(0xFF04060A)
-                                )
-                            )
-                        )
-                        .border(
-                            1.2.dp,
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color(0x80FFFFFF),
-                                    Color(0x20FFFFFF),
-                                    Color(0x06FFFFFF)
-                                )
-                            ),
-                            RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp)
-                        )
+                        .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                        .background(monetColors.surfaceContainerHigh)
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 22.dp)
-                            .padding(top = 14.dp)
-                            .navigationBarsPadding()
-                            .padding(bottom = 20.dp)
+                            .padding(horizontal = 20.dp)
+                            .padding(top = 10.dp)
                             .verticalScroll(rememberScrollState()),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Grabber handle
+                        // 1. Pixel OEM Drag Handle
                         Box(
                             modifier = Modifier
-                                .width(42.dp)
-                                .height(5.dp)
+                                .width(36.dp)
+                                .height(4.dp)
                                 .clip(CircleShape)
-                                .background(Color(0x40FFFFFF))
+                                .background(monetColors.outlineVariant.copy(alpha = 0.40f))
                         )
 
-                        // Top Bar (ColorOS / MIUI Minimalist Bar: Close, Title, Share)
+                        // 2. Redesigned Pixel OEM Top App Bar Header
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // Back / Close Button (Pixel tonal disc)
                             Box(
                                 modifier = Modifier
-                                    .size(36.dp)
+                                    .size(40.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0x1EFFFFFF))
-                                    .border(0.8.dp, Color(0x30FFFFFF), CircleShape)
+                                    .background(monetColors.surfaceContainerHighest.copy(alpha = 0.70f))
                                     .clickable {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         animateDismiss()
@@ -1437,359 +1853,781 @@ fun Ios26LiquidContactDetailsSheet(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.Rounded.Close,
-                                    contentDescription = "Close",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
+                                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                    contentDescription = "Back",
+                                    tint = monetColors.onSurface,
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
 
-                        Text("Contact Info", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                text = if (isUnknownNumber) "Caller details" else "Contact info",
+                                color = monetColors.onSurface,
+                                fontSize = 17.5.sp,
+                                fontFamily = GoogleSans,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = (-0.2).sp
+                            )
 
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Color(0x1EFFFFFF))
-                                .border(0.8.dp, Color(0x30FFFFFF), CircleShape)
-                                .clickable {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                        type = "text/plain"
-                                        putExtra(Intent.EXTRA_SUBJECT, contact.name)
-                                        putExtra(Intent.EXTRA_TEXT, "${contact.name}: ${contact.number}")
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (isUnknownNumber) {
+                                    // Add to contacts button
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(monetColors.primaryContainer)
+                                            .clickable {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                DialerRepository.openSystemSaveContact(
+                                                    context,
+                                                    contact.number,
+                                                    if (contact.name != contact.number && !contact.name.equals("Unknown Caller", true) && !contact.name.equals("Unknown", true)) contact.name else null
+                                                )
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.PersonAdd,
+                                            contentDescription = "Add Contact",
+                                            tint = monetColors.onPrimaryContainer,
+                                            modifier = Modifier.size(19.dp)
+                                        )
                                     }
-                                    context.startActivity(Intent.createChooser(shareIntent, "Share Contact"))
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Filled.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(16.dp))
+                                } else {
+                                    // Star / Favorite
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (contact.isStarred) Color(0xFFFFB74D).copy(alpha = 0.20f)
+                                                else monetColors.surfaceContainerHighest.copy(alpha = 0.70f)
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Star,
+                                            contentDescription = if (contact.isStarred) "Starred" else "Not starred",
+                                            tint = if (contact.isStarred) Color(0xFFFFB74D) else monetColors.onSurfaceVariant.copy(alpha = 0.60f),
+                                            modifier = Modifier.size(19.dp)
+                                        )
+                                    }
+
+                                    // Edit Contact
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(monetColors.surfaceContainerHighest.copy(alpha = 0.70f))
+                                            .clickable {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                try {
+                                                    val intent = Intent(Intent.ACTION_EDIT).apply {
+                                                        setDataAndType(
+                                                            ContactsContract.Contacts.CONTENT_URI,
+                                                            ContactsContract.Contacts.CONTENT_ITEM_TYPE
+                                                        )
+                                                        putExtra(ContactsContract.Intents.Insert.PHONE, contact.number)
+                                                        putExtra(ContactsContract.Intents.Insert.NAME, contact.name)
+                                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                                    }
+                                                    context.startActivity(intent)
+                                                } catch (_: Exception) {
+                                                    DialerRepository.openSystemSaveContact(context, contact.number, contact.name)
+                                                }
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Edit,
+                                            contentDescription = "Edit Contact",
+                                            tint = monetColors.onSurface,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+
+                                // Share Contact
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(monetColors.surfaceContainerHighest.copy(alpha = 0.70f))
+                                        .clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                type = "text/plain"
+                                                putExtra(Intent.EXTRA_SUBJECT, contact.name)
+                                                putExtra(Intent.EXTRA_TEXT, "${contact.name}: ${contact.number}")
+                                            }
+                                            context.startActivity(Intent.createChooser(shareIntent, "Share Contact"))
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Share,
+                                        contentDescription = "Share",
+                                        tint = monetColors.onSurface,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
                         }
-                    }
 
-                    // Hero Avatar (ColorOS / MIUI Refined 84dp frosted titanium glass orb)
-                    Box(
-                        modifier = Modifier
-                            .size(84.dp)
-                            .clip(CircleShape)
-                            .background(Color(0x22FFFFFF))
-                            .border(1.2.dp, Color(0x40FFFFFF), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = initials,
-                            color = Color.White,
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.5.sp
-                        )
-                    }
-
-                    // Display Name & Verified Status Badge
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = contact.name,
-                            color = Color.White,
-                            fontSize = 23.sp,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                            letterSpacing = (-0.4).sp
-                        )
-
-                        Row(
+                        // 3. Pixel Hero Avatar & Identity Section
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0x14FFFFFF))
-                                .border(0.8.dp, Color(0x22FFFFFF), RoundedCornerShape(10.dp))
-                                .padding(horizontal = 10.dp, vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
                         ) {
                             Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .clip(CircleShape)
-                                    .background(AppleGreen)
-                            )
+                                modifier = Modifier.size(100.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(96.dp)
+                                        .clip(CircleShape)
+                                        .background(avatarBg)
+                                        .clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            photoPickerLauncher.launch("image/*")
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (contactPhotoBitmap != null) {
+                                        Image(
+                                            bitmap = contactPhotoBitmap,
+                                            contentDescription = contact.name,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    } else {
+                                        Text(
+                                            text = initials,
+                                            color = avatarFg,
+                                            fontSize = 34.sp,
+                                            fontFamily = GoogleSans,
+                                            fontWeight = FontWeight.SemiBold,
+                                            letterSpacing = 0.5.sp
+                                        )
+                                    }
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .size(30.dp)
+                                        .clip(CircleShape)
+                                        .background(monetColors.primary)
+                                        .border(2.dp, monetColors.surfaceContainerHigh, CircleShape)
+                                        .clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            photoPickerLauncher.launch("image/*")
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.CameraAlt,
+                                        contentDescription = "Set photo",
+                                        tint = monetColors.onPrimary,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                }
+                            }
+
+                            if (customPhotoPath != null) {
+                                Row(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(monetColors.surfaceContainerHighest.copy(alpha = 0.60f))
+                                        .clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            CallerProfileManager.removeCustomPhoto(context, contact.number)
+                                            customPhotoPath = null
+                                            Toast.makeText(context, "Custom photo removed", Toast.LENGTH_SHORT).show()
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Close,
+                                        contentDescription = null,
+                                        tint = monetColors.error,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Text(
+                                        text = "Remove custom photo",
+                                        color = monetColors.onSurfaceVariant,
+                                        fontSize = 11.5.sp,
+                                        fontFamily = GoogleSans,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+
                             Text(
-                                text = "Mobile • Carrier Verified",
-                                color = TextSecondary,
-                                fontSize = 11.sp,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Medium
+                                text = contact.name,
+                                color = monetColors.onSurface,
+                                fontSize = 24.sp,
+                                fontFamily = GoogleSans,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                letterSpacing = (-0.4).sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
                             )
+
+                            Text(
+                                text = formattedNum,
+                                color = monetColors.onSurfaceVariant,
+                                fontSize = 15.sp,
+                                fontFamily = GoogleSans,
+                                fontWeight = FontWeight.Normal,
+                                textAlign = TextAlign.Center
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(monetColors.surfaceContainerHighest.copy(alpha = 0.70f))
+                                    .padding(horizontal = 10.dp, vertical = 3.5.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (isUnknownNumber) monetColors.onSurfaceVariant.copy(alpha = 0.50f)
+                                                else Color(0xFF2EAA55)
+                                            )
+                                    )
+                                    Text(
+                                        text = if (isUnknownNumber) "Not in contacts" else "Mobile • Carrier Verified",
+                                        color = monetColors.onSurfaceVariant,
+                                        fontSize = 11.5.sp,
+                                        fontFamily = GoogleSans,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
                         }
-                    }
 
-                    // 4 ColorOS / MIUI Minimalist Frosted Action Orbs
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        ContactHeroActionPill(
-                            icon = Icons.Filled.Call,
-                            label = "Call",
-                            accentColor = AppleGreen,
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onCall(contact.number)
-                            }
-                        )
-
-                        ContactHeroActionPill(
-                            icon = Icons.Rounded.Chat,
-                            label = "Message",
-                            accentColor = Color.White,
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                DialerRepository.sendSms(context, contact.number)
-                            }
-                        )
-
-                        ContactHeroActionPill(
-                            icon = Icons.Rounded.Chat,
-                            label = "WhatsApp",
-                            accentColor = AppleGreen,
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                val digits = contact.number.filter { it.isDigit() }
-                                val waIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$digits"))
-                                try { context.startActivity(waIntent) } catch (_: Exception) {}
-                            }
-                        )
-
-                        ContactHeroActionPill(
-                            icon = Icons.Rounded.Security,
-                            label = "Screen AI",
-                            accentColor = Color.White,
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onScreen(contact.number, contact.name)
-                            }
-                        )
-                    }
-
-                    // Card 1: Primary Phone Number (Clean ColorOS Card)
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(Color(0x14FFFFFF))
-                            .border(0.8.dp, Color(0x22FFFFFF), RoundedCornerShape(20.dp))
-                            .padding(16.dp)
-                    ) {
+                        // 4. Pixel Expressive Tactile Action Row (Call, Message, Screen AI, WhatsApp)
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
-                                Text("MOBILE", color = TextTertiary, fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = formattedNum,
-                                    color = Color.White,
-                                    fontSize = 17.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                            }
-
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0x1CFFFFFF))
-                                        .border(0.8.dp, Color(0x30FFFFFF), CircleShape)
-                                        .clickable {
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            DialerRepository.copyToClipboard(context, "Phone Number", contact.number)
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.Rounded.ContentCopy, contentDescription = "Copy", tint = Color.White, modifier = Modifier.size(16.dp))
+                            ContactHeroActionPill(
+                                icon = Icons.Filled.Call,
+                                label = "Call",
+                                accentColor = Color.White,
+                                buttonBg = Color(0xFF2EAA55),
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onCall(contact.number)
                                 }
+                            )
 
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(AppleGreen)
-                                        .clickable {
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            onCall(contact.number)
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.Filled.Call, contentDescription = "Call", tint = Color.White, modifier = Modifier.size(16.dp))
+                            ContactHeroActionPill(
+                                icon = Icons.Rounded.Chat,
+                                label = "Message",
+                                accentColor = monetColors.onSurface,
+                                buttonBg = monetColors.surfaceContainerHighest,
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    DialerRepository.sendSms(context, contact.number)
                                 }
-                            }
+                            )
+
+                            ContactHeroActionPill(
+                                icon = Icons.Rounded.AutoAwesome,
+                                label = "Screen AI",
+                                accentColor = monetColors.onPrimaryContainer,
+                                buttonBg = monetColors.primaryContainer,
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onScreen(contact.number, contact.name)
+                                }
+                            )
+
+                            ContactHeroActionPill(
+                                icon = Icons.Rounded.Chat,
+                                label = "WhatsApp",
+                                accentColor = Color(0xFF25D366),
+                                buttonBg = monetColors.surfaceContainerHighest,
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    val digits = contact.number.filter { it.isDigit() }
+                                    val waIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$digits"))
+                                    try { context.startActivity(waIntent) } catch (_: Exception) {}
+                                }
+                            )
                         }
-                    }
 
-                    // Card 2: AI Voice Screening Policy
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(Color(0x14FFFFFF))
-                            .border(0.8.dp, Color(0x25FFFFFF), RoundedCornerShape(20.dp))
-                            .padding(16.dp)
-                    ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("Always Screen This Caller", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                                    Text("Assistant intercepts before phone rings", color = TextSecondary, fontSize = 11.sp)
-                                }
-                                Switch(
-                                    checked = autoScreenThisContact,
-                                    onCheckedChange = { autoScreenThisContact = it },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = Color.White,
-                                        checkedTrackColor = AppleGreen,
-                                        uncheckedThumbColor = Color(0xFF8E8E93),
-                                        uncheckedTrackColor = Color(0x30FFFFFF)
-                                    )
-                                )
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("Screening Persona", color = TextSecondary, fontSize = 12.sp)
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(Color(0x22FFFFFF))
-                                        .border(0.8.dp, Color(0x35FFFFFF), RoundedCornerShape(10.dp))
-                                        .clickable {
-                                            val all = VoicePersona.ALL_PERSONAS
-                                            val nextIdx = (all.indexOf(selectedPersona) + 1) % all.size
-                                            selectedPersona = all[nextIdx]
-                                        }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text(
-                                        text = "${selectedPersona.name} (${selectedPersona.code})",
-                                        color = AppleGreen,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Card 3: Recent Call History with this contact
-                    if (callHistory.isNotEmpty()) {
+                        // Card 1: Phone Details Card
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(20.dp))
-                                .background(Color(0x14FFFFFF))
-                                .border(0.8.dp, Color(0x22FFFFFF), RoundedCornerShape(20.dp))
+                                .background(monetColors.surfaceContainerHighest.copy(alpha = 0.50f))
                                 .padding(16.dp)
                         ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("Call History", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                    Text("${callHistory.size} records", color = TextTertiary, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .clip(CircleShape)
+                                                .background(monetColors.surfaceContainerHighest),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Call,
+                                                contentDescription = null,
+                                                tint = monetColors.primary,
+                                                modifier = Modifier.size(19.dp)
+                                            )
+                                        }
+
+                                        Column {
+                                            Text(
+                                                text = formattedNum,
+                                                color = monetColors.onSurface,
+                                                fontSize = 16.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                fontFamily = GoogleSans
+                                            )
+                                            Text(
+                                                text = "Mobile",
+                                                color = monetColors.onSurfaceVariant,
+                                                fontSize = 12.sp,
+                                                fontFamily = GoogleSans
+                                            )
+                                        }
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(monetColors.surfaceContainerHighest)
+                                            .clickable {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                DialerRepository.copyToClipboard(context, "Phone Number", contact.number)
+                                                Toast.makeText(context, "Number copied", Toast.LENGTH_SHORT).show()
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.ContentCopy,
+                                            contentDescription = "Copy number",
+                                            tint = monetColors.onSurface,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
                                 }
-                                callHistory.take(4).forEach { log ->
-                                    val isMissed = log.type == CallLog.Calls.MISSED_TYPE || log.type == CallLog.Calls.REJECTED_TYPE
-                                    val isOut = log.type == CallLog.Calls.OUTGOING_TYPE
+
+                                if (isUnknownNumber) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(0.6.dp)
+                                            .background(monetColors.outlineVariant.copy(alpha = 0.25f))
+                                    )
+
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                DialerRepository.openSystemSaveContact(
+                                                    context,
+                                                    contact.number,
+                                                    if (contact.name != contact.number && !contact.name.equals("Unknown Caller", true) && !contact.name.equals("Unknown", true)) contact.name else null
+                                                )
+                                            }
+                                            .padding(vertical = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.PersonAdd,
+                                                contentDescription = null,
+                                                tint = monetColors.primary,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Text(
+                                                text = "Add to contacts",
+                                                color = monetColors.primary,
+                                                fontSize = 14.sp,
+                                                fontFamily = GoogleSans,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+
+                                        Icon(
+                                            imageVector = Icons.Rounded.ChevronRight,
+                                            contentDescription = null,
+                                            tint = monetColors.onSurfaceVariant,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Card 2: Call Screener AI Options Card
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(monetColors.surfaceContainerHighest.copy(alpha = 0.50f))
+                                .padding(16.dp)
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.AutoAwesome,
+                                        contentDescription = null,
+                                        tint = monetColors.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "CALL SCREENER AI",
+                                        color = monetColors.primary,
+                                        fontSize = 11.sp,
+                                        fontFamily = GoogleSans,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.8.sp
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Always screen this caller",
+                                            color = monetColors.onSurface,
+                                            fontSize = 14.sp,
+                                            fontFamily = GoogleSans,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            text = "AI assistant intercepts before phone rings",
+                                            color = monetColors.onSurfaceVariant,
+                                            fontSize = 11.5.sp,
+                                            fontFamily = GoogleSans
+                                        )
+                                    }
+                                    Switch(
+                                        checked = autoScreenThisContact,
+                                        onCheckedChange = {
+                                            autoScreenThisContact = it
+                                            persistProfile(it, isVipBypass, selectedPersona)
+                                        },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = Color.White,
+                                            checkedTrackColor = Color(0xFF2EAA55),
+                                            uncheckedThumbColor = monetColors.onSurfaceVariant,
+                                            uncheckedTrackColor = monetColors.surfaceContainerHighest
+                                        )
+                                    )
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(0.6.dp)
+                                        .background(monetColors.outlineVariant.copy(alpha = 0.25f))
+                                )
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "VIP caller (Never screen)",
+                                            color = monetColors.onSurface,
+                                            fontSize = 14.sp,
+                                            fontFamily = GoogleSans,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            text = "Calls ring through directly without screening",
+                                            color = monetColors.onSurfaceVariant,
+                                            fontSize = 11.5.sp,
+                                            fontFamily = GoogleSans
+                                        )
+                                    }
+                                    Switch(
+                                        checked = isVipBypass,
+                                        onCheckedChange = {
+                                            isVipBypass = it
+                                            persistProfile(autoScreenThisContact, it, selectedPersona)
+                                        },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = Color.White,
+                                            checkedTrackColor = monetColors.primary,
+                                            uncheckedThumbColor = monetColors.onSurfaceVariant,
+                                            uncheckedTrackColor = monetColors.surfaceContainerHighest
+                                        )
+                                    )
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(0.6.dp)
+                                        .background(monetColors.outlineVariant.copy(alpha = 0.25f))
+                                )
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = "Screening Persona",
+                                            color = monetColors.onSurface,
+                                            fontSize = 13.5.sp,
+                                            fontFamily = GoogleSans,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            text = "Voice applied to this caller",
+                                            color = monetColors.onSurfaceVariant,
+                                            fontSize = 11.sp,
+                                            fontFamily = GoogleSans
+                                        )
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(monetColors.primaryContainer)
+                                            .clickable {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                val all = VoicePersona.ALL_PERSONAS
+                                                val nextIdx = (all.indexOf(selectedPersona) + 1) % all.size
+                                                selectedPersona = all[nextIdx]
+                                                persistProfile(autoScreenThisContact, isVipBypass, selectedPersona)
+                                            }
+                                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    ) {
+                                        Text(
+                                            text = "${selectedPersona.name} (${selectedPersona.code})",
+                                            color = monetColors.onPrimaryContainer,
+                                            fontSize = 12.sp,
+                                            fontFamily = GoogleSans,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Card 3: Recent Call History Card (only if records exist)
+                        if (callHistory.isNotEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(monetColors.surfaceContainerHighest.copy(alpha = 0.50f))
+                                    .padding(16.dp)
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
                                             Icon(
-                                                imageVector = if (isMissed) Icons.Filled.CallMissed else if (isOut) Icons.Filled.CallMade else Icons.Filled.CallReceived,
+                                                imageVector = Icons.Rounded.History,
                                                 contentDescription = null,
-                                                tint = if (isMissed) AppleRed else if (isOut) TextSecondary else AppleGreen,
-                                                modifier = Modifier.size(15.dp)
+                                                tint = monetColors.primary,
+                                                modifier = Modifier.size(16.dp)
                                             )
                                             Text(
-                                                text = if (isMissed) "Missed" else if (isOut) "Outgoing (${formatDuration(log.durationSeconds)})" else "Incoming (${formatDuration(log.durationSeconds)})",
-                                                color = if (isMissed) AppleRed else TextSecondary,
-                                                fontSize = 12.sp
+                                                text = "RECENT CALLS",
+                                                color = monetColors.primary,
+                                                fontSize = 11.sp,
+                                                fontFamily = GoogleSans,
+                                                fontWeight = FontWeight.Bold,
+                                                letterSpacing = 0.8.sp
                                             )
                                         }
-                                        Text(formatCallDate(log.timestamp), color = TextTertiary, fontSize = 11.sp)
+                                        Text(
+                                            text = "${callHistory.size} recorded",
+                                            color = monetColors.onSurfaceVariant,
+                                            fontSize = 11.sp,
+                                            fontFamily = GoogleSans
+                                        )
+                                    }
+
+                                    callHistory.take(4).forEach { log ->
+                                        val isMissed = log.type == CallLog.Calls.MISSED_TYPE || log.type == CallLog.Calls.REJECTED_TYPE
+                                        val isOut = log.type == CallLog.Calls.OUTGOING_TYPE
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(28.dp)
+                                                        .clip(CircleShape)
+                                                        .background(
+                                                            if (isMissed) Color(0xFFF44336).copy(alpha = 0.15f)
+                                                            else if (isOut) Color(0xFF2196F3).copy(alpha = 0.15f)
+                                                            else Color(0xFF4CAF50).copy(alpha = 0.15f)
+                                                        ),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = if (isMissed) Icons.Filled.CallMissed else if (isOut) Icons.Filled.CallMade else Icons.Filled.CallReceived,
+                                                        contentDescription = null,
+                                                        tint = if (isMissed) Color(0xFFF44336) else if (isOut) Color(0xFF2196F3) else Color(0xFF4CAF50),
+                                                        modifier = Modifier.size(15.dp)
+                                                    )
+                                                }
+                                                Column {
+                                                    Text(
+                                                        text = if (isMissed) "Missed" else if (isOut) "Outgoing" else "Incoming",
+                                                        color = if (isMissed) Color(0xFFF44336) else monetColors.onSurface,
+                                                        fontSize = 13.sp,
+                                                        fontFamily = GoogleSans,
+                                                        fontWeight = FontWeight.Medium
+                                                    )
+                                                    if (!isMissed && log.durationSeconds > 0) {
+                                                        Text(
+                                                            text = formatDuration(log.durationSeconds),
+                                                            color = monetColors.onSurfaceVariant,
+                                                            fontSize = 11.sp,
+                                                            fontFamily = GoogleSans
+                                                        )
+                                                    }
+                                                }
+                                            }
+
+                                            Text(
+                                                text = formatCallDate(log.timestamp),
+                                                color = monetColors.onSurfaceVariant,
+                                                fontSize = 11.5.sp,
+                                                fontFamily = GoogleSans
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
 
-                    // Card 4: Quick Utilities (WhatsApp, Block)
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(Color(0x14FFFFFF))
-                            .border(0.8.dp, Color(0x25FFFFFF), RoundedCornerShape(20.dp))
-                            .padding(14.dp)
-                    ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        // Card 4: Security (Block & Report Spam)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(monetColors.surfaceContainerHighest.copy(alpha = 0.50f))
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    Toast.makeText(context, "${contact.name} added to Auto-Screen blocklist", Toast.LENGTH_SHORT).show()
+                                    animateDismiss()
+                                }
+                                .padding(16.dp)
+                        ) {
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        val digits = contact.number.filter { it.isDigit() }
-                                        val waIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$digits"))
-                                        try { context.startActivity(waIntent) } catch (_: Exception) {}
-                                    }
-                                    .padding(vertical = 4.dp),
+                                modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("Send WhatsApp Message", color = AppleGreen, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                                Icon(Icons.Rounded.Chat, contentDescription = null, tint = AppleGreen, modifier = Modifier.size(14.dp))
-                            }
-
-                            Box(modifier = Modifier.fillMaxWidth().height(0.6.dp).background(Color(0x18FFFFFF)))
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        Toast.makeText(context, "${contact.name} added to Auto-Screen blocklist", Toast.LENGTH_SHORT).show()
-                                        onDismiss()
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFF44336).copy(alpha = 0.15f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Block,
+                                            contentDescription = null,
+                                            tint = Color(0xFFF44336),
+                                            modifier = Modifier.size(18.dp)
+                                        )
                                     }
-                                    .padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("Block & Auto-Screen This Number", color = AppleRed, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                                Icon(Icons.Filled.Warning, contentDescription = null, tint = AppleRed, modifier = Modifier.size(14.dp))
+                                    Text(
+                                        text = "Block & report spam",
+                                        color = Color(0xFFF44336),
+                                        fontSize = 14.sp,
+                                        fontFamily = GoogleSans,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+
+                                Icon(
+                                    imageVector = Icons.Rounded.ChevronRight,
+                                    contentDescription = null,
+                                    tint = Color(0xFFF44336).copy(alpha = 0.70f),
+                                    modifier = Modifier.size(18.dp)
+                                )
                             }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                        // Bottom Spacer for Gesture Navigation Bar
+                        Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                 }
             }
         }
     }
-}
 }
 
 @Composable
@@ -1797,6 +2635,7 @@ fun ContactHeroActionPill(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     accentColor: Color,
+    buttonBg: Color = Color(0x1EFFFFFF),
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -1821,16 +2660,27 @@ fun ContactHeroActionPill(
             modifier = Modifier
                 .size(54.dp)
                 .clip(CircleShape)
-                .background(if (isPressed) Color(0x35FFFFFF) else Color(0x1EFFFFFF))
-                .border(1.dp, if (isPressed) Color(0x60FFFFFF) else Color(0x35FFFFFF), CircleShape),
+                .background(if (isPressed) buttonBg.copy(alpha = 0.75f) else buttonBg),
             contentAlignment = Alignment.Center
         ) {
-            Icon(imageVector = icon, contentDescription = label, tint = accentColor, modifier = Modifier.size(22.dp))
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = accentColor,
+                modifier = Modifier.size(22.dp)
+            )
         }
         Spacer(modifier = Modifier.height(6.dp))
-        Text(text = label, color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+        Text(
+            text = label,
+            color = Color(0xFFE2E2E6),
+            fontSize = 11.5.sp,
+            fontFamily = GoogleSans,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
+
 
 @Composable
 fun CallLogDetailsDialog(
@@ -1918,6 +2768,7 @@ fun PremiumGlassSearchBar(
                 textStyle = TextStyle(
                     color = Color.White,
                     fontSize = 14.5.sp,
+                    fontFamily = GoogleSans,
                     fontWeight = FontWeight.Normal
                 ),
                 cursorBrush = SolidColor(Color.White),
@@ -1932,7 +2783,8 @@ fun PremiumGlassSearchBar(
                     if (query.isEmpty()) {
                         Text(
                             text = placeholder,
-                            color = Color(0x55FFFFFF),
+                            color = Color(0x66FFFFFF),
+                            fontFamily = GoogleSans,
                             fontSize = 14.5.sp
                         )
                     }
@@ -1965,13 +2817,16 @@ fun PremiumGlassSearchBar(
     }
 }
 
+
+
 /**
- * Screen 2: Contacts (Searchable, Alphabetical Indexing, Clean Minimal Frosted Glass Rows)
+ * Screen 2: Contacts (Material You / Expressive Pixel Contacts, Dynamic Monet Squircles & Quick Actions)
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ContactsScreen(
     contacts: List<ContactItem>,
+    callLogs: List<CallLogItem> = emptyList(),
     isLoading: Boolean,
     onCall: (String) -> Unit,
     onOpenDetails: (ContactItem) -> Unit = {},
@@ -1979,7 +2834,20 @@ fun ContactsScreen(
     onOpenPresetManager: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     var searchQuery by remember { mutableStateOf("") }
+
+    val monetColors: ColorScheme = remember(context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                dynamicDarkColorScheme(context)
+            } catch (_: Exception) {
+                getPixelMonetDarkColorScheme()
+            }
+        } else {
+            getPixelMonetDarkColorScheme()
+        }
+    }
 
     val filteredContacts = remember(contacts, searchQuery) {
         if (searchQuery.isBlank()) {
@@ -2001,12 +2869,79 @@ fun ContactsScreen(
         }
     }
 
+    // Intelligent Frequent Contacts: Starred Contacts + Highest Call Frequency & Recency
+    val frequentContacts = remember(contacts, callLogs) {
+        if (contacts.isEmpty()) return@remember emptyList<ContactItem>()
+
+        fun norm(num: String): String {
+            val digits = num.filter { it.isDigit() }
+            return if (digits.length >= 7) digits.takeLast(10) else digits
+        }
+
+        val callStats = mutableMapOf<String, Pair<Int, Long>>()
+        for (log in callLogs) {
+            val n = norm(log.number)
+            if (n.isNotEmpty()) {
+                val (count, latest) = callStats[n] ?: Pair(0, 0L)
+                callStats[n] = Pair(count + 1, maxOf(latest, log.timestamp))
+            }
+        }
+
+        val now = System.currentTimeMillis()
+        val thirtyDaysMs = 30L * 24 * 60 * 60 * 1000
+
+        val scored = contacts.mapNotNull { contact ->
+            val n = norm(contact.number)
+            val stats = if (n.isNotEmpty()) callStats[n] else null
+            val callCount = stats?.first ?: 0
+            val latestTime = stats?.second ?: 0L
+
+            var score = 0
+            if (contact.isStarred) {
+                score += 10000
+            }
+            if (callCount > 0) {
+                score += callCount * 100
+                if (latestTime > 0 && (now - latestTime) < thirtyDaysMs) {
+                    val recencyFactor = 1.0 - ((now - latestTime).toDouble() / thirtyDaysMs)
+                    score += (recencyFactor * 50).toInt()
+                }
+            }
+
+            if (score > 0) {
+                Triple(contact, score, latestTime)
+            } else {
+                null
+            }
+        }
+
+        if (scored.isNotEmpty()) {
+            scored.sortedWith(
+                compareByDescending<Triple<ContactItem, Int, Long>> { it.second }
+                    .thenByDescending { it.third }
+            )
+            .map { it.first }
+            .distinctBy { norm(it.number).ifEmpty { it.name } }
+            .take(8)
+        } else {
+            contacts.filter { it.name.isNotBlank() && it.name != "Unknown" && it.number.isNotBlank() }.take(6)
+        }
+    }
+
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (isLoading && contacts.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "Loading contacts...", color = TextSecondary, fontSize = 14.sp)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Loading contacts...",
+                        color = monetColors.onSurfaceVariant,
+                        fontSize = 15.sp,
+                        fontFamily = GoogleSans,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
         } else if (filteredContacts.isEmpty()) {
             Box(
@@ -2015,121 +2950,371 @@ fun ContactsScreen(
                     .padding(bottom = 40.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(horizontal = 32.dp)
+                ) {
                     Box(
                         modifier = Modifier
-                            .size(60.dp)
+                            .size(72.dp)
                             .clip(CircleShape)
-                            .background(Color(0x14FFFFFF))
-                            .border(1.dp, Color(0x25FFFFFF), CircleShape),
+                            .background(monetColors.primaryContainer.copy(alpha = 0.6f))
+                            .border(1.dp, monetColors.primary.copy(alpha = 0.4f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Person,
                             contentDescription = null,
-                            tint = TextMuted,
-                            modifier = Modifier.size(26.dp)
+                            tint = monetColors.primary,
+                            modifier = Modifier.size(34.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = if (searchQuery.isNotEmpty()) "No Matching Contacts" else "No Contacts Found",
-                        color = Color.White,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.SemiBold
+                        text = if (searchQuery.isNotEmpty()) "No Matching Contacts" else "No Contacts Yet",
+                        color = monetColors.onSurface,
+                        fontSize = 18.sp,
+                        fontFamily = GoogleSans,
+                        fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Allow Contacts permission to view phonebook",
-                        color = TextTertiary,
-                        fontSize = 13.sp
+                        text = if (searchQuery.isNotEmpty())
+                            "No contacts match \"$searchQuery\""
+                        else
+                            "Add contacts to your phonebook or grant permission to view them",
+                        color = monetColors.onSurfaceVariant,
+                        fontSize = 13.5.sp,
+                        fontFamily = GoogleSans,
+                        textAlign = TextAlign.Center
                     )
+                    Spacer(modifier = Modifier.height(18.dp))
+                    // Add Contact Pill
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(monetColors.primaryContainer)
+                            .border(1.dp, monetColors.primary.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                            .clickable {
+                                val intent = Intent(Intent.ACTION_INSERT).apply {
+                                    type = ContactsContract.Contacts.CONTENT_TYPE
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                try { context.startActivity(intent) } catch (_: Exception) {}
+                            }
+                            .padding(horizontal = 18.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.PersonAdd,
+                            contentDescription = null,
+                            tint = monetColors.onPrimaryContainer,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = "Add Contact",
+                            color = monetColors.onPrimaryContainer,
+                            fontSize = 14.sp,
+                            fontFamily = GoogleSans,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         } else {
-            // LazyColumn extends edge-to-edge; items scroll fluidly underneath the transparent status bar!
+            // LazyColumn with generous top clearance for status bar + header
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = statusBarTop + 116.dp, bottom = 120.dp, start = 20.dp, end = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                contentPadding = PaddingValues(top = statusBarTop + 124.dp, bottom = 120.dp, start = 18.dp, end = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                if (searchQuery.isBlank() && frequentContacts.isNotEmpty()) {
+                    item(key = "favorites_section") {
+                        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "FREQUENT CONTACTS",
+                                    fontFamily = GoogleSans,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = monetColors.primary,
+                                    letterSpacing = 0.8.sp
+                                )
+                                Text(
+                                    text = "${frequentContacts.size} quick access",
+                                    fontFamily = GoogleSans,
+                                    fontSize = 10.5.sp,
+                                    color = monetColors.onSurfaceVariant
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                itemsIndexed(frequentContacts, key = { index, contact -> "fav_${contact.id}_${contact.number}_$index" }) { _, contact ->
+                                    val (avatarBg, avatarFg) = remember(contact.name) {
+                                        getMonetAvatarColors(contact.name, monetColors)
+                                    }
+                                    val favInitials = remember(contact.name) {
+                                        getContactInitials(contact.name)
+                                    }
+                                    val favInteraction = remember { MutableInteractionSource() }
+                                    val isFavPressed by favInteraction.collectIsPressedAsState()
+                                    val favScale by animateFloatAsState(
+                                        targetValue = if (isFavPressed) 0.94f else 1.0f,
+                                        animationSpec = spring(dampingRatio = 0.65f),
+                                        label = "favCardScale"
+                                    )
+
+                                    Column(
+                                        modifier = Modifier
+                                            .width(108.dp)
+                                            .scale(favScale)
+                                            .clip(RoundedCornerShape(20.dp))
+                                            .background(
+                                                if (isFavPressed) monetColors.primaryContainer.copy(alpha = 0.35f)
+                                                else Color(0xFF1A1D24)
+                                            )
+                                            .border(
+                                                0.8.dp,
+                                                if (isFavPressed) monetColors.primary.copy(alpha = 0.5f)
+                                                else monetColors.outlineVariant.copy(alpha = 0.3f),
+                                                RoundedCornerShape(20.dp)
+                                            )
+                                            .clickable(
+                                                interactionSource = favInteraction,
+                                                indication = null,
+                                                onClick = { onOpenDetails(contact) }
+                                            )
+                                            .padding(horizontal = 10.dp, vertical = 10.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Box(
+                                            modifier = Modifier.size(42.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(42.dp)
+                                                    .clip(CircleShape)
+                                                    .background(avatarBg),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = favInitials,
+                                                    color = avatarFg,
+                                                    fontSize = 14.sp,
+                                                    fontFamily = GoogleSans,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                            if (contact.isStarred) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .align(Alignment.BottomEnd)
+                                                        .size(15.dp)
+                                                        .clip(CircleShape)
+                                                        .background(Color(0xFFFFB74D)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.Star,
+                                                        contentDescription = "Starred",
+                                                        tint = Color.Black,
+                                                        modifier = Modifier.size(9.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(7.dp))
+
+                                        Text(
+                                            text = contact.name,
+                                            color = monetColors.onSurface,
+                                            fontSize = 12.5.sp,
+                                            fontFamily = GoogleSans,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            textAlign = TextAlign.Center
+                                        )
+
+                                        Spacer(modifier = Modifier.height(4.dp))
+
+                                        // Mini Call Button
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(Color(0xFF2EAA55))
+                                                .clickable {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    onCall(contact.number)
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Call,
+                                                contentDescription = "Call",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
+                }
+
+                // Grouped Alphabetical Contacts
                 groupedContacts.forEach { (sectionKey, contactsInSection) ->
                     item(key = "section_$sectionKey") {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 2.dp, bottom = 4.dp, start = 4.dp),
+                                .padding(top = 6.dp, bottom = 4.dp, start = 4.dp, end = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = sectionKey,
-                                color = TextSecondary,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
                             Box(
                                 modifier = Modifier
-                                    .height(0.6.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(monetColors.primaryContainer.copy(alpha = 0.65f))
+                                    .padding(horizontal = 9.dp, vertical = 3.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = sectionKey,
+                                    color = monetColors.onPrimaryContainer,
+                                    fontFamily = GoogleSans,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Box(
+                                modifier = Modifier
+                                    .height(0.8.dp)
                                     .weight(1f)
-                                    .background(Color(0x18FFFFFF))
+                                    .background(monetColors.outlineVariant.copy(alpha = 0.25f))
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "${contactsInSection.size}",
+                                color = monetColors.onSurfaceVariant.copy(alpha = 0.7f),
+                                fontFamily = GoogleSans,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }
 
-                    items(contactsInSection, key = { it.id }) { contact ->
-                        val initials = remember(contact.name) {
-                            val parts = contact.name.trim().split(" ").filter { it.isNotBlank() }
-                            if (parts.size >= 2) {
-                                "${parts[0].first().uppercaseChar()}${parts[1].first().uppercaseChar()}"
-                            } else {
-                                contact.name.take(2).uppercase()
-                            }
+                    itemsIndexed(contactsInSection, key = { index, contact -> "contact_${sectionKey}_${contact.id}_${contact.number}_$index" }) { _, contact ->
+                        val (avatarBg, avatarFg) = remember(contact.name) {
+                            getMonetAvatarColors(contact.name, monetColors)
                         }
+                        val initials = remember(contact.name) {
+                            getContactInitials(contact.name)
+                        }
+                        val contactPhotoBitmap = rememberContactPhotoBitmap(contact.photoUri)
 
                         val interactionSource = remember { MutableInteractionSource() }
                         val isPressed by interactionSource.collectIsPressedAsState()
                         val rowScale by animateFloatAsState(
-                            targetValue = if (isPressed) 0.975f else 1.0f,
+                            targetValue = if (isPressed) 0.98f else 1.0f,
                             animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
                             label = "contactRowScale"
                         )
 
-                        // Minimalist, uniform frosted glass contact row
+                        // Material You / Expressive Squircle Contact Row
                         Box(
                             modifier = Modifier
                                 .animateItemPlacement()
                                 .scale(rowScale)
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(if (isPressed) Color(0x22FFFFFF) else Color(0x14FFFFFF))
-                                .border(0.8.dp, if (isPressed) Color(0x40FFFFFF) else Color(0x22FFFFFF), RoundedCornerShape(18.dp))
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(
+                                    if (isPressed) monetColors.primaryContainer.copy(alpha = 0.35f)
+                                    else Color(0xFF191C23)
+                                )
+                                .border(
+                                    0.8.dp,
+                                    if (isPressed) monetColors.primary.copy(alpha = 0.5f)
+                                    else monetColors.outlineVariant.copy(alpha = 0.3f),
+                                    RoundedCornerShape(20.dp)
+                                )
                                 .clickable(
                                     interactionSource = interactionSource,
                                     indication = null,
                                     onClick = { onOpenDetails(contact) }
                                 )
-                                .padding(horizontal = 14.dp, vertical = 11.dp)
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Frosted titanium glass initials avatar (clean monochrome)
+                                // Dynamic Monet Pastel Avatar or Custom Photo
                                 Box(
-                                    modifier = Modifier
-                                        .size(42.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0x26FFFFFF))
-                                        .border(0.8.dp, Color(0x40FFFFFF), CircleShape),
+                                    modifier = Modifier.size(44.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(
-                                        text = initials,
-                                        color = Color.White,
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    if (contactPhotoBitmap != null) {
+                                        Image(
+                                            bitmap = contactPhotoBitmap,
+                                            contentDescription = contact.name,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier
+                                                .size(44.dp)
+                                                .clip(CircleShape)
+                                        )
+                                    } else {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(44.dp)
+                                                .clip(CircleShape)
+                                                .background(avatarBg),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = initials,
+                                                color = avatarFg,
+                                                fontSize = 15.sp,
+                                                fontFamily = GoogleSans,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                    if (contact.isStarred) {
+                                        Box(
+                                            modifier = Modifier
+                                                .align(Alignment.BottomEnd)
+                                                .size(15.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(0xFFFFB74D)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Star,
+                                                contentDescription = "Starred",
+                                                tint = Color.Black,
+                                                modifier = Modifier.size(9.dp)
+                                            )
+                                        }
+                                    }
                                 }
 
                                 Spacer(modifier = Modifier.width(12.dp))
@@ -2137,8 +3322,9 @@ fun ContactsScreen(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = contact.name,
-                                        color = Color.White,
+                                        color = monetColors.onSurface,
                                         fontSize = 15.sp,
+                                        fontFamily = GoogleSans,
                                         fontWeight = FontWeight.SemiBold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -2146,9 +3332,9 @@ fun ContactsScreen(
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
                                         text = DialerRepository.formatPhoneNumber(contact.number),
-                                        color = TextSecondary,
+                                        color = monetColors.onSurfaceVariant,
                                         fontSize = 12.sp,
-                                        fontFamily = FontFamily.Monospace,
+                                        fontFamily = GoogleSans,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -2156,7 +3342,7 @@ fun ContactsScreen(
 
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     val msgInteraction = remember { MutableInteractionSource() }
                                     val isMsgPressed by msgInteraction.collectIsPressedAsState()
@@ -2169,15 +3355,16 @@ fun ContactsScreen(
                                     // Send Message Button
                                     Box(
                                         modifier = Modifier
-                                            .size(32.dp)
+                                            .size(36.dp)
                                             .scale(msgScale)
-                                            .clip(CircleShape)
-                                            .background(Color(0x1EFFFFFF))
-                                            .border(0.8.dp, Color(0x35FFFFFF), CircleShape)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(monetColors.surfaceContainerHighest.copy(alpha = 0.7f))
+                                            .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
                                             .clickable(
                                                 interactionSource = msgInteraction,
                                                 indication = null,
                                                 onClick = {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                                     DialerRepository.sendSms(context, contact.number)
                                                 }
                                             ),
@@ -2186,8 +3373,42 @@ fun ContactsScreen(
                                         Icon(
                                             imageVector = Icons.Rounded.Chat,
                                             contentDescription = "Message",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(15.dp)
+                                            tint = monetColors.primary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+
+                                    // Contact Info Button (Per Contact Details Pill)
+                                    val infoInteraction = remember { MutableInteractionSource() }
+                                    val isInfoPressed by infoInteraction.collectIsPressedAsState()
+                                    val infoScale by animateFloatAsState(
+                                        targetValue = if (isInfoPressed) 0.88f else 1.0f,
+                                        animationSpec = spring(dampingRatio = 0.65f),
+                                        label = "infoBtnScale"
+                                    )
+
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .scale(infoScale)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(monetColors.surfaceContainerHighest.copy(alpha = 0.7f))
+                                            .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                            .clickable(
+                                                interactionSource = infoInteraction,
+                                                indication = null,
+                                                onClick = {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    onOpenDetails(contact)
+                                                }
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Info,
+                                            contentDescription = "Contact Info",
+                                            tint = monetColors.onSurfaceVariant,
+                                            modifier = Modifier.size(16.dp)
                                         )
                                     }
 
@@ -2202,14 +3423,17 @@ fun ContactsScreen(
                                     // Call Button
                                     Box(
                                         modifier = Modifier
-                                            .size(32.dp)
+                                            .size(36.dp)
                                             .scale(callScale)
-                                            .clip(CircleShape)
-                                            .background(AppleGreen)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(Color(0xFF2EAA55))
                                             .clickable(
                                                 interactionSource = callInteraction,
                                                 indication = null,
-                                                onClick = { onCall(contact.number) }
+                                                onClick = {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    onCall(contact.number)
+                                                }
                                             ),
                                         contentAlignment = Alignment.Center
                                     ) {
@@ -2217,7 +3441,7 @@ fun ContactsScreen(
                                             imageVector = Icons.Filled.Call,
                                             contentDescription = "Call",
                                             tint = Color.White,
-                                            modifier = Modifier.size(16.dp)
+                                            modifier = Modifier.size(17.dp)
                                         )
                                     }
                                 }
@@ -2228,55 +3452,90 @@ fun ContactsScreen(
             }
         }
 
-        // Pinned Top Header and Search Bar (Solid Background so scrolling contacts never bleed through or hide it)
+        // Pinned Material 3 Top Header & Search Bar (Solid Gradient Background)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            Color(0xFF000000),
-                            Color(0xFF000000),
-                            Color(0xF5000000),
-                            Color(0xCC000000),
+                            Color(0xFF0F1116),
+                            Color(0xFF0F1116),
+                            Color(0xF50F1116),
+                            Color(0xD00F1116),
                             Color.Transparent
                         )
                     )
                 )
                 .statusBarsPadding()
-                .padding(top = 14.dp, start = 20.dp, end = 20.dp, bottom = 10.dp)
+                .padding(top = 10.dp, start = 18.dp, end = 18.dp, bottom = 10.dp)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 12.dp),
+                    .padding(bottom = 10.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "Contacts",
-                    color = Color.White,
+                    color = monetColors.onSurface,
                     fontSize = 28.sp,
+                    fontFamily = GoogleSans,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = (-0.5).sp
                 )
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    // + Add Contact Button
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(monetColors.primaryContainer.copy(alpha = 0.8f))
+                            .border(0.8.dp, monetColors.primary.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
+                            .clickable {
+                                val intent = Intent(Intent.ACTION_INSERT).apply {
+                                    type = ContactsContract.Contacts.CONTENT_TYPE
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                try { context.startActivity(intent) } catch (_: Exception) {}
+                            }
+                            .padding(horizontal = 9.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.PersonAdd,
+                            contentDescription = "Add Contact",
+                            tint = monetColors.onPrimaryContainer,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = "New",
+                            color = monetColors.onPrimaryContainer,
+                            fontSize = 12.sp,
+                            fontFamily = GoogleSans,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Total Count Pill
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(14.dp))
-                            .background(Color(0xFF1E2430))
-                            .border(1.dp, Color(0x35FFFFFF), RoundedCornerShape(14.dp))
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                            .background(monetColors.surfaceContainerHigh.copy(alpha = 0.7f))
+                            .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
+                            .padding(horizontal = 9.dp, vertical = 6.dp)
                     ) {
                         Text(
-                            text = "${contacts.size} Total",
-                            color = Color(0xCCFFFFFF),
+                            text = "${contacts.size}",
+                            color = monetColors.onSurfaceVariant,
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
+                            fontFamily = GoogleSans,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
 
@@ -2291,18 +3550,19 @@ fun ContactsScreen(
                         Box(
                             modifier = Modifier
                                 .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Color(0x18FFFFFF))
-                                .border(0.8.dp, Color(0x30FFFFFF), CircleShape)
-                                .clickable {
-                                    isMenuExpanded = !isMenuExpanded
-                                },
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(monetColors.surfaceContainerHigh.copy(alpha = 0.7f))
+                                .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                isMenuExpanded = !isMenuExpanded
+                            },
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.MoreVert,
                                 contentDescription = "Options",
-                                tint = Color.White,
+                                tint = monetColors.onSurface,
                                 modifier = Modifier
                                     .size(18.dp)
                                     .graphicsLayer { rotationZ = menuRotation }
@@ -2313,9 +3573,9 @@ fun ContactsScreen(
                             expanded = isMenuExpanded,
                             onDismissRequest = { isMenuExpanded = false },
                             modifier = Modifier
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(Color(0xF0151926))
-                                .border(1.dp, Color(0x30FFFFFF), RoundedCornerShape(18.dp))
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Color(0xF0181B22))
+                                .border(1.dp, monetColors.outlineVariant.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
                                 .padding(vertical = 4.dp)
                         ) {
                             DropdownMenuItem(
@@ -2324,8 +3584,8 @@ fun ContactsScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
-                                        Icon(Icons.Rounded.Settings, contentDescription = null, tint = AppleBlue, modifier = Modifier.size(18.dp))
-                                        Text("Call Settings", color = Color.White, fontSize = 14.sp)
+                                        Icon(Icons.Rounded.Settings, contentDescription = null, tint = monetColors.primary, modifier = Modifier.size(18.dp))
+                                        Text("Call Settings", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = GoogleSans)
                                     }
                                 },
                                 onClick = {
@@ -2340,7 +3600,7 @@ fun ContactsScreen(
                                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
                                         Icon(Icons.Rounded.Tune, contentDescription = null, tint = AppleAmber, modifier = Modifier.size(18.dp))
-                                        Text("Audio Presets & Personas", color = Color.White, fontSize = 14.sp)
+                                        Text("Audio Presets & Personas", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = GoogleSans)
                                     }
                                 },
                                 onClick = {
@@ -2353,24 +3613,152 @@ fun ContactsScreen(
                 }
             }
 
-            // Visible, High-Contrast Solid Search Bar
+            // Expressive Material 3 Search Bar
             PremiumGlassSearchBar(
                 query = searchQuery,
                 onQueryChange = { searchQuery = it },
-                placeholder = "Search contacts..."
+                placeholder = "Search ${contacts.size} contacts or numbers..."
             )
         }
     }
 }
 
 /**
- * OEM Specular Dialpad Key Button (Authentic Minimalist Apple Glass Style, Spacious 75dp Keys)
+ * Modern Google Pixel Material 3 Expressive Search Capsule
+ * Pill-shaped, dynamic Monet styling, integrated clear/mic & 3-dots overflow menu.
+ */
+@Composable
+fun PixelDialerSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    placeholder: String = "Search contacts & numbers...",
+    monetColors: ColorScheme = getPixelMonetDarkColorScheme(),
+    onMenuClick: () -> Unit = {},
+    menuRotation: Float = 0f,
+    modifier: Modifier = Modifier,
+    menuContent: @Composable () -> Unit = {}
+) {
+    var isSearchFocused by remember { mutableStateOf(false) }
+
+    val borderColor by animateColorAsState(
+        targetValue = if (isSearchFocused) monetColors.primary.copy(alpha = 0.65f)
+        else monetColors.outlineVariant.copy(alpha = 0.3f),
+        animationSpec = tween(durationMillis = 180),
+        label = "searchPillBorder"
+    )
+
+    val bgColor by animateColorAsState(
+        targetValue = if (isSearchFocused) monetColors.surfaceContainerHighest.copy(alpha = 0.95f)
+        else monetColors.surfaceContainerHigh.copy(alpha = 0.85f),
+        animationSpec = tween(durationMillis = 180),
+        label = "searchPillBg"
+    )
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .shadow(
+                elevation = if (isSearchFocused) 6.dp else 2.dp,
+                shape = RoundedCornerShape(26.dp),
+                spotColor = Color(0x50000000)
+            )
+            .clip(RoundedCornerShape(26.dp))
+            .background(bgColor)
+            .border(0.8.dp, borderColor, RoundedCornerShape(26.dp))
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Search,
+            contentDescription = "Search",
+            tint = if (isSearchFocused) monetColors.primary else monetColors.onSurfaceVariant,
+            modifier = Modifier.size(22.dp)
+        )
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        BasicTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier
+                .weight(1f)
+                .onFocusChanged { isSearchFocused = it.isFocused },
+            textStyle = TextStyle(
+                fontFamily = GoogleSans,
+                fontSize = 15.sp,
+                color = monetColors.onSurface,
+                fontWeight = FontWeight.Normal
+            ),
+            singleLine = true,
+            cursorBrush = SolidColor(monetColors.primary),
+            decorationBox = { innerTextField ->
+                if (query.isEmpty()) {
+                    Text(
+                        text = placeholder,
+                        fontFamily = GoogleSans,
+                        fontSize = 15.sp,
+                        color = monetColors.onSurfaceVariant.copy(alpha = 0.7f),
+                        fontWeight = FontWeight.Normal
+                    )
+                }
+                innerTextField()
+            }
+        )
+
+        if (query.isNotEmpty()) {
+            IconButton(
+                onClick = { onQueryChange("") },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Close,
+                    contentDescription = "Clear",
+                    tint = monetColors.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        } else {
+            Icon(
+                imageVector = Icons.Filled.Mic,
+                contentDescription = "Voice Search",
+                tint = monetColors.onSurfaceVariant.copy(alpha = 0.85f),
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        Box(contentAlignment = Alignment.TopEnd) {
+            IconButton(
+                onClick = onMenuClick,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.MoreVert,
+                    contentDescription = "Menu",
+                    tint = monetColors.onSurfaceVariant,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .graphicsLayer { rotationZ = menuRotation }
+                )
+            }
+
+            menuContent()
+        }
+    }
+}
+
+/**
+ * Modern Material 3 Expressive Pixel Dialpad Key Button
+ * Squircle/Pill (28dp), tactile spring press scaling, Monet accent container response, Google Sans
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OemDialerKeyButton(
     digit: String,
     letters: String,
+    monetColors: ColorScheme = getPixelMonetDarkColorScheme(),
     onClick: () -> Unit,
     onLongClick: () -> Unit = {}
 ) {
@@ -2378,25 +3766,37 @@ fun OemDialerKeyButton(
     val isPressed by interactionSource.collectIsPressedAsState()
 
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.92f else 1.0f,
-        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
+        targetValue = if (isPressed) 0.90f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessMediumLow),
         label = "keyScale"
+    )
+
+    val bgColor by animateColorAsState(
+        targetValue = if (isPressed) monetColors.primaryContainer.copy(alpha = 0.9f)
+        else monetColors.surfaceContainerHigh.copy(alpha = 0.95f),
+        animationSpec = tween(durationMillis = 100),
+        label = "keyBgColor"
+    )
+
+    val borderColor by animateColorAsState(
+        targetValue = if (isPressed) monetColors.primary.copy(alpha = 0.6f)
+        else monetColors.outlineVariant.copy(alpha = 0.3f),
+        animationSpec = tween(durationMillis = 100),
+        label = "keyBorderColor"
     )
 
     Box(
         modifier = Modifier
-            .size(75.dp)
+            .size(74.dp, 72.dp)
             .scale(scale)
-            .clip(CircleShape)
-            .background(
-                if (isPressed) Color(0x35FFFFFF)
-                else Color(0x18FFFFFF)
+            .shadow(
+                elevation = if (isPressed) 1.dp else 3.dp,
+                shape = RoundedCornerShape(28.dp),
+                spotColor = Color(0x40000000)
             )
-            .border(
-                1.dp,
-                if (isPressed) Color(0x60FFFFFF) else Color(0x24FFFFFF),
-                CircleShape
-            )
+            .clip(RoundedCornerShape(28.dp))
+            .background(bgColor)
+            .border(0.8.dp, borderColor, RoundedCornerShape(28.dp))
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -2411,28 +3811,40 @@ fun OemDialerKeyButton(
         ) {
             Text(
                 text = digit,
-                color = Color.White,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Normal,
-                fontFamily = FontFamily.SansSerif,
+                color = if (isPressed) monetColors.onPrimaryContainer else monetColors.onSurface,
+                fontSize = if (digit == "*" || digit == "#") 32.sp else 30.sp,
+                fontWeight = FontWeight.Medium,
+                fontFamily = GoogleSans,
                 lineHeight = 30.sp
             )
-            if (letters.isNotEmpty()) {
+            if (digit == "1") {
+                // Modern Google Pixel Dialer Voicemail icon
+                Icon(
+                    imageVector = Icons.Rounded.Voicemail,
+                    contentDescription = "Voicemail",
+                    tint = if (isPressed) monetColors.onPrimaryContainer.copy(alpha = 0.85f)
+                    else monetColors.onSurfaceVariant.copy(alpha = 0.8f),
+                    modifier = Modifier.size(13.dp)
+                )
+            } else if (letters.isNotEmpty()) {
                 Text(
                     text = letters,
-                    color = Color(0xAAFFFFFF),
+                    color = if (isPressed) monetColors.onPrimaryContainer.copy(alpha = 0.85f)
+                    else monetColors.onSurfaceVariant.copy(alpha = 0.85f),
                     fontSize = 9.5.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 1.2.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = GoogleSans,
+                    letterSpacing = 1.8.sp,
                     lineHeight = 11.sp
                 )
             } else if (digit == "0") {
                 Text(
                     text = "+",
-                    color = Color(0xAAFFFFFF),
-                    fontSize = 11.sp,
+                    color = if (isPressed) monetColors.onPrimaryContainer else monetColors.primary,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    lineHeight = 11.sp
+                    fontFamily = GoogleSans,
+                    lineHeight = 12.sp
                 )
             }
         }
@@ -2440,28 +3852,47 @@ fun OemDialerKeyButton(
 }
 
 /**
- * OEM Floating Liquid Call Button with Apple Green Fill & Tactile Press (75dp Pro Size)
+ * Modern Material 3 Expressive Pixel Emerald Call Button
+ * Google Phone Call Green, tactile spring press scaling, elevated squircle (28dp), white handset icon
  */
 @Composable
 fun OemCallButton(
+    monetColors: ColorScheme = getPixelMonetDarkColorScheme(),
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.92f else 1.0f,
-        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
+        targetValue = if (isPressed) 0.89f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessMediumLow),
         label = "callBtnScale"
     )
 
     Box(
         modifier = Modifier
-            .size(75.dp)
+            .size(74.dp, 72.dp)
             .scale(scale)
-            .clip(CircleShape)
-            .background(AppleGreen)
-            .border(1.dp, Color(0x50FFFFFF), CircleShape)
+            .shadow(
+                elevation = if (isPressed) 2.dp else 8.dp,
+                shape = RoundedCornerShape(28.dp),
+                spotColor = Color(0x9034A853),
+                ambientColor = Color(0x5034A853)
+            )
+            .clip(RoundedCornerShape(28.dp))
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xFF34A853), // Google Phone Call Green 500
+                        Color(0xFF1E8E3E)  // Google Phone Call Green 700
+                    )
+                )
+            )
+            .border(
+                1.dp,
+                if (isPressed) Color(0x90FFFFFF) else Color(0x40FFFFFF),
+                RoundedCornerShape(28.dp)
+            )
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -2472,14 +3903,24 @@ fun OemCallButton(
         Icon(
             imageVector = Icons.Filled.Call,
             contentDescription = "Call",
-            tint = Color.Black,
-            modifier = Modifier.size(30.dp)
+            tint = Color.White,
+            modifier = Modifier.size(32.dp)
         )
     }
 }
 
+private data class KeypadRecentItem(
+    val id: Long,
+    val name: String,
+    val number: String,
+    val type: Int,
+    val timestamp: Long,
+    val isStarred: Boolean = false,
+    val photoUri: String? = null
+)
+
 /**
- * Screen 3: Keypad (100% Rock-Solid Stable OEM Dialpad, Fixed-Height Immobile Keys, DTMF Acoustics & T9 Lookup)
+ * Screen 3: Keypad (Google Pixel Material 3 Expressive Dialpad, T9 Suggestions, 100% Fixed Immobile Keys)
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -2496,6 +3937,19 @@ fun KeypadScreen(
     val haptic = LocalHapticFeedback.current
     var typedNumber by remember { mutableStateOf("") }
     var keypadSearchQuery by remember { mutableStateOf("") }
+    var isMenuExpanded by remember { mutableStateOf(false) }
+
+    val monetColors: ColorScheme = remember(context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                dynamicDarkColorScheme(context)
+            } catch (_: Exception) {
+                getPixelMonetDarkColorScheme()
+            }
+        } else {
+            getPixelMonetDarkColorScheme()
+        }
+    }
 
     val toneGenerator = remember {
         try { ToneGenerator(AudioManager.STREAM_DTMF, 70) } catch (_: Exception) { null }
@@ -2531,9 +3985,26 @@ fun KeypadScreen(
         DialerRepository.formatPhoneNumber(typedNumber)
     }
 
-    val t9Matches = remember(typedNumber, contacts) {
+    val t9Matches = remember(typedNumber, contacts, callLogs) {
         if (typedNumber.isBlank()) emptyList()
-        else contacts.filter { T9Helper.matches(it, typedNumber) }.take(3)
+        else {
+            val numToFreq = callLogs.groupingBy { log ->
+                val d = log.number.filter { it.isDigit() }
+                if (d.length >= 7) d.takeLast(10) else d
+            }.eachCount()
+
+            contacts.filter { T9Helper.matches(it, typedNumber) }
+                .sortedWith(
+                    compareByDescending<ContactItem> { it.isStarred }
+                        .thenByDescending { contact ->
+                            val d = contact.number.filter { it.isDigit() }
+                            val key = if (d.length >= 7) d.takeLast(10) else d
+                            numToFreq[key] ?: 0
+                        }
+                        .thenBy { it.name }
+                )
+                .take(8)
+        }
     }
 
     val keys = listOf(
@@ -2553,177 +4024,194 @@ fun KeypadScreen(
 
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
+    val menuRotation by animateFloatAsState(
+        targetValue = if (isMenuExpanded) 90f else 0f,
+        animationSpec = spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow),
+        label = "keypadMenuRotate"
+    )
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = statusBarTop + 14.dp)
+            .padding(top = statusBarTop + 10.dp)
             .navigationBarsPadding()
             .padding(bottom = 86.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // ColorOS Top Header: Title & Animated 3-Dots Menu with Generous Status Bar Clearance
+        // 1. Pinned Header: "Keypad" Title & Voicemail Shortcut
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 22.dp, vertical = 4.dp),
+                .padding(horizontal = 18.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Phone",
-                style = TextStyle(
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    letterSpacing = (-0.5).sp
+                text = "Keypad",
+                color = monetColors.onSurface,
+                fontSize = 28.sp,
+                fontFamily = GoogleSans,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.5).sp
+            )
+
+            // Voicemail / Speed Dial Capsule
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(monetColors.surfaceContainerHigh.copy(alpha = 0.7f))
+                    .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onCall("1")
+                    }
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Voicemail,
+                    contentDescription = "Voicemail",
+                    tint = monetColors.primary,
+                    modifier = Modifier.size(15.dp)
                 )
-            )
-
-            var isMenuExpanded by remember { mutableStateOf(false) }
-            val menuRotation by animateFloatAsState(
-                targetValue = if (isMenuExpanded) 90f else 0f,
-                animationSpec = spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow),
-                label = "keypadMenuRotate"
-            )
-
-            Box {
-                IconButton(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        isMenuExpanded = !isMenuExpanded
-                    },
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(CircleShape)
-                        .background(Color(0x18FFFFFF))
-                        .border(0.8.dp, Color(0x30FFFFFF), CircleShape)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.MoreVert,
-                        contentDescription = "Menu",
-                        tint = Color.White,
-                        modifier = Modifier
-                            .size(20.dp)
-                            .graphicsLayer { rotationZ = menuRotation }
-                    )
-                }
-
-                DropdownMenu(
-                    expanded = isMenuExpanded,
-                    onDismissRequest = { isMenuExpanded = false },
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(Color(0xF0151926))
-                        .border(1.dp, Color(0x30FFFFFF), RoundedCornerShape(18.dp))
-                        .padding(vertical = 4.dp)
-                ) {
-                    DropdownMenuItem(
-                        text = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Icon(Icons.Rounded.Settings, contentDescription = null, tint = AppleBlue, modifier = Modifier.size(18.dp))
-                                Text("Call Settings", color = Color.White, fontSize = 14.sp)
-                            }
-                        },
-                        onClick = {
-                            isMenuExpanded = false
-                            onOpenSettings()
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Icon(Icons.Rounded.Tune, contentDescription = null, tint = AppleAmber, modifier = Modifier.size(18.dp))
-                                Text("Audio Presets & Personas", color = Color.White, fontSize = 14.sp)
-                            }
-                        },
-                        onClick = {
-                            isMenuExpanded = false
-                            onOpenPresetManager()
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = AppleGreen, modifier = Modifier.size(18.dp))
-                                Text("AI Screening Studio", color = Color.White, fontSize = 14.sp)
-                            }
-                        },
-                        onClick = {
-                            isMenuExpanded = false
-                            onSwitchTab(DialerTab.ASSISTANT)
-                        }
-                    )
-                }
+                Text(
+                    text = "Voicemail",
+                    color = monetColors.onSurface,
+                    fontSize = 12.sp,
+                    fontFamily = GoogleSans,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Top Section: Purposeful Compact Display Area with Fluid Spring Crossfade
+        // 2. Google Pixel Search Pill with integrated Menu
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp)
+        ) {
+            PixelDialerSearchBar(
+                query = keypadSearchQuery,
+                onQueryChange = { keypadSearchQuery = it },
+                placeholder = "Search contacts or numbers...",
+                monetColors = monetColors,
+                onMenuClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    isMenuExpanded = !isMenuExpanded
+                },
+                menuRotation = menuRotation,
+                menuContent = {
+                    DropdownMenu(
+                        expanded = isMenuExpanded,
+                        onDismissRequest = { isMenuExpanded = false },
+                        offset = androidx.compose.ui.unit.DpOffset(x = 0.dp, y = 6.dp),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xF0181B22))
+                            .border(1.dp, monetColors.outlineVariant.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
+                            .padding(vertical = 4.dp)
+                    ) {
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Icon(Icons.Rounded.Settings, contentDescription = null, tint = monetColors.primary, modifier = Modifier.size(18.dp))
+                                    Text("Call Settings", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = GoogleSans)
+                                }
+                            },
+                            onClick = {
+                                isMenuExpanded = false
+                                onOpenSettings()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Icon(Icons.Rounded.Tune, contentDescription = null, tint = AppleAmber, modifier = Modifier.size(18.dp))
+                                    Text("Audio Presets & Personas", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = GoogleSans)
+                                }
+                            },
+                            onClick = {
+                                isMenuExpanded = false
+                                onOpenPresetManager()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = Color(0xFF2EAA55), modifier = Modifier.size(18.dp))
+                                    Text("AI Screening Studio", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = GoogleSans)
+                                }
+                            },
+                            onClick = {
+                                isMenuExpanded = false
+                                onSwitchTab(DialerTab.ASSISTANT)
+                            }
+                        )
+                    }
+                }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // 2. Upper Dynamic Section: Recents / T9 Suggestions / Dialed Number
         AnimatedContent(
             targetState = typedNumber.isEmpty(),
             transitionSpec = {
-                (slideInVertically(
-                    initialOffsetY = { -it / 3 },
-                    animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
-                ) + fadeIn(animationSpec = tween(180)))
+                (fadeIn(animationSpec = tween(200, easing = LinearOutSlowInEasing)) +
+                 scaleIn(initialScale = 0.96f, animationSpec = tween(200, easing = LinearOutSlowInEasing)))
                 .togetherWith(
-                    slideOutVertically(
-                        targetOffsetY = { -it / 3 },
-                        animationSpec = tween(140)
-                    ) + fadeOut(animationSpec = tween(120))
+                    fadeOut(animationSpec = tween(140, easing = FastOutLinearInEasing)) +
+                    scaleOut(targetScale = 0.96f, animationSpec = tween(140, easing = FastOutLinearInEasing))
                 )
             },
             label = "KeypadDisplayTransition",
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = 18.dp)
         ) { isEmpty ->
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 if (isEmpty) {
-                    PremiumGlassSearchBar(
-                        query = keypadSearchQuery,
-                        onQueryChange = { keypadSearchQuery = it },
-                        placeholder = "Search contacts or dial number..."
-                    )
-
                     val keypadMatches = remember(keypadSearchQuery, contacts) {
                         if (keypadSearchQuery.isBlank()) emptyList()
                         else contacts.filter {
                             it.name.contains(keypadSearchQuery, ignoreCase = true) ||
                             it.number.contains(keypadSearchQuery)
-                        }.take(3)
+                        }.take(4)
                     }
 
                     if (keypadSearchQuery.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(8.dp))
                         if (keypadMatches.isNotEmpty()) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(Color(0xFF161A26))
-                                    .border(0.8.dp, Color(0x30FFFFFF), RoundedCornerShape(16.dp))
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(Color(0xFF181B22))
+                                    .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
                                     .padding(vertical = 4.dp),
                                 verticalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
                                 keypadMatches.forEach { contact ->
+                                    val (avatarBg, avatarFg) = remember(contact.name) {
+                                        getMonetAvatarColors(contact.name, monetColors)
+                                    }
                                     val matchInitials = remember(contact.name) {
-                                        val parts = contact.name.trim().split(" ").filter { it.isNotBlank() }
-                                        if (parts.size >= 2) "${parts[0].first().uppercaseChar()}${parts[1].first().uppercaseChar()}"
-                                        else contact.name.take(2).uppercase()
+                                        getContactInitials(contact.name)
                                     }
                                     val rowInteraction = remember { MutableInteractionSource() }
                                     val isRowPressed by rowInteraction.collectIsPressedAsState()
@@ -2742,35 +4230,42 @@ fun KeypadScreen(
                                                 indication = null,
                                                 onClick = { onOpenDetails(contact) }
                                             )
-                                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                                            .padding(horizontal = 14.dp, vertical = 7.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Box(
                                             modifier = Modifier
-                                                .size(30.dp)
+                                                .size(34.dp)
                                                 .clip(CircleShape)
-                                                .background(Color(0x22FFFFFF)),
+                                                .background(avatarBg),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Text(text = matchInitials, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            Text(
+                                                text = matchInitials,
+                                                color = avatarFg,
+                                                fontSize = 12.sp,
+                                                fontFamily = GoogleSans,
+                                                fontWeight = FontWeight.Bold
+                                            )
                                         }
 
-                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Spacer(modifier = Modifier.width(12.dp))
 
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
                                                 text = contact.name,
-                                                color = Color.White,
-                                                fontSize = 13.sp,
+                                                color = monetColors.onSurface,
+                                                fontSize = 13.5.sp,
+                                                fontFamily = GoogleSans,
                                                 fontWeight = FontWeight.SemiBold,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
                                             Text(
                                                 text = DialerRepository.formatPhoneNumber(contact.number),
-                                                color = Color(0x90FFFFFF),
-                                                fontSize = 11.sp,
-                                                fontFamily = FontFamily.Monospace,
+                                                color = monetColors.onSurfaceVariant,
+                                                fontSize = 11.5.sp,
+                                                fontFamily = GoogleSans,
                                                 maxLines = 1
                                             )
                                         }
@@ -2785,14 +4280,340 @@ fun KeypadScreen(
 
                                         Box(
                                             modifier = Modifier
-                                                .size(30.dp)
+                                                .size(32.dp)
                                                 .scale(callScale)
-                                                .clip(CircleShape)
-                                                .background(AppleGreen)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(Color(0xFF2EAA55))
                                                 .clickable(
                                                     interactionSource = callInteraction,
                                                     indication = null,
                                                     onClick = { onCall(contact.number) }
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Call,
+                                                contentDescription = "Call",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(monetColors.surfaceContainerHigh.copy(alpha = 0.6f))
+                                    .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+                                    .clickable {
+                                        typedNumber = keypadSearchQuery
+                                        keypadSearchQuery = ""
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Dialpad,
+                                    contentDescription = null,
+                                    tint = monetColors.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Dial \"$keypadSearchQuery\" on keypad",
+                                    color = monetColors.onSurface,
+                                    fontSize = 13.sp,
+                                    fontFamily = GoogleSans,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    } else {
+                        // Premium Pixel Expressive Favorites & Recent Contacts
+                        val keypadRecents = remember(callLogs, contacts) {
+                            val list = mutableListOf<KeypadRecentItem>()
+                            val seen = HashSet<String>()
+
+                            fun norm(num: String): String {
+                                val d = num.filter { it.isDigit() }
+                                return if (d.length >= 7) d.takeLast(10) else d.ifEmpty { num }
+                            }
+
+                            // 1. Prioritize Starred / Favorite Contacts
+                            for (c in contacts.filter { it.isStarred }) {
+                                val digits = norm(c.number)
+                                if (digits.isNotEmpty() && seen.add(digits)) {
+                                    list.add(
+                                        KeypadRecentItem(
+                                            id = c.id,
+                                            name = c.name,
+                                            number = c.number,
+                                            type = CallLog.Calls.OUTGOING_TYPE,
+                                            timestamp = 0L,
+                                            isStarred = true,
+                                            photoUri = c.photoUri
+                                        )
+                                    )
+                                    if (list.size >= 5) break
+                                }
+                            }
+
+                            // 2. Add Recent Calls
+                            for (log in callLogs) {
+                                val digits = norm(log.number)
+                                if (seen.add(digits)) {
+                                    val matched = contacts.firstOrNull { c -> norm(c.number) == digits }
+                                    list.add(
+                                        KeypadRecentItem(
+                                            id = log.id,
+                                            name = log.name ?: matched?.name ?: DialerRepository.formatPhoneNumber(log.number),
+                                            number = log.number,
+                                            type = log.type,
+                                            timestamp = log.timestamp,
+                                            isStarred = matched?.isStarred ?: false,
+                                            photoUri = matched?.photoUri
+                                        )
+                                    )
+                                    if (list.size >= 12) break
+                                }
+                            }
+
+                            // 3. Fallback to contacts if call history is empty
+                            if (list.isEmpty()) {
+                                contacts.take(8).map { c ->
+                                    KeypadRecentItem(
+                                        id = c.id,
+                                        name = c.name,
+                                        number = c.number,
+                                        type = CallLog.Calls.OUTGOING_TYPE,
+                                        timestamp = 0L,
+                                        isStarred = c.isStarred,
+                                        photoUri = c.photoUri
+                                    )
+                                }
+                            } else {
+                                list
+                            }
+                        }
+
+                        if (keypadRecents.isNotEmpty()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 4.dp, vertical = 3.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Star,
+                                        contentDescription = null,
+                                        tint = monetColors.primary,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Text(
+                                        text = "Favorites & Recents",
+                                        fontFamily = GoogleSans,
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = monetColors.onSurface,
+                                        letterSpacing = (-0.2).sp
+                                    )
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(monetColors.surfaceContainerHigh.copy(alpha = 0.6f))
+                                        .border(0.6.dp, monetColors.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                ) {
+                                    Text(
+                                        text = "${keypadRecents.size} quick access",
+                                        fontFamily = GoogleSans,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = monetColors.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                itemsIndexed(keypadRecents, key = { _, item -> "rec_${item.id}_${item.number}" }) { _, item ->
+                                    val (avatarBg, avatarFg) = remember(item.name) {
+                                        getMonetAvatarColors(item.name, monetColors)
+                                    }
+                                    val itemInitials = remember(item.name) {
+                                        getContactInitials(item.name)
+                                    }
+                                    val contactPhotoBitmap = rememberContactPhotoBitmap(item.photoUri)
+
+                                    val itemInteraction = remember { MutableInteractionSource() }
+                                    val isItemPressed by itemInteraction.collectIsPressedAsState()
+                                    val itemScale by animateFloatAsState(
+                                        targetValue = if (isItemPressed) 0.95f else 1.0f,
+                                        animationSpec = spring(dampingRatio = 0.7f),
+                                        label = "recentCardScale"
+                                    )
+
+                                    Row(
+                                        modifier = Modifier
+                                            .width(180.dp)
+                                            .height(68.dp)
+                                            .scale(itemScale)
+                                            .clip(RoundedCornerShape(22.dp))
+                                            .background(
+                                                if (isItemPressed) monetColors.primaryContainer.copy(alpha = 0.35f)
+                                                else monetColors.surfaceContainerHigh.copy(alpha = 0.85f)
+                                            )
+                                            .border(
+                                                0.8.dp,
+                                                if (isItemPressed) monetColors.primary.copy(alpha = 0.55f)
+                                                else monetColors.outlineVariant.copy(alpha = 0.35f),
+                                                RoundedCornerShape(22.dp)
+                                            )
+                                            .clickable(
+                                                interactionSource = itemInteraction,
+                                                indication = null,
+                                                onClick = {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    typedNumber = item.number
+                                                }
+                                            )
+                                            .padding(horizontal = 11.dp, vertical = 9.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        // Large Avatar with Photo or Star badge
+                                        Box(
+                                            modifier = Modifier.size(44.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(44.dp)
+                                                    .clip(CircleShape)
+                                                    .background(avatarBg),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                if (contactPhotoBitmap != null) {
+                                                    androidx.compose.foundation.Image(
+                                                        bitmap = contactPhotoBitmap,
+                                                        contentDescription = item.name,
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                                    )
+                                                } else {
+                                                    Text(
+                                                        text = itemInitials,
+                                                        color = avatarFg,
+                                                        fontSize = 15.sp,
+                                                        fontFamily = GoogleSans,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                            }
+                                            if (item.isStarred) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .align(Alignment.BottomEnd)
+                                                        .size(14.dp)
+                                                        .clip(CircleShape)
+                                                        .background(Color(0xFFFFB74D)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.Star,
+                                                        contentDescription = null,
+                                                        tint = Color.Black,
+                                                        modifier = Modifier.size(9.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        Column(
+                                            modifier = Modifier.weight(1f),
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            Text(
+                                                text = item.name,
+                                                color = monetColors.onSurface,
+                                                fontSize = 13.5.sp,
+                                                fontFamily = GoogleSans,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                val (typeIcon, typeTint) = when {
+                                                    item.isStarred -> Icons.Filled.Star to Color(0xFFFFB74D)
+                                                    item.type == CallLog.Calls.INCOMING_TYPE -> Icons.Filled.CallReceived to Color(0xFF4CAF50)
+                                                    item.type == CallLog.Calls.OUTGOING_TYPE -> Icons.Filled.CallMade to Color(0xFF2196F3)
+                                                    item.type == CallLog.Calls.MISSED_TYPE -> Icons.Filled.CallMissed to Color(0xFFFF5252)
+                                                    else -> Icons.Filled.Call to monetColors.onSurfaceVariant
+                                                }
+                                                Icon(
+                                                    imageVector = typeIcon,
+                                                    contentDescription = null,
+                                                    tint = typeTint,
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                                val subText = when {
+                                                    item.isStarred -> "Favorite"
+                                                    item.type == CallLog.Calls.MISSED_TYPE -> "Missed"
+                                                    item.type == CallLog.Calls.OUTGOING_TYPE -> "Outgoing"
+                                                    item.type == CallLog.Calls.INCOMING_TYPE -> "Incoming"
+                                                    else -> "Recent"
+                                                }
+                                                Text(
+                                                    text = subText,
+                                                    color = monetColors.onSurfaceVariant.copy(alpha = 0.8f),
+                                                    fontSize = 11.sp,
+                                                    fontFamily = GoogleSans,
+                                                    maxLines = 1
+                                                )
+                                            }
+                                        }
+
+                                        // Quick Emerald Call Button
+                                        val callInteraction = remember { MutableInteractionSource() }
+                                        val isCallPressed by callInteraction.collectIsPressedAsState()
+                                        val callScale by animateFloatAsState(
+                                            targetValue = if (isCallPressed) 0.88f else 1.0f,
+                                            animationSpec = spring(dampingRatio = 0.65f),
+                                            label = "recentCallScale"
+                                        )
+
+                                        Box(
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .scale(callScale)
+                                                .clip(RoundedCornerShape(11.dp))
+                                                .background(Color(0xFF2EAA55))
+                                                .clickable(
+                                                    interactionSource = callInteraction,
+                                                    indication = null,
+                                                    onClick = {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                        onCall(item.number)
+                                                    }
                                                 ),
                                             contentAlignment = Alignment.Center
                                         ) {
@@ -2806,137 +4627,34 @@ fun KeypadScreen(
                                     }
                                 }
                             }
-                        } else {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0x18FFFFFF))
-                                    .border(0.8.dp, Color(0x25FFFFFF), RoundedCornerShape(12.dp))
-                                    .clickable {
-                                        typedNumber = keypadSearchQuery
-                                        keypadSearchQuery = ""
-                                    }
-                                    .padding(horizontal = 14.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Dialpad,
-                                    contentDescription = null,
-                                    tint = AppleBlue,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Dial \"$keypadSearchQuery\" on keypad",
-                                    color = Color.White,
-                                    fontSize = 12.5.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
                         }
-                    } else {
-                        // Quick Recents / Frequent Dial Carousel
-                        Spacer(modifier = Modifier.height(10.dp))
-                        val recentLogs = remember(callLogs) { callLogs.distinctBy { it.number }.take(4) }
-                        if (recentLogs.isNotEmpty()) {
-                            LazyRow(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                items(recentLogs) { log ->
-                                    val itemInteraction = remember { MutableInteractionSource() }
-                                    val isItemPressed by itemInteraction.collectIsPressedAsState()
-                                    val itemScale by animateFloatAsState(
-                                        targetValue = if (isItemPressed) 0.94f else 1.0f,
-                                        animationSpec = spring(dampingRatio = 0.65f),
-                                        label = "recentPillScale"
-                                    )
 
-                                    Row(
-                                        modifier = Modifier
-                                            .scale(itemScale)
-                                            .clip(RoundedCornerShape(14.dp))
-                                            .background(if (isItemPressed) Color(0x26FFFFFF) else Color(0x16FFFFFF))
-                                            .border(0.8.dp, if (isItemPressed) Color(0x40FFFFFF) else Color(0x26FFFFFF), RoundedCornerShape(14.dp))
-                                            .clickable(
-                                                interactionSource = itemInteraction,
-                                                indication = null,
-                                                onClick = {
-                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                    typedNumber = log.number
-                                                }
-                                            )
-                                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(22.dp)
-                                                .clip(CircleShape)
-                                                .background(AppleGreen.copy(alpha = 0.2f)),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Schedule,
-                                                contentDescription = null,
-                                                tint = AppleGreen,
-                                                modifier = Modifier.size(12.dp)
-                                            )
-                                        }
-                                        Text(
-                                            text = log.name ?: DialerRepository.formatPhoneNumber(log.number),
-                                            color = Color.White,
-                                            fontSize = 12.5.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
-                            }
-                        } else {
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(monetColors.surfaceContainerHigh.copy(alpha = 0.45f))
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Info,
+                                contentDescription = null,
+                                tint = monetColors.primary,
+                                modifier = Modifier.size(13.dp)
+                            )
                             Text(
-                                text = "Press & hold 0 for +, 1 for Voicemail",
-                                color = TextMuted,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(vertical = 4.dp)
+                                text = "Hold 0 for + • Hold 1 for Voicemail",
+                                color = monetColors.onSurfaceVariant,
+                                fontSize = 11.sp,
+                                fontFamily = GoogleSans
                             )
                         }
                     }
                 } else {
-                    // T9 Matched Contact Capsule
-                    if (t9Matches.isNotEmpty()) {
-                        val match = t9Matches.first()
-                        Row(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(Color(0x18FFFFFF))
-                                .border(0.8.dp, Color(0x30FFFFFF), RoundedCornerShape(14.dp))
-                                .clickable { onOpenDetails(match) }
-                                .padding(horizontal = 12.dp, vertical = 5.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = match.name,
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = DialerRepository.formatPhoneNumber(match.number),
-                                color = TextSecondary,
-                                fontSize = 12.sp,
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                    }
-
-                    // Dialed Number Display (Auto-scaling clean ColorOS typography)
+                    // TYPING STATE: DIALED NUMBER & T9 MATCHES
                     val textSize = when {
                         typedNumber.length > 15 -> 22.sp
                         typedNumber.length > 12 -> 26.sp
@@ -2946,21 +4664,23 @@ fun KeypadScreen(
 
                     Text(
                         text = formattedNumber,
-                        color = Color.White,
+                        color = monetColors.onSurface,
                         fontSize = textSize,
                         fontWeight = FontWeight.Normal,
-                        fontFamily = FontFamily.SansSerif,
+                        fontFamily = GoogleSans,
                         letterSpacing = (-0.5).sp,
                         textAlign = TextAlign.Center,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
 
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
 
                     Row(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(monetColors.surfaceContainerHigh.copy(alpha = 0.5f))
+                            .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
                             .clickable {
                                 val intent = Intent(Intent.ACTION_INSERT).apply {
                                     type = ContactsContract.RawContacts.CONTENT_TYPE
@@ -2969,22 +4689,192 @@ fun KeypadScreen(
                                 }
                                 try { context.startActivity(intent) } catch (_: Exception) {}
                             }
-                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.PersonAdd,
                             contentDescription = null,
-                            tint = AppleBlue,
+                            tint = monetColors.primary,
                             modifier = Modifier.size(14.dp)
                         )
                         Text(
                             text = "Add to Contacts",
-                            color = AppleBlue,
-                            fontSize = 13.sp,
+                            color = monetColors.primary,
+                            fontSize = 12.5.sp,
+                            fontFamily = GoogleSans,
                             fontWeight = FontWeight.Medium
                         )
+                    }
+
+                    // T9 SUGGESTIONS CAROUSEL
+                    AnimatedVisibility(
+                        visible = t9Matches.isNotEmpty(),
+                        enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(180)),
+                        exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(120))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 4.dp, vertical = 1.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "SUGGESTIONS (${t9Matches.size})",
+                                    fontFamily = GoogleSans,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = monetColors.primary,
+                                    letterSpacing = 0.6.sp
+                                )
+                                Text(
+                                    text = "Tap to call",
+                                    fontFamily = GoogleSans,
+                                    fontSize = 10.5.sp,
+                                    color = monetColors.onSurfaceVariant
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                itemsIndexed(t9Matches, key = { index, match -> "t9_${match.id}_${match.number}_$index" }) { _, match ->
+                                    val (avatarBg, avatarFg) = remember(match.name) {
+                                        getMonetAvatarColors(match.name, monetColors)
+                                    }
+                                    val matchInitials = remember(match.name) {
+                                        getContactInitials(match.name)
+                                    }
+
+                                    val cardInteraction = remember { MutableInteractionSource() }
+                                    val isCardPressed by cardInteraction.collectIsPressedAsState()
+                                    val cardScale by animateFloatAsState(
+                                        targetValue = if (isCardPressed) 0.95f else 1.0f,
+                                        animationSpec = spring(dampingRatio = 0.7f),
+                                        label = "t9CardScale"
+                                    )
+
+                                    Row(
+                                        modifier = Modifier
+                                            .width(184.dp)
+                                            .height(56.dp)
+                                            .scale(cardScale)
+                                            .clip(RoundedCornerShape(18.dp))
+                                            .background(
+                                                if (isCardPressed) monetColors.primaryContainer.copy(alpha = 0.35f)
+                                                else monetColors.surfaceContainerHigh.copy(alpha = 0.75f)
+                                            )
+                                            .border(
+                                                0.8.dp,
+                                                if (isCardPressed) monetColors.primary.copy(alpha = 0.6f)
+                                                else monetColors.outlineVariant.copy(alpha = 0.35f),
+                                                RoundedCornerShape(18.dp)
+                                            )
+                                            .clickable(
+                                                interactionSource = cardInteraction,
+                                                indication = null,
+                                                onClick = {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    onCall(match.number)
+                                                }
+                                            )
+                                            .padding(horizontal = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(9.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier.size(36.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(36.dp)
+                                                    .clip(CircleShape)
+                                                    .background(avatarBg),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = matchInitials,
+                                                    color = avatarFg,
+                                                    fontSize = 12.sp,
+                                                    fontFamily = GoogleSans,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                            if (match.isStarred) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .align(Alignment.BottomEnd)
+                                                        .size(13.dp)
+                                                        .clip(CircleShape)
+                                                        .background(Color(0xFFFFB74D)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.Star,
+                                                        contentDescription = null,
+                                                        tint = Color.Black,
+                                                        modifier = Modifier.size(8.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        Column(
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text(
+                                                text = match.name,
+                                                color = monetColors.onSurface,
+                                                fontSize = 13.sp,
+                                                fontFamily = GoogleSans,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = DialerRepository.formatPhoneNumber(match.number),
+                                                color = monetColors.onSurfaceVariant,
+                                                fontSize = 11.sp,
+                                                fontFamily = GoogleSans,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+
+                                        // Quick Call Pill
+                                        Box(
+                                            modifier = Modifier
+                                                .size(30.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(Color(0xFF2EAA55))
+                                                .clickable {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    onCall(match.number)
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Call,
+                                                contentDescription = "Call",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -2992,15 +4882,17 @@ fun KeypadScreen(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Keypad Grid: 100% FIXED-HEIGHT, IMMOBILE, ZERO-JUMP DIALPAD (Spacious 75dp Keys)
+        // 3. Pixel Material 3 Expressive Dialpad (Seamless, Floating, Dynamic Monet Surface)
         Column(
-            modifier = Modifier.wrapContentHeight(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp, bottom = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             for (row in 0..3) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(22.dp),
+                    horizontalArrangement = Arrangement.spacedBy(18.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     for (col in 0..2) {
@@ -3010,6 +4902,7 @@ fun KeypadScreen(
                         OemDialerKeyButton(
                             digit = digit,
                             letters = letters,
+                            monetColors = monetColors,
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 playTone(digit)
@@ -3020,6 +4913,12 @@ fun KeypadScreen(
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     playTone(digit)
                                     typedNumber += "+"
+                                } else if (digit == "1") {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    playTone(digit)
+                                    if (typedNumber.isEmpty()) {
+                                        onCall("1")
+                                    }
                                 }
                             }
                         )
@@ -3029,14 +4928,15 @@ fun KeypadScreen(
 
             // 5th Row: Symmetrical Call & Backspace Row
             Row(
-                horizontalArrangement = Arrangement.spacedBy(22.dp),
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Column 1: Invisible 75dp placeholder for perfect geometric centering
-                Box(modifier = Modifier.size(75.dp))
+                // Column 1: Invisible 74dp placeholder for geometric centering under column 1
+                Box(modifier = Modifier.size(74.dp, 72.dp))
 
-                // Column 2: Green Call Button (Rock-solid directly under '0' key)
+                // Column 2: Pixel Emerald Call Button (Rock-solid directly under '0' key)
                 OemCallButton(
+                    monetColors = monetColors,
                     onClick = {
                         if (typedNumber.isNotBlank()) {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -3051,9 +4951,9 @@ fun KeypadScreen(
                     }
                 )
 
-                // Column 3: Backspace Button in 75dp slot with spring pop animation
+                // Column 3: Backspace Button in 74dp slot with spring pop animation
                 Box(
-                    modifier = Modifier.size(75.dp),
+                    modifier = Modifier.size(74.dp, 72.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     androidx.compose.animation.AnimatedVisibility(
@@ -3073,11 +4973,24 @@ fun KeypadScreen(
                             )
                         ) + fadeOut(animationSpec = tween(120))
                     ) {
+                        val backspaceInteraction = remember { MutableInteractionSource() }
+                        val isBackspacePressed by backspaceInteraction.collectIsPressedAsState()
+                        val backspaceScale by animateFloatAsState(
+                            targetValue = if (isBackspacePressed) 0.88f else 1.0f,
+                            animationSpec = spring(dampingRatio = 0.65f),
+                            label = "backspaceScale"
+                        )
+
                         Box(
                             modifier = Modifier
-                                .size(52.dp)
-                                .clip(CircleShape)
+                                .size(56.dp)
+                                .scale(backspaceScale)
+                                .clip(RoundedCornerShape(22.dp))
+                                .background(monetColors.surfaceContainerHigh.copy(alpha = 0.85f))
+                                .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(22.dp))
                                 .combinedClickable(
+                                    interactionSource = backspaceInteraction,
+                                    indication = null,
                                     onClick = {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         typedNumber = typedNumber.dropLast(1)
@@ -3092,8 +5005,8 @@ fun KeypadScreen(
                             Icon(
                                 imageVector = Icons.Filled.Backspace,
                                 contentDescription = "Delete",
-                                tint = Color(0xCCFFFFFF),
-                                modifier = Modifier.size(25.dp)
+                                tint = monetColors.onSurfaceVariant,
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     }
@@ -3118,33 +5031,46 @@ fun AssistantTabScreen(
     presetManager: AudioPresetManager? = null,
     onOpenPresetManager: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+
+    val monetColors: ColorScheme = remember(context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                dynamicDarkColorScheme(context)
+            } catch (_: Exception) {
+                getPixelMonetDarkColorScheme()
+            }
+        } else {
+            getPixelMonetDarkColorScheme()
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(start = 20.dp, end = 20.dp, top = statusBarTop + 8.dp, bottom = 120.dp),
+            .padding(start = 18.dp, end = 18.dp, top = statusBarTop + 10.dp, bottom = 120.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // App Header: Minimalist Luxury Glass
+        // App Header: Material You Pixel Expressive Header
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+            modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(42.dp)
-                    .clip(RoundedCornerShape(13.dp))
-                    .background(Color(0x16FFFFFF))
-                    .border(0.8.dp, Color(0x30FFFFFF), RoundedCornerShape(13.dp)),
+                    .size(46.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(monetColors.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Rounded.GraphicEq,
                     contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(22.dp)
+                    tint = monetColors.onPrimaryContainer,
+                    modifier = Modifier.size(24.dp)
                 )
             }
 
@@ -3153,97 +5079,109 @@ fun AssistantTabScreen(
             Column {
                 Text(
                     text = "Assistant",
-                    color = Color.White,
-                    fontSize = 24.sp,
+                    color = monetColors.onSurface,
+                    fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
+                    fontFamily = GoogleSans,
                     letterSpacing = (-0.5).sp
                 )
                 Text(
                     text = "Neural speech synthesis, voice personas & soundboard",
-                    color = Color(0x99FFFFFF),
-                    fontSize = 12.5.sp
+                    color = monetColors.onSurfaceVariant,
+                    fontSize = 12.5.sp,
+                    fontFamily = GoogleSans
                 )
             }
         }
 
         // Section 1: Real-Time Voice Studio & Live DSP
-        SettingsSectionHeader(title = "VOICE STUDIO")
+        SettingsSectionHeader(title = "VOICE STUDIO", monetColors = monetColors)
         GlassVoiceStudioCard(
             selectedPersona = selectedPersona,
             onSelectPersona = onSelectPersona,
             isLiveMicActive = isLiveMicActive,
-            onToggleLiveMic = onToggleLiveMic
+            onToggleLiveMic = onToggleLiveMic,
+            monetColors = monetColors
         )
 
         // Section 2: Audio Presets & Direct Hardware Uplink Soundboard
         presetManager?.let { pm ->
-            SettingsSectionHeader(title = "SOUNDBOARD & PRESETS")
+            SettingsSectionHeader(title = "SOUNDBOARD & PRESETS", monetColors = monetColors)
             GlassAudioPresetsCard(
                 presetManager = pm,
-                onOpenManager = onOpenPresetManager
+                onOpenManager = onOpenPresetManager,
+                monetColors = monetColors
             )
         }
 
         // Section 3: Call Screening & Simulation
-        SettingsSectionHeader(title = "SCREENING BEHAVIOR & SIMULATOR")
-        SettingsGroupCard {
+        SettingsSectionHeader(title = "SCREENING BEHAVIOR & SIMULATOR", monetColors = monetColors)
+        SettingsGroupCard(monetColors = monetColors) {
             // Row 1: Automated Voice Greeting
             SettingsItemRow(
                 icon = Icons.Rounded.RecordVoiceOver,
-                iconTint = Color.White,
-                iconBgColor = Color(0x18FFFFFF),
+                iconTint = monetColors.primary,
+                iconBgColor = monetColors.primary.copy(alpha = 0.14f),
                 title = "Automated Voice Greeting",
                 subtitle = if (isGreetingEnabled)
                     "Speaks automated assistant greeting on call pickup"
                 else
                     "Silent pickup: ready for speech relay without intro",
+                monetColors = monetColors,
                 trailingContent = {
                     Switch(
                         checked = isGreetingEnabled,
-                        onCheckedChange = onToggleGreeting,
+                        onCheckedChange = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onToggleGreeting(it)
+                        },
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = Color(0x50FFFFFF),
-                            uncheckedThumbColor = Color(0x80FFFFFF),
-                            uncheckedTrackColor = Color(0x18FFFFFF)
+                            checkedThumbColor = monetColors.onPrimary,
+                            checkedTrackColor = monetColors.primary,
+                            uncheckedThumbColor = monetColors.outline,
+                            uncheckedTrackColor = monetColors.surfaceVariant
                         )
                     )
                 }
             )
 
-            SettingsDivider()
+            SettingsDivider(monetColors = monetColors)
 
             // Row 2: Call Screener Simulator
             SettingsItemRow(
                 icon = Icons.Rounded.Headphones,
-                iconTint = Color.White,
-                iconBgColor = Color(0x18FFFFFF),
+                iconTint = Color(0xFF81C995),
+                iconBgColor = Color(0xFF81C995).copy(alpha = 0.16f),
                 title = "Call Screener Simulator",
                 subtitle = "Test speech relay with Bluetooth earbuds or speaker",
+                monetColors = monetColors,
                 trailingContent = {
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0x22FFFFFF))
-                            .border(0.8.dp, Color(0x35FFFFFF), RoundedCornerShape(10.dp))
-                            .clickable { onStartSimulation() }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color(0xFF81C995).copy(alpha = 0.18f))
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onStartSimulation()
+                            }
+                            .padding(horizontal = 14.dp, vertical = 7.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.PhoneInTalk,
                                 contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(13.dp)
+                                tint = Color(0xFF81C995),
+                                modifier = Modifier.size(14.dp)
                             )
                             Text(
                                 text = "Launch",
-                                color = Color.White,
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.SemiBold
+                                color = Color(0xFF81C995),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = GoogleSans
                             )
                         }
                     }
@@ -3921,7 +5859,8 @@ fun GlassVoiceStudioCard(
     selectedPersona: VoicePersona,
     onSelectPersona: (VoicePersona) -> Unit,
     isLiveMicActive: Boolean = false,
-    onToggleLiveMic: () -> Unit = {}
+    onToggleLiveMic: () -> Unit = {},
+    monetColors: ColorScheme = getPixelMonetDarkColorScheme()
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -3942,31 +5881,29 @@ fun GlassVoiceStudioCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(elevation = 14.dp, shape = RoundedCornerShape(24.dp), spotColor = Color(0x60000000), ambientColor = Color(0x40000000))
             .clip(RoundedCornerShape(24.dp))
-            .background(Color(0x14FFFFFF))
-            .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(24.dp))
+            .background(monetColors.surfaceVariant.copy(alpha = 0.45f))
+            .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(24.dp))
             .padding(16.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            // Header Row: Minimalist Titanium Glass
+            // Header Row: Material You Expressive Squircle
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(Color(0x18FFFFFF))
-                        .border(0.8.dp, Color(0x30FFFFFF), CircleShape),
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(monetColors.primaryContainer),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.RecordVoiceOver,
                         contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp)
+                        tint = monetColors.onPrimaryContainer,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
 
@@ -3975,27 +5912,28 @@ fun GlassVoiceStudioCard(
                 Column {
                     Text(
                         text = "AI Voice Studio",
-                        color = Color.White,
+                        color = monetColors.onSurface,
                         fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = GoogleSans,
                         letterSpacing = (-0.3).sp
                     )
                     Text(
                         text = "Select neural voice for live calls & screening",
-                        color = Color(0x99FFFFFF),
-                        fontSize = 11.5.sp
+                        color = monetColors.onSurfaceVariant,
+                        fontSize = 11.5.sp,
+                        fontFamily = GoogleSans
                     )
                 }
             }
 
-            // Monochromatic Category Segmented Switcher
+            // Material You Category Segmented Pill Bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color(0x10FFFFFF))
-                    .border(0.8.dp, Color(0x20FFFFFF), RoundedCornerShape(14.dp))
-                    .padding(3.dp),
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(monetColors.surfaceContainerHigh.copy(alpha = 0.5f))
+                    .padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 categories.forEachIndexed { idx, categoryTitle ->
@@ -4003,43 +5941,42 @@ fun GlassVoiceStudioCard(
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(11.dp))
-                            .background(if (isTabActive) Color(0x28FFFFFF) else Color.Transparent)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isTabActive) monetColors.primary else Color.Transparent)
                             .clickable {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 activeCategoryIndex = idx
                             }
-                            .padding(vertical = 7.dp),
+                            .padding(vertical = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = categoryTitle,
-                            color = if (isTabActive) Color.White else Color(0x80FFFFFF),
+                            color = if (isTabActive) monetColors.onPrimary else monetColors.onSurfaceVariant,
                             fontSize = 11.5.sp,
-                            fontWeight = if (isTabActive) FontWeight.Bold else FontWeight.Medium
+                            fontWeight = if (isTabActive) FontWeight.Bold else FontWeight.Medium,
+                            fontFamily = GoogleSans
                         )
                     }
                 }
             }
 
             // Horizontal Persona Carousel
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(currentPersonas, key = { it.id }) { persona ->
                     val isSelected = persona.id == selectedPersona.id
                     Box(
                         modifier = Modifier
                             .width(155.dp)
-                            .shadow(
-                                elevation = if (isSelected) 10.dp else 0.dp,
-                                shape = RoundedCornerShape(16.dp),
-                                spotColor = Color(0x60000000)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(
+                                if (isSelected) monetColors.primaryContainer
+                                else monetColors.surfaceContainerHighest.copy(alpha = 0.5f)
                             )
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (isSelected) Color(0x32FFFFFF) else Color(0x10FFFFFF))
                             .border(
-                                width = if (isSelected) 1.2.dp else 0.8.dp,
-                                color = if (isSelected) Color(0xE0FFFFFF) else Color(0x20FFFFFF),
-                                shape = RoundedCornerShape(16.dp)
+                                width = if (isSelected) 1.5.dp else 0.8.dp,
+                                color = if (isSelected) monetColors.primary else monetColors.outlineVariant.copy(alpha = 0.25f),
+                                shape = RoundedCornerShape(20.dp)
                             )
                             .clickable {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -4056,42 +5993,47 @@ fun GlassVoiceStudioCard(
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(if (isSelected) Color(0x40FFFFFF) else Color(0x18FFFFFF))
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(
+                                            if (isSelected) monetColors.primary
+                                            else monetColors.surfaceVariant
+                                        )
+                                        .padding(horizontal = 7.dp, vertical = 2.dp)
                                 ) {
                                     Text(
                                         text = persona.code,
-                                        color = Color.White,
+                                        color = if (isSelected) monetColors.onPrimary else monetColors.onSurfaceVariant,
                                         fontSize = 9.5.sp,
                                         fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace
+                                        fontFamily = GoogleSans
                                     )
                                 }
 
                                 if (isSelected) {
                                     Box(
                                         modifier = Modifier
-                                            .size(7.dp)
+                                            .size(8.dp)
                                             .clip(CircleShape)
-                                            .background(Color.White)
+                                            .background(monetColors.primary)
                                     )
                                 }
                             }
 
                             Text(
                                 text = persona.name,
-                                color = Color.White,
-                                fontSize = 13.5.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                color = if (isSelected) monetColors.onPrimaryContainer else monetColors.onSurface,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = GoogleSans,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
 
                             Text(
                                 text = persona.tag,
-                                color = Color(0x85FFFFFF),
+                                color = if (isSelected) monetColors.onPrimaryContainer.copy(alpha = 0.8f) else monetColors.onSurfaceVariant,
                                 fontSize = 11.sp,
+                                fontFamily = GoogleSans,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -4104,16 +6046,17 @@ fun GlassVoiceStudioCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color(0x0CFFFFFF))
-                    .border(0.8.dp, Color(0x18FFFFFF), RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(monetColors.surfaceContainerHigh.copy(alpha = 0.4f))
+                    .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
                     .padding(12.dp)
             ) {
                 Text(
                     text = "${selectedPersona.name} • ${selectedPersona.tag}: ${selectedPersona.description}",
-                    color = Color(0x95FFFFFF),
+                    color = monetColors.onSurfaceVariant,
                     fontSize = 11.5.sp,
-                    lineHeight = 16.sp
+                    lineHeight = 16.sp,
+                    fontFamily = GoogleSans
                 )
             }
 
@@ -4122,17 +6065,17 @@ fun GlassVoiceStudioCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0x20FFFFFF))
-                        .border(1.dp, Color(0x60FFFFFF), RoundedCornerShape(14.dp))
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(monetColors.secondaryContainer.copy(alpha = 0.7f))
+                        .border(1.dp, monetColors.secondary.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
                         .padding(12.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(7.dp)
+                                .size(8.dp)
                                 .clip(CircleShape)
-                                .background(Color.White)
+                                .background(monetColors.onSecondaryContainer)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
@@ -4140,27 +6083,28 @@ fun GlassVoiceStudioCard(
                                 "Recognized: \"${sessionState.userLiveTranscript}\""
                             else
                                 "AI Voice Relay: Listening to microphone... Speak now",
-                            color = Color.White,
+                            color = monetColors.onSecondaryContainer,
                             fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Medium,
+                            fontFamily = GoogleSans
                         )
                     }
                 }
             }
 
-            // Monochromatic Action Controls: Sample Voice & Test AI Voice Relay
+            // Action Controls: Sample Voice & Test AI Voice Relay
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // Button 1: Sample Voice
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(42.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0x18FFFFFF))
-                        .border(0.8.dp, Color(0x35FFFFFF), RoundedCornerShape(14.dp))
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(monetColors.primary.copy(alpha = 0.15f))
+                        .border(0.8.dp, monetColors.primary.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
                         .clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             val sampleText = when (selectedPersona.id) {
@@ -4186,29 +6130,34 @@ fun GlassVoiceStudioCard(
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.VolumeUp,
                             contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(15.dp)
+                            tint = monetColors.primary,
+                            modifier = Modifier.size(16.dp)
                         )
                         Text(
                             text = "Sample Voice",
-                            color = Color.White,
+                            color = monetColors.primary,
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = GoogleSans
                         )
                     }
                 }
 
                 // Button 2: Test AI Voice Relay Mic
+                val isListening = sessionState.isListeningToUserSpeech
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(42.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(if (sessionState.isListeningToUserSpeech) Color(0x40FFFFFF) else Color(0x14FFFFFF))
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            if (isListening) Color(0xFF81C995).copy(alpha = 0.22f)
+                            else monetColors.surfaceContainerHigh.copy(alpha = 0.7f)
+                        )
                         .border(
                             0.8.dp,
-                            if (sessionState.isListeningToUserSpeech) Color.White else Color(0x28FFFFFF),
-                            RoundedCornerShape(14.dp)
+                            if (isListening) Color(0xFF81C995) else monetColors.outlineVariant.copy(alpha = 0.3f),
+                            RoundedCornerShape(16.dp)
                         )
                         .clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -4221,16 +6170,17 @@ fun GlassVoiceStudioCard(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Icon(
-                            imageVector = if (sessionState.isListeningToUserSpeech) Icons.Filled.Mic else Icons.Filled.MicOff,
+                            imageVector = if (isListening) Icons.Filled.Mic else Icons.Filled.MicOff,
                             contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(15.dp)
+                            tint = if (isListening) Color(0xFF81C995) else monetColors.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
                         )
                         Text(
-                            text = if (sessionState.isListeningToUserSpeech) "Listening..." else "Test Relay Mic",
-                            color = Color.White,
+                            text = if (isListening) "Listening..." else "Test Relay Mic",
+                            color = if (isListening) Color(0xFF81C995) else monetColors.onSurface,
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = GoogleSans
                         )
                     }
                 }
@@ -4246,7 +6196,8 @@ fun GlassVoiceStudioCard(
 @Composable
 fun GlassAudioPresetsCard(
     presetManager: AudioPresetManager,
-    onOpenManager: () -> Unit = {}
+    onOpenManager: () -> Unit = {},
+    monetColors: ColorScheme = getPixelMonetDarkColorScheme()
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -4285,14 +6236,13 @@ fun GlassAudioPresetsCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(elevation = 14.dp, shape = RoundedCornerShape(24.dp), spotColor = Color(0x60000000), ambientColor = Color(0x40000000))
             .clip(RoundedCornerShape(24.dp))
-            .background(Color(0x14FFFFFF))
-            .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(24.dp))
+            .background(monetColors.surfaceVariant.copy(alpha = 0.45f))
+            .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(24.dp))
             .padding(16.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            // Header Row: Minimalist Titanium Glass
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            // Header Row: Material You Expressive Squircle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -4304,17 +6254,16 @@ fun GlassAudioPresetsCard(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(Color(0x18FFFFFF))
-                            .border(0.8.dp, Color(0x30FFFFFF), CircleShape),
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(monetColors.secondaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.GraphicEq,
                             contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(18.dp)
+                            tint = monetColors.onSecondaryContainer,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
 
@@ -4327,31 +6276,32 @@ fun GlassAudioPresetsCard(
                         ) {
                             Text(
                                 text = "Audio Presets",
-                                color = Color.White,
+                                color = monetColors.onSurface,
                                 fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = GoogleSans,
                                 letterSpacing = (-0.3).sp
                             )
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(6.dp))
-                                    .background(Color(0x1AFFFFFF))
-                                    .border(0.6.dp, Color(0x30FFFFFF), RoundedCornerShape(6.dp))
-                                    .padding(horizontal = 5.dp, vertical = 2.dp)
+                                    .background(monetColors.surfaceContainerHighest.copy(alpha = 0.7f))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
                                 Text(
                                     text = "ALSA",
-                                    color = Color(0xDDFFFFFF),
+                                    color = monetColors.onSurfaceVariant,
                                     fontSize = 9.sp,
-                                    fontFamily = FontFamily.Monospace,
+                                    fontFamily = GoogleSans,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                         }
                         Text(
                             text = "Direct hardware soundboard (${presets.size} items)",
-                            color = Color(0x99FFFFFF),
+                            color = monetColors.onSurfaceVariant,
                             fontSize = 11.5.sp,
+                            fontFamily = GoogleSans,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -4361,52 +6311,56 @@ fun GlassAudioPresetsCard(
                 // Manage / Reorder Pill Button
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(11.dp))
-                        .background(Color(0x22FFFFFF))
-                        .border(0.8.dp, Color(0x38FFFFFF), RoundedCornerShape(11.dp))
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(monetColors.primary.copy(alpha = 0.15f))
+                        .border(0.8.dp, monetColors.primary.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
                         .clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onOpenManager()
                         }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Tune,
                             contentDescription = "Manage",
-                            tint = Color.White,
+                            tint = monetColors.primary,
                             modifier = Modifier.size(13.dp)
                         )
                         Text(
                             text = "Arrange",
-                            color = Color.White,
+                            color = monetColors.primary,
                             fontSize = 11.5.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = GoogleSans
                         )
                     }
                 }
             }
 
-            // Quick Access Preview (Top 3 Presets in Clean Monochromatic Glass)
+            // Quick Access Preview (Top 3 Presets in Clean Pixel Squircles)
             val previewPresets = remember(presets) { presets.take(3) }
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 previewPresets.forEach { preset ->
                     val isPlaying = currentlyPlayingId == preset.id
 
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (isPlaying) Color(0x25FFFFFF) else Color(0x0EFFFFFF))
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                if (isPlaying) monetColors.primaryContainer.copy(alpha = 0.7f)
+                                else monetColors.surfaceContainerHigh.copy(alpha = 0.5f)
+                            )
                             .border(
                                 0.8.dp,
-                                if (isPlaying) Color.White else Color(0x1AFFFFFF),
-                                RoundedCornerShape(12.dp)
+                                if (isPlaying) monetColors.primary else monetColors.outlineVariant.copy(alpha = 0.25f),
+                                RoundedCornerShape(16.dp)
                             )
-                            .padding(horizontal = 10.dp, vertical = 7.dp)
+                            .padding(horizontal = 12.dp, vertical = 9.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -4414,34 +6368,36 @@ fun GlassAudioPresetsCard(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0x16FFFFFF)),
+                                    .size(32.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(monetColors.surfaceVariant),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = if (preset.isAudioFile) Icons.Rounded.GraphicEq else Icons.AutoMirrored.Rounded.VolumeUp,
                                     contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(14.dp)
+                                    tint = monetColors.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
 
-                            Spacer(modifier = Modifier.width(10.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
 
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = preset.title,
-                                    color = Color.White,
-                                    fontSize = 12.5.sp,
-                                    fontWeight = FontWeight.SemiBold,
+                                    color = monetColors.onSurface,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = GoogleSans,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = if (preset.isAudioFile) "Custom Audio Track" else preset.textOrPath,
-                                    color = Color(0x75FFFFFF),
-                                    fontSize = 10.5.sp,
+                                    color = monetColors.onSurfaceVariant,
+                                    fontSize = 11.sp,
+                                    fontFamily = GoogleSans,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -4451,9 +6407,12 @@ fun GlassAudioPresetsCard(
 
                             Box(
                                 modifier = Modifier
-                                    .size(28.dp)
+                                    .size(32.dp)
                                     .clip(CircleShape)
-                                    .background(if (isPlaying) Color(0x40FFFFFF) else Color(0x18FFFFFF))
+                                    .background(
+                                        if (isPlaying) Color(0xFFF28B82)
+                                        else monetColors.primary
+                                    )
                                     .clickable {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         if (isPlaying) {
@@ -4467,8 +6426,8 @@ fun GlassAudioPresetsCard(
                                 Icon(
                                     imageVector = if (isPlaying) Icons.Filled.Stop else Icons.Filled.PlayArrow,
                                     contentDescription = "Preview",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(14.dp)
+                                    tint = if (isPlaying) Color.White else monetColors.onPrimary,
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                         }
@@ -4480,14 +6439,14 @@ fun GlassAudioPresetsCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color(0x14FFFFFF))
-                    .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(monetColors.surfaceContainerHigh.copy(alpha = 0.6f))
+                    .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
                     .clickable {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onOpenManager()
                     }
-                    .padding(horizontal = 12.dp, vertical = 9.dp)
+                    .padding(horizontal = 14.dp, vertical = 11.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -4496,32 +6455,34 @@ fun GlassAudioPresetsCard(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.DragIndicator,
                             contentDescription = null,
-                            tint = Color(0xCCFFFFFF),
-                            modifier = Modifier.size(18.dp)
+                            tint = monetColors.primary,
+                            modifier = Modifier.size(20.dp)
                         )
                         Column {
                             Text(
                                 text = "Hold & Drag to Reorder (${presets.size} Presets)",
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold
+                                color = monetColors.onSurface,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = GoogleSans
                             )
                             Text(
                                 text = "Align in-call audio tracks, arrange & organize",
-                                color = Color(0x80FFFFFF),
-                                fontSize = 10.5.sp
+                                color = monetColors.onSurfaceVariant,
+                                fontSize = 11.sp,
+                                fontFamily = GoogleSans
                             )
                         }
                     }
                     Icon(
                         imageVector = Icons.Rounded.ChevronRight,
                         contentDescription = "Open",
-                        tint = Color(0x80FFFFFF),
+                        tint = monetColors.onSurfaceVariant,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -4530,15 +6491,15 @@ fun GlassAudioPresetsCard(
             // Action Buttons: Add Custom Phrase & Import Audio File
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(36.dp)
-                        .clip(RoundedCornerShape(11.dp))
-                        .background(Color(0x12FFFFFF))
-                        .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(11.dp))
+                        .height(40.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(monetColors.surfaceContainerHigh.copy(alpha = 0.7f))
+                        .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
                         .clickable {
                             textPresetTitle = ""
                             textPresetPhrase = ""
@@ -4548,20 +6509,20 @@ fun GlassAudioPresetsCard(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(Icons.Rounded.RecordVoiceOver, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
-                        Text("Add Phrase", color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.Medium)
+                        Icon(Icons.Rounded.RecordVoiceOver, contentDescription = null, tint = monetColors.onSurface, modifier = Modifier.size(15.dp))
+                        Text("Add Phrase", color = monetColors.onSurface, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, fontFamily = GoogleSans)
                     }
                 }
 
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(36.dp)
-                        .clip(RoundedCornerShape(11.dp))
-                        .background(Color(0x20FFFFFF))
-                        .border(0.8.dp, Color(0x38FFFFFF), RoundedCornerShape(11.dp))
+                        .height(40.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(monetColors.primaryContainer)
+                        .border(0.8.dp, monetColors.primary.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
                         .clickable {
                             audioPickerLauncher.launch("audio/*")
                         },
@@ -4569,10 +6530,10 @@ fun GlassAudioPresetsCard(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
-                        Text("Import Audio", color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
+                        Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = monetColors.onPrimaryContainer, modifier = Modifier.size(15.dp))
+                        Text("Import Audio", color = monetColors.onPrimaryContainer, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
                     }
                 }
             }
@@ -4585,28 +6546,28 @@ fun GlassAudioPresetsCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(Color(0xF0182234))
-                    .border(1.2.dp, LiquidGlassBorder, RoundedCornerShape(24.dp))
-                    .padding(20.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(Color(0xFF1E222D))
+                    .border(1.dp, monetColors.outlineVariant.copy(alpha = 0.4f), RoundedCornerShape(28.dp))
+                    .padding(22.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Add Custom Voice Phrase", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Text("Assistant speaks this response directly into caller's ear with 0% background noise.", color = TextSecondary, fontSize = 11.sp)
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Text("Add Custom Voice Phrase", color = monetColors.onSurface, fontSize = 17.sp, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
+                    Text("Assistant speaks this response directly into caller's ear with 0% background noise.", color = monetColors.onSurfaceVariant, fontSize = 12.sp, fontFamily = GoogleSans)
 
                     BasicTextField(
                         value = textPresetTitle,
                         onValueChange = { textPresetTitle = it },
-                        textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
+                        textStyle = TextStyle(color = monetColors.onSurface, fontSize = 14.sp, fontFamily = GoogleSans),
                         decorationBox = { inner ->
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0x25FFFFFF))
-                                    .padding(12.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(monetColors.surfaceVariant.copy(alpha = 0.6f))
+                                    .padding(14.dp)
                             ) {
-                                if (textPresetTitle.isBlank()) Text("Preset Title (e.g. Can't talk)", color = TextTertiary, fontSize = 14.sp)
+                                if (textPresetTitle.isBlank()) Text("Preset Title (e.g. Can't talk)", color = monetColors.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 14.sp, fontFamily = GoogleSans)
                                 inner()
                             }
                         }
@@ -4615,16 +6576,16 @@ fun GlassAudioPresetsCard(
                     BasicTextField(
                         value = textPresetPhrase,
                         onValueChange = { textPresetPhrase = it },
-                        textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
+                        textStyle = TextStyle(color = monetColors.onSurface, fontSize = 14.sp, fontFamily = GoogleSans),
                         decorationBox = { inner ->
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0x25FFFFFF))
-                                    .padding(12.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(monetColors.surfaceVariant.copy(alpha = 0.6f))
+                                    .padding(14.dp)
                             ) {
-                                if (textPresetPhrase.isBlank()) Text("Phrase to speak (e.g. I am in a meeting, call back later)", color = TextTertiary, fontSize = 14.sp)
+                                if (textPresetPhrase.isBlank()) Text("Phrase to speak (e.g. I am in a meeting, call back later)", color = monetColors.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 14.sp, fontFamily = GoogleSans)
                                 inner()
                             }
                         }
@@ -4636,11 +6597,12 @@ fun GlassAudioPresetsCard(
                     ) {
                         OutlinedButton(
                             onClick = { showAddTextDialog = false },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = monetColors.onSurfaceVariant)
                         ) {
-                            Text("Cancel")
+                            Text("Cancel", fontFamily = GoogleSans)
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Button(
                             onClick = {
                                 if (textPresetPhrase.isNotBlank()) {
@@ -4650,9 +6612,10 @@ fun GlassAudioPresetsCard(
                                     Toast.makeText(context, "Added preset \"$title\"", Toast.LENGTH_SHORT).show()
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = AppleTeal)
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = monetColors.primary)
                         ) {
-                            Text("Save Preset")
+                            Text("Save Preset", color = monetColors.onPrimary, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
                         }
                     }
                 }
@@ -4666,28 +6629,28 @@ fun GlassAudioPresetsCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(Color(0xF0182234))
-                    .border(1.2.dp, LiquidGlassBorder, RoundedCornerShape(24.dp))
-                    .padding(20.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(Color(0xFF1E222D))
+                    .border(1.dp, monetColors.outlineVariant.copy(alpha = 0.4f), RoundedCornerShape(28.dp))
+                    .padding(22.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Name Audio Preset", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Text("File imported for hardware uplink injection during active calls.", color = TextSecondary, fontSize = 11.sp)
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Text("Name Audio Preset", color = monetColors.onSurface, fontSize = 17.sp, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
+                    Text("File imported for hardware uplink injection during active calls.", color = monetColors.onSurfaceVariant, fontSize = 12.sp, fontFamily = GoogleSans)
 
                     BasicTextField(
                         value = audioPresetTitle,
                         onValueChange = { audioPresetTitle = it },
-                        textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
+                        textStyle = TextStyle(color = monetColors.onSurface, fontSize = 14.sp, fontFamily = GoogleSans),
                         decorationBox = { inner ->
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0x25FFFFFF))
-                                    .padding(12.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(monetColors.surfaceVariant.copy(alpha = 0.6f))
+                                    .padding(14.dp)
                             ) {
-                                if (audioPresetTitle.isBlank()) Text("Preset Name (e.g. Office Ambient / Ringtone)", color = TextTertiary, fontSize = 14.sp)
+                                if (audioPresetTitle.isBlank()) Text("Preset Name (e.g. Office Ambient / Ringtone)", color = monetColors.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 14.sp, fontFamily = GoogleSans)
                                 inner()
                             }
                         }
@@ -4699,11 +6662,12 @@ fun GlassAudioPresetsCard(
                     ) {
                         OutlinedButton(
                             onClick = { showImportDialog = false },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = monetColors.onSurfaceVariant)
                         ) {
-                            Text("Cancel")
+                            Text("Cancel", fontFamily = GoogleSans)
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Button(
                             onClick = {
                                 val uri = selectedAudioUri ?: return@Button
@@ -4718,9 +6682,10 @@ fun GlassAudioPresetsCard(
                                     showImportDialog = false
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = AppleAmber)
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = monetColors.primary)
                         ) {
-                            Text("Import")
+                            Text("Import", color = monetColors.onPrimary, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
                         }
                     }
                 }
@@ -4734,28 +6699,28 @@ fun GlassAudioPresetsCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(Color(0xF0182234))
-                    .border(1.2.dp, LiquidGlassBorder, RoundedCornerShape(24.dp))
-                    .padding(20.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(Color(0xFF1E222D))
+                    .border(1.dp, monetColors.outlineVariant.copy(alpha = 0.4f), RoundedCornerShape(28.dp))
+                    .padding(22.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Rename Preset", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Text("Enter a custom title so you know which preset is playing during calls.", color = TextSecondary, fontSize = 11.5.sp)
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Text("Rename Preset", color = monetColors.onSurface, fontSize = 17.sp, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
+                    Text("Enter a custom title so you know which preset is playing during calls.", color = monetColors.onSurfaceVariant, fontSize = 12.sp, fontFamily = GoogleSans)
 
                     BasicTextField(
                         value = renamePresetTitle,
                         onValueChange = { renamePresetTitle = it },
-                        textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
+                        textStyle = TextStyle(color = monetColors.onSurface, fontSize = 14.sp, fontFamily = GoogleSans),
                         decorationBox = { inner ->
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0x25FFFFFF))
-                                    .padding(12.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(monetColors.surfaceVariant.copy(alpha = 0.6f))
+                                    .padding(14.dp)
                             ) {
-                                if (renamePresetTitle.isBlank()) Text("Preset Name", color = TextTertiary, fontSize = 14.sp)
+                                if (renamePresetTitle.isBlank()) Text("Preset Name", color = monetColors.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 14.sp, fontFamily = GoogleSans)
                                 inner()
                             }
                         }
@@ -4767,11 +6732,12 @@ fun GlassAudioPresetsCard(
                     ) {
                         OutlinedButton(
                             onClick = { showRenameDialog = false },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = monetColors.onSurfaceVariant)
                         ) {
-                            Text("Cancel")
+                            Text("Cancel", fontFamily = GoogleSans)
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Button(
                             onClick = {
                                 val targetId = presetToRenameId
@@ -4781,9 +6747,10 @@ fun GlassAudioPresetsCard(
                                 }
                                 showRenameDialog = false
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = AppleTeal)
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = monetColors.primary)
                         ) {
-                            Text("Save", fontWeight = FontWeight.Bold)
+                            Text("Save", color = monetColors.onPrimary, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
                         }
                     }
                 }
@@ -5088,36 +7055,40 @@ fun DialerSystemSettingsCard(
 }
 
 /**
- * iOS / ColorOS Inset Grouped Settings Components
+ * Material You / Pixel Expressive Settings Components
  */
 @Composable
-fun SettingsSectionHeader(title: String) {
+fun SettingsSectionHeader(
+    title: String,
+    monetColors: ColorScheme = getPixelMonetDarkColorScheme()
+) {
     Text(
         text = title,
-        color = TextTertiary,
+        color = monetColors.primary,
         fontSize = 11.5.sp,
-        fontWeight = FontWeight.SemiBold,
+        fontFamily = GoogleSans,
+        fontWeight = FontWeight.Bold,
         letterSpacing = 0.8.sp,
-        modifier = Modifier.padding(start = 6.dp, top = 6.dp, bottom = 2.dp)
+        modifier = Modifier.padding(start = 6.dp, top = 10.dp, bottom = 4.dp)
     )
 }
 
 @Composable
 fun SettingsGroupCard(
+    monetColors: ColorScheme = getPixelMonetDarkColorScheme(),
     content: @Composable ColumnScope.() -> Unit
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .shadow(
-                elevation = 12.dp,
+                elevation = 6.dp,
                 shape = RoundedCornerShape(22.dp),
-                spotColor = Color(0x60000000),
-                ambientColor = Color(0x35000000)
+                spotColor = Color(0x40000000)
             )
             .clip(RoundedCornerShape(22.dp))
-            .background(LiquidGlassFill)
-            .border(1.2.dp, LiquidGlassBorder, RoundedCornerShape(22.dp))
+            .background(Color(0xFF191C23))
+            .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(22.dp))
             .padding(vertical = 4.dp)
     ) {
         Column(
@@ -5135,51 +7106,54 @@ fun SettingsItemRow(
     title: String,
     subtitle: String,
     modifier: Modifier = Modifier,
+    monetColors: ColorScheme = getPixelMonetDarkColorScheme(),
     trailingContent: @Composable () -> Unit
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 11.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Uniform 36dp rounded square icon container with clean minimal glass
+        // Uniform 40dp rounded squircle icon container
         Box(
             modifier = Modifier
-                .size(36.dp)
-                .clip(RoundedCornerShape(10.dp))
+                .size(40.dp)
+                .clip(RoundedCornerShape(12.dp))
                 .background(iconBgColor)
-                .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(10.dp)),
+                .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = iconTint,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
 
         Spacer(modifier = Modifier.width(14.dp))
 
-        // Aligned title and subtitle column
+        // Aligned title and subtitle column in Google Sans
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.Center
         ) {
             Text(
                 text = title,
-                color = TextPrimary,
-                fontSize = 14.sp,
+                color = monetColors.onSurface,
+                fontSize = 15.sp,
+                fontFamily = GoogleSans,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = (-0.2).sp
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = subtitle,
-                color = TextSecondary,
-                fontSize = 11.5.sp,
-                lineHeight = 15.sp
+                color = monetColors.onSurfaceVariant,
+                fontSize = 12.sp,
+                fontFamily = GoogleSans,
+                lineHeight = 16.sp
             )
         }
 
@@ -5190,13 +7164,15 @@ fun SettingsItemRow(
 }
 
 @Composable
-fun SettingsDivider() {
+fun SettingsDivider(
+    monetColors: ColorScheme = getPixelMonetDarkColorScheme()
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 66.dp, end = 16.dp)
+            .padding(start = 70.dp, end = 16.dp)
             .height(0.6.dp)
-            .background(Color(0x16FFFFFF))
+            .background(monetColors.outlineVariant.copy(alpha = 0.25f))
     )
 }
 
@@ -5216,12 +7192,26 @@ fun DialerSettingsSheet(
     onToggleHideNumber: (Boolean) -> Unit,
     isAutoRecordEnabled: Boolean,
     onToggleAutoRecord: (Boolean) -> Unit,
+    callLogs: List<CallLogItem> = emptyList(),
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
 
+    val monetColors: ColorScheme = remember(context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                dynamicDarkColorScheme(context)
+            } catch (_: Exception) {
+                getPixelMonetDarkColorScheme()
+            }
+        } else {
+            getPixelMonetDarkColorScheme()
+        }
+    }
+
+    var showCallStatsScreen by remember { mutableStateOf(false) }
     var showRecordingsDialog by remember { mutableStateOf(false) }
     var showSpeechJammerDialog by remember { mutableStateOf(false) }
     var rootAvailable by remember { mutableStateOf(RootPrivilegeManager.isRootAvailable()) }
@@ -5238,711 +7228,733 @@ fun DialerSettingsSheet(
         if (!isVisible) return
         coroutineScope.launch {
             isVisible = false
-            delay(200)
+            delay(180)
             onDismiss()
         }
     }
 
-    Dialog(
-        onDismissRequest = { animateDismiss() },
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        val scrimAlpha by animateFloatAsState(
-            targetValue = if (isVisible) 0.65f else 0f,
-            animationSpec = tween(durationMillis = 240, easing = LinearOutSlowInEasing),
-            label = "settingsScrimAlpha"
-        )
+    BackHandler(enabled = isVisible) {
+        animateDismiss()
+    }
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = scrimAlpha))
-                .clickable { animateDismiss() },
-            contentAlignment = Alignment.BottomCenter
+    AnimatedVisibility(
+        visible = isVisible,
+        enter = slideInHorizontally(
+            initialOffsetX = { fullWidth -> fullWidth },
+            animationSpec = spring(
+                    dampingRatio = 0.85f,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            ) + fadeIn(animationSpec = tween(200)),
+            exit = slideOutHorizontally(
+                targetOffsetX = { fullWidth -> fullWidth },
+                animationSpec = tween(180, easing = FastOutLinearInEasing)
+            ) + fadeOut(animationSpec = tween(140))
         ) {
-            AnimatedVisibility(
-                visible = isVisible,
-                enter = slideInVertically(
-                    initialOffsetY = { fullHeight -> fullHeight },
-                    animationSpec = spring(
-                        dampingRatio = 0.82f,
-                        stiffness = Spring.StiffnessMediumLow
-                    )
-                ) + fadeIn(animationSpec = tween(180)),
-                exit = slideOutVertically(
-                    targetOffsetY = { fullHeight -> fullHeight },
-                    animationSpec = tween(200, easing = FastOutLinearInEasing)
-                ) + fadeOut(animationSpec = tween(150))
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(monetColors.background)
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .fillMaxHeight(0.92f)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) {}
-                        .shadow(
-                            elevation = 28.dp,
-                            shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
-                            spotColor = Color(0xB5000000),
-                            ambientColor = Color(0x70000000)
-                        )
-                        .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color(0xFA141824),
-                                    Color(0xF50D111A)
-                                )
-                            )
-                        )
-                        .border(
-                            1.2.dp,
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color(0x60FFFFFF),
-                                    Color(0x18FFFFFF)
-                                )
-                            ),
-                            RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
-                        )
+                Column(
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    Column(
+                    // Modern Pixel Expressive Top App Bar
+                    Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 20.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                            .fillMaxWidth()
+                            .background(monetColors.background)
                     ) {
-                        // Drag Handle Pill
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.CenterHorizontally)
-                                .width(42.dp)
-                                .height(4.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(Color(0x40FFFFFF))
-                        )
-
-                        // Header Row
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .statusBarsPadding()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
-                                Text(
-                                    text = "Settings",
-                                    color = Color.White,
-                                    fontSize = 24.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = (-0.5).sp
-                                )
-                                Text(
-                                    text = "Telephony, Recording & Privileges",
-                                    color = TextSecondary,
-                                    fontSize = 12.5.sp
-                                )
-                            }
-
                             IconButton(
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     animateDismiss()
                                 },
                                 modifier = Modifier
-                                    .size(36.dp)
+                                    .size(44.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0x1AFFFFFF))
-                                    .border(0.8.dp, Color(0x30FFFFFF), CircleShape)
+                                    .background(monetColors.surfaceVariant.copy(alpha = 0.6f))
                             ) {
                                 Icon(
-                                    imageVector = Icons.Rounded.Close,
-                                    contentDescription = "Close",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
+                                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                    contentDescription = "Back",
+                                    tint = monetColors.onSurface,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(14.dp))
+
+                            Column {
+                                Text(
+                                    text = "Settings",
+                                    color = monetColors.onSurface,
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = GoogleSans,
+                                    letterSpacing = (-0.5).sp
+                                )
+                                Text(
+                                    text = "Telephony, Recording & Privileges",
+                                    color = monetColors.onSurfaceVariant,
+                                    fontSize = 12.sp,
+                                    fontFamily = GoogleSans
                                 )
                             }
                         }
-
-                    // ==========================================
-                    // GROUP 1: CALL HANDLING & SCREENING
-                    // ==========================================
-                    SettingsSectionHeader(title = "CALL HANDLING & SCREENING")
-                    SettingsGroupCard {
-                        // Row 1: Default Phone App
-                        SettingsItemRow(
-                            icon = if (isDefaultDialer) Icons.Rounded.PhoneInTalk else Icons.Filled.Warning,
-                            iconTint = Color.White,
-                            iconBgColor = Color(0x18FFFFFF),
-                            title = "Default Phone App",
-                            subtitle = if (isDefaultDialer)
-                                "Active • Managing incoming & outgoing carrier calls"
-                            else
-                                "Required by Android to intercept and screen incoming calls",
-                            trailingContent = {
-                                if (isDefaultDialer) {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(AppleGreen.copy(alpha = 0.18f))
-                                            .border(0.8.dp, AppleGreen.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
-                                            .padding(horizontal = 9.dp, vertical = 5.dp)
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                                tint = AppleGreen,
-                                                modifier = Modifier.size(12.dp)
-                                            )
-                                            Text(
-                                                text = "ACTIVE",
-                                                color = AppleGreen,
-                                                fontSize = 10.5.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                fontFamily = FontFamily.Monospace
-                                            )
-                                        }
-                                    }
-                                } else {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .background(AppleBlue)
-                                            .clickable {
-                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                onRequestDefaultDialer()
-                                            }
-                                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                                    ) {
-                                        Text(
-                                            text = "Set Default",
-                                            color = Color.White,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-                            }
-                        )
-
-                        SettingsDivider()
-
-                        // Row 2: Auto-Screen Unknown
-                        SettingsItemRow(
-                            icon = Icons.Rounded.Security,
-                            iconTint = Color.White,
-                            iconBgColor = Color(0x18FFFFFF),
-                            title = "Auto-Screen Unknown",
-                            subtitle = if (autoScreenUnknown)
-                                "Assistant answers callers not saved in your contacts"
-                            else
-                                "Manual screening: tap Screen on incoming call canopy",
-                            trailingContent = {
-                                Switch(
-                                    checked = autoScreenUnknown,
-                                    onCheckedChange = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        onToggleAutoScreen(it)
-                                    },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = Color.White,
-                                        checkedTrackColor = Color(0x40FFFFFF),
-                                        uncheckedThumbColor = TextMuted,
-                                        uncheckedTrackColor = Color(0x22FFFFFF)
-                                    )
-                                )
-                            }
-                        )
-
-                        SettingsDivider()
-
-                        // Row 3: Stealth Caller ID
-                        SettingsItemRow(
-                            icon = Icons.Rounded.VisibilityOff,
-                            iconTint = Color.White,
-                            iconBgColor = Color(0x18FFFFFF),
-                            title = "Stealth Caller ID",
-                            subtitle = if (isHideNumberOnCallerId)
-                                "Private Caller: raw numbers masked on in-call screens"
-                            else
-                                "Standard: full caller phone numbers displayed",
-                            trailingContent = {
-                                Switch(
-                                    checked = isHideNumberOnCallerId,
-                                    onCheckedChange = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        onToggleHideNumber(it)
-                                    },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = Color.White,
-                                        checkedTrackColor = Color(0x40FFFFFF),
-                                        uncheckedThumbColor = TextMuted,
-                                        uncheckedTrackColor = Color(0x22FFFFFF)
-                                    )
-                                )
-                            }
-                        )
                     }
 
-                    // ==========================================
-                    // GROUP 2: CALL RECORDING ENGINE
-                    // ==========================================
-                    SettingsSectionHeader(title = "CALL RECORDING ENGINE")
-                    SettingsGroupCard {
-                        // Row 1: Auto-Record Calls
-                        SettingsItemRow(
-                            icon = Icons.Filled.Mic,
-                            iconTint = Color.White,
-                            iconBgColor = Color(0x18FFFFFF),
-                            title = "Auto-Record Calls",
-                            subtitle = if (isAutoRecordEnabled)
-                                "Dual-side capture: records caller and mic directly"
-                            else
-                                "Manual recording: tap in-call REC button anytime",
-                            trailingContent = {
-                                Switch(
-                                    checked = isAutoRecordEnabled,
-                                    onCheckedChange = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        onToggleAutoRecord(it)
-                                    },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = Color.White,
-                                        checkedTrackColor = Color(0x40FFFFFF),
-                                        uncheckedThumbColor = TextMuted,
-                                        uncheckedTrackColor = Color(0x22FFFFFF)
-                                    )
-                                )
-                            }
-                        )
-
-                        SettingsDivider()
-
-                        // Row 2: Saved Call Recordings Manager
-                        SettingsItemRow(
-                            icon = Icons.Rounded.GraphicEq,
-                            iconTint = Color.White,
-                            iconBgColor = Color(0x18FFFFFF),
-                            title = "Saved Recordings",
-                            subtitle = "Playback audio, share WAV files, or manage storage",
-                            modifier = Modifier.clickable {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                showRecordingsDialog = true
-                            },
-                            trailingContent = {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(Color(0x18FFFFFF))
-                                        .border(0.8.dp, Color(0x30FFFFFF), RoundedCornerShape(8.dp))
-                                        .padding(horizontal = 9.dp, vertical = 5.dp)
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Text(
-                                            text = "Manage",
-                                            color = Color.White,
-                                            fontSize = 11.5.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                        Icon(
-                                            imageVector = Icons.Rounded.ChevronRight,
-                                            contentDescription = null,
-                                            tint = Color.White,
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        )
-                    }
-
-                    // ==========================================
-                    // GROUP 3: SPEECH JAMMER (ACOUSTIC DAF ENGINE)
-                    // ==========================================
-                    SettingsSectionHeader(title = "SPEECH JAMMER (ACOUSTIC DAF ENGINE)")
-                    SettingsGroupCard {
-                        val jammerEngine = remember { com.callscreener.app.engine.SpeechJammerEngine.getInstance(context) }
-                        var isJammerEnabled by remember { mutableStateOf(jammerEngine.isEnabled) }
-
-                        SettingsItemRow(
-                            icon = Icons.Rounded.Psychology,
-                            iconTint = Color(0xFFBA68C8),
-                            iconBgColor = Color(0x259C27B0),
-                            title = "Speech Jammer (DAF)",
-                            subtitle = if (isJammerEnabled)
-                                "Acoustic DAF Active: disrupts caller with ${jammerEngine.delayMs}ms delayed feedback"
-                            else
-                                "Disabled: in-call Speech Jammer controls hidden",
-                            trailingContent = {
-                                Switch(
-                                    checked = isJammerEnabled,
-                                    onCheckedChange = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        isJammerEnabled = it
-                                        jammerEngine.isEnabled = it
-                                    },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = Color.White,
-                                        checkedTrackColor = Color(0xFF9C27B0),
-                                        uncheckedThumbColor = TextMuted,
-                                        uncheckedTrackColor = Color(0x22FFFFFF)
-                                    )
-                                )
-                            }
-                        )
-
-                        SettingsDivider()
-
-                        SettingsItemRow(
-                            icon = Icons.Rounded.Tune,
-                            iconTint = Color(0xFFE1BEE7),
-                            iconBgColor = Color(0x189C27B0),
-                            title = "Configure & Live Test Lab",
-                            subtitle = "Adjust 160-240ms delay, intensity gain, or test on your own voice",
-                            modifier = Modifier.clickable {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                showSpeechJammerDialog = true
-                            },
-                            trailingContent = {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(Color(0x259C27B0))
-                                        .border(0.8.dp, Color(0x60BA68C8), RoundedCornerShape(8.dp))
-                                        .padding(horizontal = 9.dp, vertical = 5.dp)
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Text(
-                                            text = "Tune / Test",
-                                            color = Color(0xFFE1BEE7),
-                                            fontSize = 11.5.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                        Icon(
-                                            imageVector = Icons.Rounded.ChevronRight,
-                                            contentDescription = null,
-                                            tint = Color(0xFFE1BEE7),
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        )
-                    }
-
-                    // ==========================================
-                    // GROUP 4: OPERATING PROFILE & PRIVILEGES
-                    // ==========================================
-                    SettingsSectionHeader(title = "OPERATING PROFILE & PRIVILEGES")
-                    SettingsGroupCard {
-                        // Row 1: Profile Summary & Status Pill
-                        SettingsItemRow(
-                            icon = if (operationMode == AppOperationMode.ROOT_ENHANCED) Icons.Rounded.Security else Icons.Filled.Call,
-                            iconTint = Color.White,
-                            iconBgColor = Color(0x18FFFFFF),
-                            title = "Operating Profile",
-                            subtitle = if (operationMode == AppOperationMode.ROOT_ENHANCED)
-                                "Root Superpowers & Direct Audio Uplink"
-                            else
-                                "Standard Non-Root Telecom Profile",
-                            trailingContent = {
-                                val badgeText = if (operationMode == AppOperationMode.ROOT_ENHANCED) {
-                                    if (rootAvailable) "ROOT READY" else "SU NEEDED"
-                                } else {
-                                    "STANDARD"
-                                }
-                                val badgeColor = if (operationMode == AppOperationMode.ROOT_ENHANCED) {
-                                    if (rootAvailable) AppleGreen else AppleAmber
-                                } else {
-                                    AppleBlue
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(badgeColor.copy(alpha = 0.18f))
-                                        .border(0.8.dp, badgeColor.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text(
-                                        text = badgeText,
-                                        color = badgeColor,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                }
-                            }
-                        )
-
-                        SettingsDivider()
-
-                        // Segmented Liquid Glass Mode Selector Pill
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(Color(0x18FFFFFF))
-                                    .border(1.dp, LiquidGlassBorderSubtle, RoundedCornerShape(14.dp))
-                                    .padding(3.dp),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                val isStandard = operationMode == AppOperationMode.STANDARD
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(11.dp))
-                                        .background(if (isStandard) AppleBlueGlassFill else SolidColor(Color.Transparent))
-                                        .clickable {
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            onSelectMode(AppOperationMode.STANDARD)
-                                        }
-                                        .padding(vertical = 8.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "Standard (Non-Root)",
-                                        color = if (isStandard) Color.White else TextSecondary,
-                                        fontSize = 12.sp,
-                                        fontWeight = if (isStandard) FontWeight.SemiBold else FontWeight.Medium
-                                    )
-                                }
-
-                                val isRoot = operationMode == AppOperationMode.ROOT_ENHANCED
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(11.dp))
-                                        .background(if (isRoot) AppleAmberGlassFill else SolidColor(Color.Transparent))
-                                        .clickable {
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            onSelectMode(AppOperationMode.ROOT_ENHANCED)
-                                            coroutineScope.launch {
-                                                rootAvailable = RootPrivilegeManager.isRootAvailable()
-                                                isPrivileged = RootPrivilegeManager.isPrivilegedApp(context)
-                                                isModuleInstalled = RootPrivilegeManager.isMagiskModuleInstalled()
-                                            }
-                                        }
-                                        .padding(vertical = 8.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "Root Enhanced",
-                                        color = if (isRoot) Color.White else TextSecondary,
-                                        fontSize = 12.sp,
-                                        fontWeight = if (isRoot) FontWeight.SemiBold else FontWeight.Medium
-                                    )
-                                }
-                            }
-                        }
-
-                        // Feature Bullets Card
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 6.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(Color(0x0CFFFFFF))
-                                .border(0.8.dp, Color(0x14FFFFFF), RoundedCornerShape(14.dp))
-                                .padding(12.dp)
-                        ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                if (operationMode == AppOperationMode.STANDARD) {
-                                    Text(
-                                        text = "Standard Mode is built for normal everyday calling on any Android phone. Calls use your natural microphone directly with zero root modifications, zero risk, and maximum stability.",
-                                        color = TextSecondary,
-                                        fontSize = 11.5.sp,
-                                        lineHeight = 16.sp
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    ModeFeatureRow(text = "Standard Telecom framework (works on all devices)", isIncluded = true)
-                                    ModeFeatureRow(text = "Instant call screening & neural AI assistant", isIncluded = true)
-                                    ModeFeatureRow(text = "Zero unlocked bootloader or root required", isIncluded = true)
-                                } else {
-                                    Text(
-                                        text = "Root Enhanced Mode unlocks privileged digital audio routing, zero-noise digital cellular injection, and system priv-app integration via Magisk or KernelSU.",
-                                        color = AppleAmber,
-                                        fontSize = 11.5.sp,
-                                        lineHeight = 16.sp
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    ModeFeatureRow(text = "Direct cellular uplink audio injection (zero mic noise)", isIncluded = true)
-                                    ModeFeatureRow(text = "High-fidelity dual-side in-call audio recording", isIncluded = true)
-                                    ModeFeatureRow(text = "Magisk / KernelSU system priv-app integration", isIncluded = true)
-                                }
-                            }
-                        }
-
-                        // Root Actions & Module Management
-                        if (operationMode == AppOperationMode.ROOT_ENHANCED) {
-                            SettingsDivider()
-
+                    // Settings Grouped Content List
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // ==========================================
+                        // GROUP 1: CALL HANDLING & SCREENING
+                        // ==========================================
+                        SettingsSectionHeader(title = "CALL HANDLING & SCREENING", monetColors = monetColors)
+                        SettingsGroupCard(monetColors = monetColors) {
+                            // Row 1: Default Phone App
                             SettingsItemRow(
-                                icon = Icons.Rounded.Extension,
-                                iconTint = Color.White,
-                                iconBgColor = Color(0x18FFFFFF),
-                                title = when {
-                                    isPrivileged -> "System Priv-App: Active"
-                                    isModuleInstalled -> "Module Installed (Pending Reboot)"
-                                    else -> "Magisk / KernelSU Module"
-                                },
-                                subtitle = when {
-                                    isPrivileged -> "Verified in /system/priv-app with CAPTURE_AUDIO_OUTPUT"
-                                    isModuleInstalled -> "Restart device to finish mounting into system_server"
-                                    rootAvailable -> "Tap below to build and activate systemless module"
-                                    else -> "Grant root (su) access to unlock digital injection"
-                                },
+                                icon = if (isDefaultDialer) Icons.Rounded.PhoneInTalk else Icons.Filled.Warning,
+                                iconTint = if (isDefaultDialer) Color(0xFF81C995) else monetColors.error,
+                                iconBgColor = if (isDefaultDialer) Color(0xFF81C995).copy(alpha = 0.16f) else monetColors.error.copy(alpha = 0.16f),
+                                title = "Default Phone App",
+                                subtitle = if (isDefaultDialer)
+                                    "Active • Managing incoming & outgoing carrier calls"
+                                else
+                                    "Required by Android to intercept and screen incoming calls",
+                                monetColors = monetColors,
                                 trailingContent = {
-                                    if (isPrivileged) {
+                                    if (isDefaultDialer) {
                                         Box(
                                             modifier = Modifier
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(AppleGreen.copy(alpha = 0.18f))
-                                                .border(0.8.dp, AppleGreen.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
-                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(Color(0xFF81C995).copy(alpha = 0.18f))
+                                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.Check,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFF81C995),
+                                                    modifier = Modifier.size(13.dp)
+                                                )
+                                                Text(
+                                                    text = "ACTIVE",
+                                                    color = Color(0xFF81C995),
+                                                    fontSize = 10.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontFamily = GoogleSans
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(14.dp))
+                                                .background(monetColors.primary)
+                                                .clickable {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    onRequestDefaultDialer()
+                                                }
+                                                .padding(horizontal = 14.dp, vertical = 7.dp)
                                         ) {
                                             Text(
-                                                text = "PRIV-APP",
-                                                color = AppleGreen,
-                                                fontSize = 10.sp,
+                                                text = "Set Default",
+                                                color = monetColors.onPrimary,
+                                                fontSize = 12.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                fontFamily = FontFamily.Monospace
+                                                fontFamily = GoogleSans
                                             )
                                         }
                                     }
                                 }
                             )
 
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                if (isPrivileged) {
-                                    OutlinedButton(
-                                        onClick = {
-                                            coroutineScope.launch {
-                                                val result = RootPrivilegeManager.uninstallSystemModule()
-                                                isModuleInstalled = RootPrivilegeManager.isMagiskModuleInstalled()
-                                                isPrivileged = RootPrivilegeManager.isPrivilegedApp(context)
-                                                Toast.makeText(context, result.second, Toast.LENGTH_SHORT).show()
-                                            }
+                            SettingsDivider(monetColors = monetColors)
+
+                            // Row 2: Auto-Screen Unknown
+                            SettingsItemRow(
+                                icon = Icons.Rounded.Security,
+                                iconTint = monetColors.primary,
+                                iconBgColor = monetColors.primary.copy(alpha = 0.14f),
+                                title = "Auto-Screen Unknown",
+                                subtitle = if (autoScreenUnknown)
+                                    "Assistant answers callers not saved in your contacts"
+                                else
+                                    "Manual screening: tap Screen on incoming call canopy",
+                                monetColors = monetColors,
+                                trailingContent = {
+                                    Switch(
+                                        checked = autoScreenUnknown,
+                                        onCheckedChange = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            onToggleAutoScreen(it)
                                         },
-                                        shape = RoundedCornerShape(12.dp),
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary),
-                                        modifier = Modifier.fillMaxWidth().height(40.dp)
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = monetColors.onPrimary,
+                                            checkedTrackColor = monetColors.primary,
+                                            uncheckedThumbColor = monetColors.outline,
+                                            uncheckedTrackColor = monetColors.surfaceVariant
+                                        )
+                                    )
+                                }
+                            )
+
+                            SettingsDivider(monetColors = monetColors)
+
+                            // Row 3: Stealth Caller ID
+                            SettingsItemRow(
+                                icon = Icons.Rounded.VisibilityOff,
+                                iconTint = monetColors.secondary,
+                                iconBgColor = monetColors.secondary.copy(alpha = 0.14f),
+                                title = "Stealth Caller ID",
+                                subtitle = if (isHideNumberOnCallerId)
+                                    "Private Caller: raw numbers masked on in-call screens"
+                                else
+                                    "Standard: full caller phone numbers displayed",
+                                monetColors = monetColors,
+                                trailingContent = {
+                                    Switch(
+                                        checked = isHideNumberOnCallerId,
+                                        onCheckedChange = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            onToggleHideNumber(it)
+                                        },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = monetColors.onPrimary,
+                                            checkedTrackColor = monetColors.primary,
+                                            uncheckedThumbColor = monetColors.outline,
+                                            uncheckedTrackColor = monetColors.surfaceVariant
+                                        )
+                                    )
+                                }
+                            )
+                        }
+
+                        // ==========================================
+                        // GROUP: CALL STATISTICS & INSIGHTS
+                        // ==========================================
+                        SettingsSectionHeader(title = "CALL STATISTICS & INSIGHTS", monetColors = monetColors)
+                        SettingsGroupCard(monetColors = monetColors) {
+                            val totalTalkTime = remember(callLogs) { callLogs.sumOf { it.durationSeconds } }
+                            val totalCallCount = remember(callLogs) { callLogs.size }
+
+                            SettingsItemRow(
+                                icon = Icons.Rounded.Schedule,
+                                iconTint = Color(0xFF8AB4F8),
+                                iconBgColor = Color(0xFF8AB4F8).copy(alpha = 0.16f),
+                                title = "Call Statistics",
+                                subtitle = "${formatCallDuration(totalTalkTime)} total talk time • $totalCallCount calls recorded",
+                                monetColors = monetColors,
+                                modifier = Modifier.clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    showCallStatsScreen = true
+                                },
+                                trailingContent = {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(Color(0xFF8AB4F8).copy(alpha = 0.18f))
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
                                     ) {
-                                        Text("Uninstall System Module", fontSize = 12.sp)
-                                    }
-                                } else if (rootAvailable) {
-                                    if (isModuleInstalled) {
-                                        Button(
-                                            onClick = {
-                                                coroutineScope.launch {
-                                                    RootPrivilegeManager.rebootDevice()
-                                                }
-                                            },
-                                            colors = ButtonDefaults.buttonColors(containerColor = AppleAmber),
-                                            shape = RoundedCornerShape(12.dp),
-                                            modifier = Modifier.fillMaxWidth().height(42.dp)
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                                         ) {
-                                            Text("Restart Device Now", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                            Text(
+                                                text = "View",
+                                                color = Color(0xFF8AB4F8),
+                                                fontSize = 11.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                fontFamily = GoogleSans
+                                            )
+                                            Icon(
+                                                imageVector = Icons.Rounded.ChevronRight,
+                                                contentDescription = null,
+                                                tint = Color(0xFF8AB4F8),
+                                                modifier = Modifier.size(14.dp)
+                                            )
                                         }
                                     }
+                                }
+                            )
+                        }
 
-                                    Button(
-                                        onClick = {
-                                            isInstalling = true
-                                            coroutineScope.launch {
-                                                val result = RootPrivilegeManager.installSystemModule(context)
-                                                isInstalling = false
-                                                isModuleInstalled = RootPrivilegeManager.isMagiskModuleInstalled()
-                                                isPrivileged = RootPrivilegeManager.isPrivilegedApp(context)
-                                                Toast.makeText(context, result.second, Toast.LENGTH_LONG).show()
-                                            }
+                        // ==========================================
+                        // GROUP 2: CALL RECORDING ENGINE
+                        // ==========================================
+                        SettingsSectionHeader(title = "CALL RECORDING ENGINE", monetColors = monetColors)
+                        SettingsGroupCard(monetColors = monetColors) {
+                            // Row 1: Auto-Record Calls
+                            SettingsItemRow(
+                                icon = Icons.Filled.Mic,
+                                iconTint = Color(0xFFF28B82),
+                                iconBgColor = Color(0xFFF28B82).copy(alpha = 0.14f),
+                                title = "Auto-Record Calls",
+                                subtitle = if (isAutoRecordEnabled)
+                                    "Dual-side capture: records caller and mic directly"
+                                else
+                                    "Manual recording: tap in-call REC button anytime",
+                                monetColors = monetColors,
+                                trailingContent = {
+                                    Switch(
+                                        checked = isAutoRecordEnabled,
+                                        onCheckedChange = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            onToggleAutoRecord(it)
                                         },
-                                        enabled = !isInstalling,
-                                        colors = ButtonDefaults.buttonColors(containerColor = AppleBlue),
-                                        shape = RoundedCornerShape(12.dp),
-                                        modifier = Modifier.fillMaxWidth().height(42.dp)
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = monetColors.onPrimary,
+                                            checkedTrackColor = monetColors.primary,
+                                            uncheckedThumbColor = monetColors.outline,
+                                            uncheckedTrackColor = monetColors.surfaceVariant
+                                        )
+                                    )
+                                }
+                            )
+
+                            SettingsDivider(monetColors = monetColors)
+
+                            // Row 2: Saved Call Recordings Manager
+                            SettingsItemRow(
+                                icon = Icons.Rounded.GraphicEq,
+                                iconTint = monetColors.tertiary,
+                                iconBgColor = monetColors.tertiary.copy(alpha = 0.14f),
+                                title = "Saved Recordings",
+                                subtitle = "Playback audio, share WAV files, or manage storage",
+                                monetColors = monetColors,
+                                modifier = Modifier.clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    showRecordingsDialog = true
+                                },
+                                trailingContent = {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(monetColors.surfaceVariant.copy(alpha = 0.7f))
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Text(
+                                                text = "Manage",
+                                                color = monetColors.onSurface,
+                                                fontSize = 11.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                fontFamily = GoogleSans
+                                            )
+                                            Icon(
+                                                imageVector = Icons.Rounded.ChevronRight,
+                                                contentDescription = null,
+                                                tint = monetColors.onSurfaceVariant,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            )
+                        }
+
+                        // ==========================================
+                        // GROUP 3: SPEECH JAMMER (ACOUSTIC DAF ENGINE)
+                        // ==========================================
+                        SettingsSectionHeader(title = "SPEECH JAMMER (ACOUSTIC DAF ENGINE)", monetColors = monetColors)
+                        SettingsGroupCard(monetColors = monetColors) {
+                            val jammerEngine = remember { com.callscreener.app.engine.SpeechJammerEngine.getInstance(context) }
+                            var isJammerEnabled by remember { mutableStateOf(jammerEngine.isEnabled) }
+
+                            SettingsItemRow(
+                                icon = Icons.Rounded.Psychology,
+                                iconTint = Color(0xFFD0BCFF),
+                                iconBgColor = Color(0xFFD0BCFF).copy(alpha = 0.16f),
+                                title = "Speech Jammer (DAF)",
+                                subtitle = if (isJammerEnabled)
+                                    "Acoustic DAF Active: disrupts caller with ${jammerEngine.delayMs}ms delayed feedback"
+                                else
+                                    "Disabled: in-call Speech Jammer controls hidden",
+                                monetColors = monetColors,
+                                trailingContent = {
+                                    Switch(
+                                        checked = isJammerEnabled,
+                                        onCheckedChange = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            isJammerEnabled = it
+                                            jammerEngine.isEnabled = it
+                                        },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = Color(0xFFD0BCFF),
+                                            checkedTrackColor = Color(0xFF6750A4),
+                                            uncheckedThumbColor = monetColors.outline,
+                                            uncheckedTrackColor = monetColors.surfaceVariant
+                                        )
+                                    )
+                                }
+                            )
+
+                            SettingsDivider(monetColors = monetColors)
+
+                            SettingsItemRow(
+                                icon = Icons.Rounded.Tune,
+                                iconTint = Color(0xFFE8DEF8),
+                                iconBgColor = Color(0xFFE8DEF8).copy(alpha = 0.16f),
+                                title = "Configure & Live Test Lab",
+                                subtitle = "Adjust 160-240ms delay, intensity gain, or test on your own voice",
+                                monetColors = monetColors,
+                                modifier = Modifier.clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    showSpeechJammerDialog = true
+                                },
+                                trailingContent = {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(Color(0xFFD0BCFF).copy(alpha = 0.2f))
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Text(
+                                                text = "Tune / Test",
+                                                color = Color(0xFFD0BCFF),
+                                                fontSize = 11.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                fontFamily = GoogleSans
+                                            )
+                                            Icon(
+                                                imageVector = Icons.Rounded.ChevronRight,
+                                                contentDescription = null,
+                                                tint = Color(0xFFD0BCFF),
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            )
+                        }
+
+                        // ==========================================
+                        // GROUP 4: OPERATING PROFILE & PRIVILEGES
+                        // ==========================================
+                        SettingsSectionHeader(title = "OPERATING PROFILE & PRIVILEGES", monetColors = monetColors)
+                        SettingsGroupCard(monetColors = monetColors) {
+                            // Row 1: Profile Summary & Status Pill
+                            SettingsItemRow(
+                                icon = if (operationMode == AppOperationMode.ROOT_ENHANCED) Icons.Rounded.Security else Icons.Filled.Call,
+                                iconTint = monetColors.primary,
+                                iconBgColor = monetColors.primary.copy(alpha = 0.14f),
+                                title = "Operating Profile",
+                                subtitle = if (operationMode == AppOperationMode.ROOT_ENHANCED)
+                                    "Root Superpowers & Direct Audio Uplink"
+                                else
+                                    "Standard Non-Root Telecom Profile",
+                                monetColors = monetColors,
+                                trailingContent = {
+                                    val badgeText = if (operationMode == AppOperationMode.ROOT_ENHANCED) {
+                                        if (rootAvailable) "ROOT READY" else "SU NEEDED"
+                                    } else {
+                                        "STANDARD"
+                                    }
+                                    val badgeColor = if (operationMode == AppOperationMode.ROOT_ENHANCED) {
+                                        if (rootAvailable) Color(0xFF81C995) else Color(0xFFFFB74D)
+                                    } else {
+                                        monetColors.primary
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(badgeColor.copy(alpha = 0.18f))
+                                            .padding(horizontal = 9.dp, vertical = 5.dp)
                                     ) {
                                         Text(
-                                            text = if (isInstalling) "Configuring Module..." else if (isModuleInstalled) "Re-install / Update Module" else "Activate Priv-App Module",
-                                            color = Color.White,
+                                            text = badgeText,
+                                            color = badgeColor,
+                                            fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp
+                                            fontFamily = GoogleSans
+                                        )
+                                    }
+                                }
+                            )
+
+                            SettingsDivider(monetColors = monetColors)
+
+                            // Segmented Pixel Mode Selector Pill
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(monetColors.surfaceVariant.copy(alpha = 0.5f))
+                                        .padding(4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    val isStandard = operationMode == AppOperationMode.STANDARD
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(if (isStandard) monetColors.primary else Color.Transparent)
+                                            .clickable {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                onSelectMode(AppOperationMode.STANDARD)
+                                            }
+                                            .padding(vertical = 10.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "Standard (Non-Root)",
+                                            color = if (isStandard) monetColors.onPrimary else monetColors.onSurfaceVariant,
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isStandard) FontWeight.SemiBold else FontWeight.Medium,
+                                            fontFamily = GoogleSans
                                         )
                                     }
 
-                                    if (isModuleInstalled) {
+                                    val isRoot = operationMode == AppOperationMode.ROOT_ENHANCED
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(if (isRoot) Color(0xFFFFB74D).copy(alpha = 0.28f) else Color.Transparent)
+                                            .clickable {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                onSelectMode(AppOperationMode.ROOT_ENHANCED)
+                                                coroutineScope.launch {
+                                                    rootAvailable = RootPrivilegeManager.isRootAvailable()
+                                                    isPrivileged = RootPrivilegeManager.isPrivilegedApp(context)
+                                                    isModuleInstalled = RootPrivilegeManager.isMagiskModuleInstalled()
+                                                }
+                                            }
+                                            .padding(vertical = 10.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "Root Enhanced",
+                                            color = if (isRoot) Color(0xFFFFB74D) else monetColors.onSurfaceVariant,
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isRoot) FontWeight.SemiBold else FontWeight.Medium,
+                                            fontFamily = GoogleSans
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Feature Bullets Card
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(monetColors.surfaceVariant.copy(alpha = 0.35f))
+                                    .padding(14.dp)
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    if (operationMode == AppOperationMode.STANDARD) {
+                                        Text(
+                                            text = "Standard Mode is built for normal everyday calling on any Android phone. Calls use your natural microphone directly with zero root modifications, zero risk, and maximum stability.",
+                                            color = monetColors.onSurfaceVariant,
+                                            fontSize = 12.sp,
+                                            lineHeight = 16.sp,
+                                            fontFamily = GoogleSans
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        ModeFeatureRow(text = "Standard Telecom framework (works on all devices)", isIncluded = true)
+                                        ModeFeatureRow(text = "Instant call screening & neural AI assistant", isIncluded = true)
+                                        ModeFeatureRow(text = "Zero unlocked bootloader or root required", isIncluded = true)
+                                    } else {
+                                        Text(
+                                            text = "Root Enhanced Mode unlocks privileged digital audio routing, zero-noise digital cellular injection, and system priv-app integration via Magisk or KernelSU.",
+                                            color = Color(0xFFFFB74D),
+                                            fontSize = 12.sp,
+                                            lineHeight = 16.sp,
+                                            fontFamily = GoogleSans
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        ModeFeatureRow(text = "Direct cellular uplink audio injection (zero mic noise)", isIncluded = true)
+                                        ModeFeatureRow(text = "High-fidelity dual-side in-call audio recording", isIncluded = true)
+                                        ModeFeatureRow(text = "Magisk / KernelSU system priv-app integration", isIncluded = true)
+                                    }
+                                }
+                            }
+
+                            // Root Actions & Module Management
+                            if (operationMode == AppOperationMode.ROOT_ENHANCED) {
+                                SettingsDivider(monetColors = monetColors)
+
+                                SettingsItemRow(
+                                    icon = Icons.Rounded.Extension,
+                                    iconTint = monetColors.primary,
+                                    iconBgColor = monetColors.primary.copy(alpha = 0.14f),
+                                    title = when {
+                                        isPrivileged -> "System Priv-App: Active"
+                                        isModuleInstalled -> "Module Installed (Pending Reboot)"
+                                        else -> "Magisk / KernelSU Module"
+                                    },
+                                    subtitle = when {
+                                        isPrivileged -> "Verified in /system/priv-app with CAPTURE_AUDIO_OUTPUT"
+                                        isModuleInstalled -> "Restart device to finish mounting into system_server"
+                                        rootAvailable -> "Tap below to build and activate systemless module"
+                                        else -> "Grant root (su) access to unlock digital injection"
+                                    },
+                                    monetColors = monetColors,
+                                    trailingContent = {
+                                        if (isPrivileged) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(10.dp))
+                                                    .background(Color(0xFF81C995).copy(alpha = 0.18f))
+                                                    .padding(horizontal = 9.dp, vertical = 5.dp)
+                                            ) {
+                                                Text(
+                                                    text = "PRIV-APP",
+                                                    color = Color(0xFF81C995),
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontFamily = GoogleSans
+                                                )
+                                            }
+                                        }
+                                    }
+                                )
+
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    if (isPrivileged) {
                                         OutlinedButton(
                                             onClick = {
                                                 coroutineScope.launch {
                                                     val result = RootPrivilegeManager.uninstallSystemModule()
                                                     isModuleInstalled = RootPrivilegeManager.isMagiskModuleInstalled()
+                                                    isPrivileged = RootPrivilegeManager.isPrivilegedApp(context)
                                                     Toast.makeText(context, result.second, Toast.LENGTH_SHORT).show()
                                                 }
                                             },
-                                            shape = RoundedCornerShape(12.dp),
-                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary),
-                                            modifier = Modifier.fillMaxWidth().height(40.dp)
+                                            shape = RoundedCornerShape(16.dp),
+                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = monetColors.onSurfaceVariant),
+                                            modifier = Modifier.fillMaxWidth().height(42.dp)
                                         ) {
-                                            Text("Uninstall Module", fontSize = 12.sp)
+                                            Text("Uninstall System Module", fontSize = 12.sp, fontFamily = GoogleSans)
+                                        }
+                                    } else if (rootAvailable) {
+                                        if (isModuleInstalled) {
+                                            Button(
+                                                onClick = {
+                                                    coroutineScope.launch {
+                                                        RootPrivilegeManager.rebootDevice()
+                                                    }
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFB74D)),
+                                                shape = RoundedCornerShape(16.dp),
+                                                modifier = Modifier.fillMaxWidth().height(44.dp)
+                                            ) {
+                                                Text("Restart Device Now", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold, fontSize = 13.sp, fontFamily = GoogleSans)
+                                            }
+                                        }
+
+                                        Button(
+                                            onClick = {
+                                                isInstalling = true
+                                                coroutineScope.launch {
+                                                    val result = RootPrivilegeManager.installSystemModule(context)
+                                                    isInstalling = false
+                                                    isModuleInstalled = RootPrivilegeManager.isMagiskModuleInstalled()
+                                                    isPrivileged = RootPrivilegeManager.isPrivilegedApp(context)
+                                                    Toast.makeText(context, result.second, Toast.LENGTH_LONG).show()
+                                                }
+                                            },
+                                            enabled = !isInstalling,
+                                            colors = ButtonDefaults.buttonColors(containerColor = monetColors.primary),
+                                            shape = RoundedCornerShape(16.dp),
+                                            modifier = Modifier.fillMaxWidth().height(44.dp)
+                                        ) {
+                                            Text(
+                                                text = if (isInstalling) "Configuring Module..." else if (isModuleInstalled) "Re-install / Update Module" else "Activate Priv-App Module",
+                                                color = monetColors.onPrimary,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                fontFamily = GoogleSans
+                                            )
+                                        }
+
+                                        if (isModuleInstalled) {
+                                            OutlinedButton(
+                                                onClick = {
+                                                    coroutineScope.launch {
+                                                        val result = RootPrivilegeManager.uninstallSystemModule()
+                                                        isModuleInstalled = RootPrivilegeManager.isMagiskModuleInstalled()
+                                                        Toast.makeText(context, result.second, Toast.LENGTH_SHORT).show()
+                                                    }
+                                                },
+                                                shape = RoundedCornerShape(16.dp),
+                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = monetColors.onSurfaceVariant),
+                                                modifier = Modifier.fillMaxWidth().height(42.dp)
+                                            ) {
+                                                Text("Uninstall Module", fontSize = 12.sp, fontFamily = GoogleSans)
+                                            }
                                         }
                                     }
                                 }
-                            }
 
-                            SettingsDivider()
+                                SettingsDivider(monetColors = monetColors)
 
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.Top,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Info,
-                                    contentDescription = null,
-                                    tint = TextTertiary,
-                                    modifier = Modifier.size(16.dp).padding(top = 1.dp)
-                                )
-                                Text(
-                                    text = "Android security isolates cellular voice channels from user apps. System priv-app installation mounts Call Screener into /system/priv-app with CAPTURE_AUDIO_OUTPUT permissions, bypassing loudspeaker audio loopback.",
-                                    color = TextTertiary,
-                                    fontSize = 11.sp,
-                                    lineHeight = 15.sp
-                                )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.Top,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Info,
+                                        contentDescription = null,
+                                        tint = monetColors.onSurfaceVariant.copy(alpha = 0.7f),
+                                        modifier = Modifier.size(16.dp).padding(top = 1.dp)
+                                    )
+                                    Text(
+                                        text = "Android security isolates cellular voice channels from user apps. System priv-app installation mounts Call Screener into /system/priv-app with CAPTURE_AUDIO_OUTPUT permissions, bypassing loudspeaker audio loopback.",
+                                        color = monetColors.onSurfaceVariant.copy(alpha = 0.7f),
+                                        fontSize = 11.5.sp,
+                                        lineHeight = 15.sp,
+                                        fontFamily = GoogleSans
+                                    )
+                                }
                             }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(28.dp).navigationBarsPadding())
+                    }
                 }
             }
         }
-    }
-}
-
     if (showSpeechJammerDialog) {
         val jammerEngine = remember { com.callscreener.app.engine.SpeechJammerEngine.getInstance(context) }
         SpeechJammerDialog(
@@ -5953,6 +7965,807 @@ fun DialerSettingsSheet(
 
     if (showRecordingsDialog) {
         SavedRecordingsDialog(onDismiss = { showRecordingsDialog = false })
+    }
+
+    if (showCallStatsScreen) {
+        CallStatsScreen(
+            callLogs = callLogs,
+            monetColors = monetColors,
+            onDismiss = { showCallStatsScreen = false },
+            onCall = { number ->
+                DialerRepository.placeCall(context, number)
+            }
+        )
+    }
+}
+
+// =========================================================================
+// CALL STATISTICS FEATURE (Google Pixel / Expressive Dialer Design)
+// =========================================================================
+
+enum class StatsDateRange(val label: String) {
+    ALL_TIME("All time"),
+    TODAY("Today"),
+    SEVEN_DAYS("Last 7 days"),
+    THIRTY_DAYS("Last 30 days")
+}
+
+enum class StatsCallType(val label: String) {
+    ALL("All"),
+    INCOMING("Incoming"),
+    OUTGOING("Outgoing"),
+    MISSED("Missed")
+}
+
+data class ContactCallMetric(
+    val name: String,
+    val number: String,
+    val totalDuration: Long,
+    val callCount: Int,
+    val incomingCount: Int,
+    val outgoingCount: Int,
+    val missedCount: Int
+)
+
+/**
+ * Pixel Expressive Call Statistics Screen
+ * Direct match to Google Dialer's CallStatsScreen:
+ * - Date Range Filter Row (All time, Today, Last 7 days, Last 30 days)
+ * - Call Type Filter Row (All, Incoming, Outgoing, Missed)
+ * - Hero Summary Card with full duration, matching calls, and average duration
+ * - 3 Mini Metric Cards (Incoming, Outgoing, Missed)
+ * - Top Contacts Ranked List with Duration Progress Bars and One-Tap Call Action
+ */
+@Composable
+fun CallStatsScreen(
+    callLogs: List<CallLogItem>,
+    monetColors: ColorScheme,
+    onDismiss: () -> Unit,
+    onCall: (String) -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    val coroutineScope = rememberCoroutineScope()
+    var isVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        isVisible = true
+    }
+
+    fun animateDismiss() {
+        if (!isVisible) return
+        coroutineScope.launch {
+            isVisible = false
+            delay(180)
+            onDismiss()
+        }
+    }
+
+    Dialog(
+        onDismissRequest = { animateDismiss() },
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        val view = LocalView.current
+        SideEffect {
+            var parent: Any? = view.parent
+            var dialogWindow: android.view.Window? = null
+            while (parent != null) {
+                if (parent is DialogWindowProvider) {
+                    dialogWindow = parent.window
+                    break
+                }
+                parent = (parent as? android.view.View)?.parent
+            }
+            if (dialogWindow == null) {
+                dialogWindow = (view.rootView.parent as? DialogWindowProvider)?.window
+            }
+
+            dialogWindow?.let { win ->
+                win.setDimAmount(0f)
+                win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+                win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION)
+                win.addFlags(android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+                win.setLayout(
+                    android.view.WindowManager.LayoutParams.MATCH_PARENT,
+                    android.view.WindowManager.LayoutParams.MATCH_PARENT
+                )
+                win.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+                WindowCompat.setDecorFitsSystemWindows(win, false)
+                win.statusBarColor = android.graphics.Color.TRANSPARENT
+                win.navigationBarColor = android.graphics.Color.TRANSPARENT
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    win.isNavigationBarContrastEnforced = false
+                    win.isStatusBarContrastEnforced = false
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    win.attributes = win.attributes.apply {
+                        layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    }
+                }
+                val insets = WindowCompat.getInsetsController(win, win.decorView)
+                insets.isAppearanceLightStatusBars = false
+                insets.isAppearanceLightNavigationBars = false
+                win.decorView.fitsSystemWindows = false
+                (win.decorView as? android.view.ViewGroup)?.clipToPadding = false
+            }
+            (view.parent as? android.view.View)?.fitsSystemWindows = false
+            (view as? android.view.View)?.fitsSystemWindows = false
+        }
+
+        BackHandler(enabled = isVisible) {
+            animateDismiss()
+        }
+
+        var selectedDateRange by remember { mutableStateOf(StatsDateRange.ALL_TIME) }
+        var selectedCallType by remember { mutableStateOf(StatsCallType.ALL) }
+
+        val now = remember { System.currentTimeMillis() }
+        val dateRangeCutoff = remember(selectedDateRange, now) {
+            when (selectedDateRange) {
+                StatsDateRange.ALL_TIME -> 0L
+                StatsDateRange.TODAY -> {
+                    val cal = java.util.Calendar.getInstance()
+                    cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                    cal.set(java.util.Calendar.MINUTE, 0)
+                    cal.set(java.util.Calendar.SECOND, 0)
+                    cal.set(java.util.Calendar.MILLISECOND, 0)
+                    cal.timeInMillis
+                }
+                StatsDateRange.SEVEN_DAYS -> now - (7L * 24 * 60 * 60 * 1000L)
+                StatsDateRange.THIRTY_DAYS -> now - (30L * 24 * 60 * 60 * 1000L)
+            }
+        }
+
+        val dateFilteredLogs = remember(callLogs, dateRangeCutoff) {
+            if (dateRangeCutoff == 0L) callLogs else callLogs.filter { it.timestamp >= dateRangeCutoff }
+        }
+
+        val filteredLogs = remember(dateFilteredLogs, selectedCallType) {
+            when (selectedCallType) {
+                StatsCallType.ALL -> dateFilteredLogs
+                StatsCallType.INCOMING -> dateFilteredLogs.filter { it.type == 1 }
+                StatsCallType.OUTGOING -> dateFilteredLogs.filter { it.type == 2 }
+                StatsCallType.MISSED -> dateFilteredLogs.filter { it.type == 3 || it.type == 5 || it.type == 6 }
+            }
+        }
+
+        val totalDuration = remember(filteredLogs) { filteredLogs.sumOf { it.durationSeconds } }
+        val totalCallCount = remember(filteredLogs) { filteredLogs.size }
+        val avgDuration = remember(totalDuration, totalCallCount) {
+            if (totalCallCount > 0) totalDuration / totalCallCount else 0L
+        }
+
+        // 3 Metric cards (breakdown for selected date range)
+        val inLogs = remember(dateFilteredLogs) { dateFilteredLogs.filter { it.type == 1 } }
+        val outLogs = remember(dateFilteredLogs) { dateFilteredLogs.filter { it.type == 2 } }
+        val missedLogs = remember(dateFilteredLogs) { dateFilteredLogs.filter { it.type == 3 || it.type == 5 || it.type == 6 } }
+
+        val inDuration = remember(inLogs) { inLogs.sumOf { it.durationSeconds } }
+        val outDuration = remember(outLogs) { outLogs.sumOf { it.durationSeconds } }
+        val inCount = inLogs.size
+        val outCount = outLogs.size
+        val missedCount = missedLogs.size
+
+        // Top contacts breakdown
+        val contactMetrics = remember(filteredLogs) {
+            val grouped = filteredLogs.groupBy { log ->
+                val clean = log.number.trim().replace(Regex("[\\s\\-\\(\\)]"), "")
+                if (clean.isNotEmpty()) clean else (log.name ?: "Unknown")
+            }
+            grouped.map { (key, logs) ->
+                val bestName = logs.firstOrNull { !it.name.isNullOrBlank() }?.name ?: ""
+                val bestNumber = logs.firstOrNull { it.number.isNotBlank() }?.number ?: key
+                val totalSecs = logs.sumOf { it.durationSeconds }
+                val count = logs.size
+                val incCount = logs.count { it.type == 1 }
+                val ogCount = logs.count { it.type == 2 }
+                val mCount = logs.count { it.type == 3 || it.type == 5 || it.type == 6 }
+
+                ContactCallMetric(
+                    name = bestName,
+                    number = bestNumber,
+                    totalDuration = totalSecs,
+                    callCount = count,
+                    incomingCount = incCount,
+                    outgoingCount = ogCount,
+                    missedCount = mCount
+                )
+            }.sortedWith(
+                compareByDescending<ContactCallMetric> { it.totalDuration }
+                    .thenByDescending { it.callCount }
+            )
+        }
+
+        val maxContactDuration = remember(contactMetrics) { contactMetrics.maxOfOrNull { it.totalDuration } ?: 0L }
+        val maxContactCount = remember(contactMetrics) { contactMetrics.maxOfOrNull { it.callCount } ?: 0 }
+
+        AnimatedVisibility(
+            visible = isVisible,
+            enter = slideInHorizontally(
+                initialOffsetX = { fullWidth -> fullWidth },
+                animationSpec = spring(
+                    dampingRatio = 0.85f,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            ) + fadeIn(animationSpec = tween(200)),
+            exit = slideOutHorizontally(
+                targetOffsetX = { fullWidth -> fullWidth },
+                animationSpec = tween(180, easing = FastOutLinearInEasing)
+            ) + fadeOut(animationSpec = tween(140))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(monetColors.background)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    // Pixel Expressive Top Bar
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(monetColors.background)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .statusBarsPadding()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    animateDismiss()
+                                },
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(monetColors.surfaceVariant.copy(alpha = 0.6f))
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                    contentDescription = "Back",
+                                    tint = monetColors.onSurface,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+
+                            Text(
+                                text = "Call statistics",
+                                style = androidx.compose.ui.text.TextStyle(
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = GoogleSans,
+                                    color = monetColors.onSurface
+                                ),
+                                modifier = Modifier
+                                    .padding(start = 16.dp)
+                                    .weight(1f)
+                            )
+
+                            if (selectedDateRange != StatsDateRange.ALL_TIME || selectedCallType != StatsCallType.ALL) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(monetColors.primaryContainer.copy(alpha = 0.6f))
+                                        .clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            selectedDateRange = StatsDateRange.ALL_TIME
+                                            selectedCallType = StatsCallType.ALL
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Close,
+                                            contentDescription = "Reset filter",
+                                            tint = monetColors.onPrimaryContainer,
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                        Text(
+                                            text = "Reset",
+                                            color = monetColors.onPrimaryContainer,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontFamily = GoogleSans
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Content
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 32.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // Date Range Filters
+                        item {
+                            StatsChoiceRow(
+                                items = StatsDateRange.values().toList(),
+                                selectedItem = selectedDateRange,
+                                onItemSelected = { selectedDateRange = it },
+                                labelProvider = { it.label },
+                                monetColors = monetColors
+                            )
+                        }
+
+                        // Call Type Filters
+                        item {
+                            StatsChoiceRow(
+                                items = StatsCallType.values().toList(),
+                                selectedItem = selectedCallType,
+                                onItemSelected = { selectedCallType = it },
+                                labelProvider = { it.label },
+                                monetColors = monetColors
+                            )
+                        }
+
+                        // Hero Summary Card
+                        item {
+                            StatsSummaryCard(
+                                dateRange = selectedDateRange,
+                                callType = selectedCallType,
+                                totalDuration = totalDuration,
+                                callCount = totalCallCount,
+                                avgDuration = avgDuration,
+                                monetColors = monetColors
+                            )
+                        }
+
+                        // 3 Mini Metric Cards
+                        item {
+                            StatsMetricCards(
+                                inCount = inCount,
+                                inDuration = inDuration,
+                                outCount = outCount,
+                                outDuration = outDuration,
+                                missedCount = missedCount,
+                                monetColors = monetColors
+                            )
+                        }
+
+                        // Top Contacts Section Header
+                        item {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 10.dp, bottom = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "Top contacts",
+                                        fontFamily = GoogleSans,
+                                        fontSize = 17.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = monetColors.onSurface
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(monetColors.surfaceVariant)
+                                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = "${contactMetrics.size}",
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = monetColors.onSurfaceVariant,
+                                            fontFamily = GoogleSans
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Contact Metrics List
+                        if (contactMetrics.isEmpty()) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(24.dp))
+                                        .background(monetColors.surfaceVariant.copy(alpha = 0.35f))
+                                        .padding(32.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Schedule,
+                                            contentDescription = null,
+                                            tint = monetColors.onSurfaceVariant.copy(alpha = 0.5f),
+                                            modifier = Modifier.size(40.dp)
+                                        )
+                                        Text(
+                                            text = "No calls found",
+                                            fontFamily = GoogleSans,
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 15.sp,
+                                            color = monetColors.onSurface
+                                        )
+                                        Text(
+                                            text = "No calls match the selected date range and call type filters.",
+                                            fontFamily = GoogleSans,
+                                            fontSize = 12.sp,
+                                            color = monetColors.onSurfaceVariant,
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            items(
+                                items = contactMetrics,
+                                key = { it.number + "_" + it.name }
+                            ) { contact ->
+                                ContactMetricCard(
+                                    contact = contact,
+                                    maxDuration = maxContactDuration,
+                                    maxCallCount = maxContactCount,
+                                    monetColors = monetColors,
+                                    onClick = {
+                                        onCall(contact.number)
+                                    }
+                                )
+                            }
+                        }
+
+                        item {
+                            Spacer(modifier = Modifier.height(24.dp).navigationBarsPadding())
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Filter Choice Row (Date Range & Call Type)
+ */
+@Composable
+fun <T> StatsChoiceRow(
+    items: List<T>,
+    selectedItem: T,
+    onItemSelected: (T) -> Unit,
+    labelProvider: (T) -> String,
+    monetColors: ColorScheme,
+    modifier: Modifier = Modifier
+) {
+    val haptic = LocalHapticFeedback.current
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        items.forEach { item ->
+            val isSelected = item == selectedItem
+            Box(
+                modifier = Modifier
+                    .height(38.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(if (isSelected) monetColors.primaryContainer else monetColors.surfaceVariant.copy(alpha = 0.45f))
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onItemSelected(item)
+                    }
+                    .padding(horizontal = 14.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = labelProvider(item),
+                    fontSize = 13.5.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isSelected) monetColors.onPrimaryContainer else monetColors.onSurfaceVariant,
+                    fontFamily = GoogleSans
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Google Pixel Hero Summary Card
+ */
+@Composable
+fun StatsSummaryCard(
+    dateRange: StatsDateRange,
+    callType: StatsCallType,
+    totalDuration: Long,
+    callCount: Int,
+    avgDuration: Long,
+    monetColors: ColorScheme,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(monetColors.primaryContainer.copy(alpha = 0.75f))
+            .padding(22.dp)
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = "${dateRange.label.uppercase(java.util.Locale.ROOT)} · ${callType.label.uppercase(java.util.Locale.ROOT)}",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp,
+                color = monetColors.onPrimaryContainer.copy(alpha = 0.75f),
+                fontFamily = GoogleSans
+            )
+
+            Text(
+                text = formatCallDuration(totalDuration),
+                fontSize = 36.sp,
+                lineHeight = 40.sp,
+                fontWeight = FontWeight.Bold,
+                color = monetColors.onPrimaryContainer,
+                fontFamily = GoogleSans
+            )
+
+            Text(
+                text = "$callCount matching calls • Avg ${formatCallDuration(avgDuration)}",
+                fontSize = 13.5.sp,
+                color = monetColors.onPrimaryContainer.copy(alpha = 0.85f),
+                fontFamily = GoogleSans
+            )
+        }
+    }
+}
+
+/**
+ * Row of 3 Metric Breakdown Cards (Incoming, Outgoing, Missed)
+ */
+@Composable
+fun StatsMetricCards(
+    inCount: Int,
+    inDuration: Long,
+    outCount: Int,
+    outDuration: Long,
+    missedCount: Int,
+    monetColors: ColorScheme,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        StatsMetricMiniCard(
+            title = "Incoming",
+            count = inCount,
+            duration = formatCallDuration(inDuration),
+            icon = Icons.Filled.CallReceived,
+            accentColor = Color(0xFF81C995),
+            monetColors = monetColors,
+            modifier = Modifier.weight(1f)
+        )
+
+        StatsMetricMiniCard(
+            title = "Outgoing",
+            count = outCount,
+            duration = formatCallDuration(outDuration),
+            icon = Icons.Filled.CallMade,
+            accentColor = Color(0xFF8AB4F8),
+            monetColors = monetColors,
+            modifier = Modifier.weight(1f)
+        )
+
+        StatsMetricMiniCard(
+            title = "Missed",
+            count = missedCount,
+            duration = "-",
+            icon = Icons.Filled.CallMissed,
+            accentColor = Color(0xFFF28B82),
+            monetColors = monetColors,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+fun StatsMetricMiniCard(
+    title: String,
+    count: Int,
+    duration: String,
+    icon: ImageVector,
+    accentColor: Color,
+    monetColors: ColorScheme,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(monetColors.surfaceVariant.copy(alpha = 0.45f))
+            .padding(horizontal = 12.dp, vertical = 14.dp)
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = accentColor,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = title,
+                    fontSize = 11.5.sp,
+                    color = monetColors.onSurfaceVariant,
+                    fontFamily = GoogleSans,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1
+                )
+            }
+
+            Text(
+                text = "$count",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = monetColors.onSurface,
+                fontFamily = GoogleSans
+            )
+
+            Text(
+                text = duration,
+                fontSize = 11.5.sp,
+                color = monetColors.onSurfaceVariant.copy(alpha = 0.8f),
+                fontFamily = GoogleSans,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+/**
+ * Top Contact Metric Card with duration bar and call info
+ */
+@Composable
+fun ContactMetricCard(
+    contact: ContactCallMetric,
+    maxDuration: Long,
+    maxCallCount: Int,
+    monetColors: ColorScheme,
+    onClick: () -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    val progress = remember(contact.totalDuration, maxDuration, contact.callCount, maxCallCount) {
+        if (maxDuration > 0) {
+            (contact.totalDuration.toFloat() / maxDuration.toFloat()).coerceIn(0.04f, 1f)
+        } else if (maxCallCount > 0) {
+            (contact.callCount.toFloat() / maxCallCount.toFloat()).coerceIn(0.04f, 1f)
+        } else {
+            0.04f
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(monetColors.surfaceVariant.copy(alpha = 0.35f))
+            .clickable {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            }
+            .padding(16.dp)
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val initial = remember(contact.name, contact.number) {
+                    val displayName = contact.name.ifBlank { contact.number }
+                    displayName.firstOrNull { it.isLetterOrDigit() }?.uppercaseChar()?.toString() ?: "#"
+                }
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(monetColors.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = initial,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = monetColors.onPrimaryContainer,
+                        fontFamily = GoogleSans
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = contact.name.ifBlank { contact.number },
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        color = monetColors.onSurface,
+                        fontFamily = GoogleSans
+                    )
+                    if (contact.name.isNotBlank() && contact.name != contact.number) {
+                        Text(
+                            text = contact.number,
+                            fontSize = 12.sp,
+                            color = monetColors.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            fontFamily = GoogleSans
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(
+                    horizontalAlignment = Alignment.End
+                ) {
+                    Text(
+                        text = formatCallDuration(contact.totalDuration),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = monetColors.onSurface,
+                        fontFamily = GoogleSans
+                    )
+                    Text(
+                        text = "${contact.callCount} calls",
+                        fontSize = 11.5.sp,
+                        color = monetColors.onSurfaceVariant,
+                        fontFamily = GoogleSans
+                    )
+                }
+            }
+
+            // Duration Progress Bar (Google Dialer style)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(monetColors.surfaceVariant.copy(alpha = 0.7f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(progress)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(monetColors.primary)
+                )
+            }
+        }
     }
 }
 
@@ -5990,16 +8803,50 @@ fun SavedRecordingsDialog(onDismiss: () -> Unit) {
     ) {
         val view = LocalView.current
         SideEffect {
-            val dialogWindow = (view.parent as? DialogWindowProvider)?.window
+            var parent: Any? = view.parent
+            var dialogWindow: android.view.Window? = null
+            while (parent != null) {
+                if (parent is DialogWindowProvider) {
+                    dialogWindow = parent.window
+                    break
+                }
+                parent = (parent as? android.view.View)?.parent
+            }
+            if (dialogWindow == null) {
+                dialogWindow = (view.rootView.parent as? DialogWindowProvider)?.window
+            }
+
             dialogWindow?.let { win ->
                 win.setDimAmount(0f)
+                win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+                win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION)
+                win.addFlags(android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+                win.setLayout(
+                    android.view.WindowManager.LayoutParams.MATCH_PARENT,
+                    android.view.WindowManager.LayoutParams.MATCH_PARENT
+                )
+                win.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
                 WindowCompat.setDecorFitsSystemWindows(win, false)
-                win.navigationBarColor = android.graphics.Color.TRANSPARENT
                 win.statusBarColor = android.graphics.Color.TRANSPARENT
+                win.navigationBarColor = android.graphics.Color.TRANSPARENT
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     win.isNavigationBarContrastEnforced = false
+                    win.isStatusBarContrastEnforced = false
                 }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    win.attributes = win.attributes.apply {
+                        layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    }
+                }
+                val insets = WindowCompat.getInsetsController(win, win.decorView)
+                insets.isAppearanceLightStatusBars = false
+                insets.isAppearanceLightNavigationBars = false
+                win.decorView.fitsSystemWindows = false
+                (win.decorView as? android.view.ViewGroup)?.clipToPadding = false
             }
+            (view.parent as? android.view.View)?.fitsSystemWindows = false
+            (view as? android.view.View)?.fitsSystemWindows = false
         }
 
         Box(
@@ -6109,7 +8956,7 @@ fun SavedRecordingsDialog(onDismiss: () -> Unit) {
                                 .heightIn(max = 420.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            items(recordings, key = { it.id }) { item ->
+                            itemsIndexed(recordings, key = { index, item -> "rec_${item.id}_$index" }) { _, item ->
                                 val isPlaying = playingId == item.id
                                 val formattedDate = remember(item.timestamp) {
                                     SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()).format(Date(item.timestamp))

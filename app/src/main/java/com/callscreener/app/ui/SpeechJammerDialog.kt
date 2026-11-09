@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.callscreener.app.engine.JammerMode
 import com.callscreener.app.engine.SpeechJammerEngine
 import com.callscreener.app.ui.theme.AppleAmber
 import com.callscreener.app.ui.theme.AppleBlue
@@ -96,8 +97,10 @@ fun SpeechJammerDialog(
     val haptic = LocalHapticFeedback.current
 
     var isEnabled by remember { mutableStateOf(engine.isEnabled) }
+    var selectedMode by remember { mutableStateOf(engine.mode) }
     var selectedDelayMs by remember { mutableIntStateOf(engine.delayMs) }
     var selectedGain by remember { mutableFloatStateOf(engine.intensityGain) }
+    var selectedEchoDecay by remember { mutableFloatStateOf(engine.echoDecay) }
     var autoJamUnknown by remember { mutableStateOf(engine.autoJamUnknown) }
 
     var isTestRunning by remember { mutableStateOf(false) }
@@ -272,14 +275,14 @@ fun SpeechJammerDialog(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = "Enable Speech Jammer Engine",
+                                            text = "Enable Acoustic Disruption Engine",
                                             color = TextPrimary,
                                             fontSize = 15.sp,
                                             fontWeight = FontWeight.SemiBold
                                         )
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
-                                            text = if (isEnabled) "Active: Speech Jammer button appears in all calls" else "Disabled: Jammer controls hidden",
+                                            text = if (isEnabled) "Active: Disruption pill appears in live call screen" else "Disabled: Controls hidden",
                                             color = if (isEnabled) ApplePurple else TextSecondary,
                                             fontSize = 12.sp
                                         )
@@ -303,7 +306,203 @@ fun SpeechJammerDialog(
                             }
                         }
 
-                        // Section 2: Cognitive Disruption Delay Selector
+                        // Section 2: Acoustic Disruption Mode (DAF vs Infinite Echo Chamber)
+                        item {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Tune,
+                                        contentDescription = null,
+                                        tint = Color(0xFFBA68C8),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "ACOUSTIC DISRUPTION MODE",
+                                        color = Color(0xFFCE93D8),
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.8.sp
+                                    )
+                                }
+
+                                val modes = listOf(
+                                    JammerMode.DAF_JAMMER to ("Speech Jammer (DAF)" to "200ms timing collision — arrests speech motor cadence"),
+                                    JammerMode.INFINITE_ECHO to ("Infinite Echo Chamber" to "Multi-tap noise-free recursive acoustic reflections with warm damping")
+                                )
+
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    modes.forEach { (modeOption, details) ->
+                                        val isSelected = selectedMode == modeOption
+                                        val bgModifier = if (isSelected) {
+                                            Modifier.background(
+                                                Brush.horizontalGradient(
+                                                    listOf(
+                                                        Color(0x359C27B0),
+                                                        if (modeOption == JammerMode.INFINITE_ECHO) Color(0x303F51B5) else Color(0x30E91E63)
+                                                    )
+                                                )
+                                            )
+                                        } else {
+                                            Modifier.background(Color(0x10FFFFFF))
+                                        }
+
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(14.dp))
+                                                .then(bgModifier)
+                                                .border(
+                                                    width = if (isSelected) 1.5.dp else 0.8.dp,
+                                                    color = if (isSelected) Color(0xFFBA68C8) else Color(0x18FFFFFF),
+                                                    shape = RoundedCornerShape(14.dp)
+                                                )
+                                                .clickable {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    selectedMode = modeOption
+                                                    engine.mode = modeOption
+                                                }
+                                                .padding(14.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.weight(1f),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(34.dp)
+                                                            .clip(CircleShape)
+                                                            .background(if (isSelected) Color(0x40BA68C8) else Color(0x18FFFFFF)),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = if (modeOption == JammerMode.INFINITE_ECHO) Icons.Rounded.GraphicEq else Icons.Rounded.Psychology,
+                                                            contentDescription = null,
+                                                            tint = if (isSelected) Color(0xFFFF80AB) else TextSecondary,
+                                                            modifier = Modifier.size(18.dp)
+                                                        )
+                                                    }
+                                                    Column {
+                                                        Text(
+                                                            text = details.first,
+                                                            color = if (isSelected) Color.White else TextPrimary,
+                                                            fontSize = 13.5.sp,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                        Text(
+                                                            text = details.second,
+                                                            color = TextSecondary,
+                                                            fontSize = 11.sp,
+                                                            lineHeight = 14.sp
+                                                        )
+                                                    }
+                                                }
+
+                                                if (isSelected) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .clip(RoundedCornerShape(6.dp))
+                                                            .background(Color(0xFF9C27B0))
+                                                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = "SELECTED",
+                                                            color = Color.White,
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontFamily = FontFamily.Monospace
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Section 3: Reverb Decay Duration (when Infinite Echo Chamber selected)
+                        if (selectedMode == JammerMode.INFINITE_ECHO) {
+                            item {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.GraphicEq,
+                                            contentDescription = null,
+                                            tint = Color(0xFFBA68C8),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = "ACOUSTIC REVERB DECAY (FEEDBACK CYCLES)",
+                                            color = Color(0xFFCE93D8),
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            letterSpacing = 0.8.sp
+                                        )
+                                    }
+
+                                    val decays = listOf(
+                                        0.55f to "0.55x (Natural Room)",
+                                        0.68f to "0.68x (Cathedral Chamber)",
+                                        0.85f to "0.85x (Stadium Loop)"
+                                    )
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        decays.forEach { (decay, label) ->
+                                            val isSelected = (selectedEchoDecay - decay).let { kotlin.math.abs(it) < 0.05f }
+                                            Box(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .clip(RoundedCornerShape(12.dp))
+                                                    .background(if (isSelected) Color(0x359C27B0) else Color(0x10FFFFFF))
+                                                    .border(
+                                                        width = if (isSelected) 1.2.dp else 0.8.dp,
+                                                        color = if (isSelected) Color(0xFFBA68C8) else Color(0x18FFFFFF),
+                                                        shape = RoundedCornerShape(12.dp)
+                                                    )
+                                                    .clickable {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                        selectedEchoDecay = decay
+                                                        engine.echoDecay = decay
+                                                    }
+                                                    .padding(vertical = 10.dp, horizontal = 4.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = label,
+                                                    color = if (isSelected) Color.White else TextSecondary,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Text(
+                                        text = "Dynamic noise-gate squelch cuts background room noise to 0 so silence produces clean reflections without amplifier hiss.",
+                                        color = TextSecondary,
+                                        fontSize = 11.sp,
+                                        modifier = Modifier.padding(start = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Section 4: Cognitive Disruption Delay Selector
                         item {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Row(
@@ -490,7 +689,7 @@ fun SpeechJammerDialog(
                             }
                         }
 
-                        // Section 5: Interactive Live DAF Test Lab
+                        // Section 6: Interactive Live Audio Test Lab
                         item {
                             Box(
                                 modifier = Modifier
@@ -512,7 +711,7 @@ fun SpeechJammerDialog(
                                             modifier = Modifier.size(18.dp)
                                         )
                                         Text(
-                                            text = "Live DAF Test Lab (Experience It Yourself)",
+                                            text = if (selectedMode == JammerMode.INFINITE_ECHO) "Live Echo Chamber Test Lab" else "Live DAF Jammer Test Lab",
                                             color = Color.White,
                                             fontSize = 14.sp,
                                             fontWeight = FontWeight.Bold
@@ -520,7 +719,10 @@ fun SpeechJammerDialog(
                                     }
 
                                     Text(
-                                        text = "Put on headphones or hold phone to ear. Speak aloud while testing to feel how your brain struggles to speak with 200ms delayed auditory feedback!",
+                                        text = if (selectedMode == JammerMode.INFINITE_ECHO)
+                                            "Put on headphones or hold phone to ear. Speak aloud to experience warm, noise-free cascading reflections in an infinite acoustic chamber!"
+                                        else
+                                            "Put on headphones or hold phone to ear. Speak aloud while testing to feel how your brain struggles to speak with 200ms delayed auditory feedback!",
                                         color = TextSecondary,
                                         fontSize = 11.5.sp,
                                         lineHeight = 15.sp
@@ -585,7 +787,11 @@ fun SpeechJammerDialog(
                                                 val ok = engine.startJammer(forTestLab = true)
                                                 if (ok) {
                                                     isTestRunning = true
-                                                    Toast.makeText(context, "DAF Active: Speak into mic to feel the jammer!", Toast.LENGTH_SHORT).show()
+                                                    val msg = if (selectedMode == JammerMode.INFINITE_ECHO)
+                                                        "Echo Chamber Active: Speak into mic to hear cascading reflections!"
+                                                    else
+                                                        "DAF Active: Speak into mic to feel the jammer!"
+                                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                                 } else {
                                                     Toast.makeText(context, "Could not start audio stream", Toast.LENGTH_SHORT).show()
                                                 }
@@ -603,8 +809,13 @@ fun SpeechJammerDialog(
                                             modifier = Modifier.size(16.dp)
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
+                                        val btnText = if (isTestRunning) {
+                                            if (selectedMode == JammerMode.INFINITE_ECHO) "Stop Echo Test" else "Stop DAF Test"
+                                        } else {
+                                            if (selectedMode == JammerMode.INFINITE_ECHO) "Start Live Echo Test" else "Start Live DAF Test"
+                                        }
                                         Text(
-                                            text = if (isTestRunning) "Stop DAF Test" else "Start Live DAF Test",
+                                            text = btnText,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 13.sp
                                         )

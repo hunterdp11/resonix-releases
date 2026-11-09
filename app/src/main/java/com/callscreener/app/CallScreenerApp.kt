@@ -10,8 +10,12 @@ class CallScreenerApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         createNotificationChannels()
         NotificationHelper.initNotificationChannels(this)
+        com.callscreener.app.engine.StealthBlockAudioEngine.prewarm(this)
+        com.callscreener.app.root.RootPrivilegeManager.warmUp(this)
+        com.callscreener.app.data.DialerRepository.prewarmCache(this)
     }
 
     private fun createNotificationChannels() {
@@ -33,6 +37,8 @@ class CallScreenerApp : Application() {
 
     companion object {
         const val CHANNEL_ID_CALL_SCREENING = "call_screening_channel"
+        lateinit var instance: CallScreenerApp
+            private set
     }
 }
 

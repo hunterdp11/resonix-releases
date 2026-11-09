@@ -297,21 +297,7 @@ class RootCallAudioInjector(private val context: Context) {
 
         var success = false
         try {
-            // 1. Hardware Mute Microphone to guarantee ZERO room noise or echo!
-            try {
-                audioManager.isMicrophoneMute = true
-                audioManager.setParameters("voice_tx_mute=1")
-                audioManager.setParameters("voice_tx_mute=true")
-                CallScreeningInCallService.setCallMute(true)
-            } catch (_: Exception) {}
-
-            // Mute modem Voice_Tx via root ALSA so caller hears ONLY the audio file
-            RootPrivilegeManager.executeSuCommand("""
-                tinymix 'Voice Tx Mute' 1 2>/dev/null || true
-                tinymix 'Voice Tx Device Mute' 1 2>/dev/null || true
-            """.trimIndent())
-
-            // 2. Enable in-call mixer routing via root
+            // Enable hardware ALSA in-call uplink mixer routing (unmuting Voice Tx so audio reaches caller)
             enableHardwareInCallMixers()
 
             // 3. Decode audio file universally to clean 16-bit Mono PCM @ 48kHz (Fullband HD Voice)
@@ -345,7 +331,7 @@ class RootCallAudioInjector(private val context: Context) {
             val bufferSize = maxOf(minBufferSize * 4, 16384)
 
             val audioAttributes = AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                .setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                 .setFlags(AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
                 .build()
@@ -397,18 +383,15 @@ class RootCallAudioInjector(private val context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "injectAudioFile failed", e)
         } finally {
-            // Restore microphone hardware state only if call is not in telecom mute screening mode
-            if (!CallScreeningInCallService.isTelecomMuted) {
-                try {
-                    audioManager.isMicrophoneMute = false
-                    audioManager.setParameters("voice_tx_mute=0")
-                    audioManager.setParameters("voice_tx_mute=false")
-                } catch (_: Exception) {}
-                RootPrivilegeManager.executeSuCommand("""
-                    tinymix 'Voice Tx Mute' 0 2>/dev/null || true
-                    tinymix 'Voice Tx Device Mute' 0 2>/dev/null || true
-                """.trimIndent())
-            }
+            try {
+                audioManager.isMicrophoneMute = false
+                audioManager.setParameters("voice_tx_mute=0")
+                audioManager.setParameters("voice_tx_mute=false")
+            } catch (_: Exception) {}
+            RootPrivilegeManager.executeSuCommand("""
+                tinymix 'Voice Tx Mute' 0 2>/dev/null || true
+                tinymix 'Voice Tx Device Mute' 0 2>/dev/null || true
+            """.trimIndent())
             onComplete(success)
         }
     }
@@ -452,10 +435,21 @@ class RootCallAudioInjector(private val context: Context) {
     private suspend fun enableHardwareInCallMixers() {
         try {
             // Enable Qualcomm/MediaTek hardware ALSA in-call music / uplink mixing if root is present
+            // Ensure Voice Tx is completely unmuted so the caller hears the injected stream,
+            // while physical microphone remains unrouted from caller uplink.
             val mixerCommands = """
+                tinymix 'Voice Tx Mute' 0 2>/dev/null || true
+                tinymix 'Voice Tx Device Mute' 0 2>/dev/null || true
                 tinymix 'Incall_Music Audio Mixer MultiMedia1' 1 2>/dev/null || true
                 tinymix 'Incall_Music Audio Mixer MultiMedia2' 1 2>/dev/null || true
                 tinymix 'Voice_Tx Mixer MultiMedia1' 1 2>/dev/null || true
+                tinymix 'Voice_Tx Mixer TX_Voice' 0 2>/dev/null || true
+                tinymix 'Voice_Tx Mixer SLIM_0_TX_Voice' 0 2>/dev/null || true
+                tinymix 'Voice_Tx Mixer PRI_TX_Voice' 0 2>/dev/null || true
+                tinymix 'Voice_Tx Mixer TERT_MI2S_TX_Voice' 0 2>/dev/null || true
+                tinymix 'Voice_Tx Mixer TX_CDC_DMA_TX_3' 0 2>/dev/null || true
+                tinymix 'Voice_Tx Mixer SLIM_0_TX' 0 2>/dev/null || true
+                tinymix 'Voice_Tx Mixer AFE_PCM_TX' 0 2>/dev/null || true
             """.trimIndent()
             RootPrivilegeManager.executeSuCommand(mixerCommands)
         } catch (e: Exception) {
