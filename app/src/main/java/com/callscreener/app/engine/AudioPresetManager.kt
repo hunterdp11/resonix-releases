@@ -27,6 +27,8 @@ class AudioPresetManager(private val context: Context) {
     private var activePlayer: MediaPlayer? = null
     private val _currentlyPlayingId = MutableStateFlow<String?>(null)
     val currentlyPlayingId: StateFlow<String?> = _currentlyPlayingId.asStateFlow()
+    private val _isPaused = MutableStateFlow(false)
+    val isPaused: StateFlow<Boolean> = _isPaused.asStateFlow()
 
     init {
         loadPresets()
@@ -267,6 +269,7 @@ class AudioPresetManager(private val context: Context) {
      */
     fun previewPreset(preset: AudioPreset, onComplete: () -> Unit = {}) {
         stopPreview()
+        _isPaused.value = false
         if (preset.isAudioFile) {
             val f = File(preset.textOrPath)
             if (f.exists()) {
@@ -287,12 +290,35 @@ class AudioPresetManager(private val context: Context) {
                     }
                     activePlayer = player
                     _currentlyPlayingId.value = preset.id
+                    _isPaused.value = false
                 } catch (e: Exception) {
                     Log.e(TAG, "Error playing audio file preset", e)
                     stopPreview()
                     onComplete()
                 }
             }
+        }
+    }
+
+    fun pausePreview() {
+        try {
+            if (activePlayer?.isPlaying == true) {
+                activePlayer?.pause()
+                _isPaused.value = true
+                Log.i(TAG, "Preview paused: ${_currentlyPlayingId.value}")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error pausing preview", e)
+        }
+    }
+
+    fun resumePreview() {
+        try {
+            activePlayer?.start()
+            _isPaused.value = false
+            Log.i(TAG, "Preview resumed: ${_currentlyPlayingId.value}")
+        } catch (e: Exception) {
+            Log.w(TAG, "Error resuming preview", e)
         }
     }
 
@@ -303,6 +329,7 @@ class AudioPresetManager(private val context: Context) {
         } catch (_: Exception) {}
         activePlayer = null
         _currentlyPlayingId.value = null
+        _isPaused.value = false
     }
 
     companion object {

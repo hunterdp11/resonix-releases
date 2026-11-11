@@ -63,6 +63,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material.icons.rounded.AddAPhoto
@@ -138,6 +139,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarOutline
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.Chat
@@ -174,6 +176,10 @@ import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.haze
 import dev.chrisbanes.haze.hazeChild
 import com.callscreener.app.data.T9Helper
+import com.callscreener.app.ota.OtaUpdateManager
+import com.callscreener.app.ota.UpdateCheckStatus
+import com.callscreener.app.ota.DownloadStatus
+import com.callscreener.app.ota.UpdateInfo
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -182,6 +188,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -201,9 +209,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.People
-import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Voicemail
 import kotlin.math.absoluteValue
+import kotlin.math.roundToInt
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
@@ -220,6 +228,9 @@ import java.util.Locale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.callscreener.app.engine.AudioPresetManager
@@ -304,15 +315,30 @@ class MainActivity : ComponentActivity() {
         setContent {
             CallScreenerTheme {
                 val isDefault by isDefaultDialerState
-                MainDashboard(
-                    isDefaultDialer = isDefault,
-                    onRequestDefaultDialer = { requestDefaultDialer() },
-                    onStartSimulation = {
-                        val sessionManager = CallSessionManager.getInstance(this)
-                        sessionManager.startSimulatedCall()
-                        startActivity(Intent(this, ScreeningCallActivity::class.java))
-                    }
-                )
+                val onboardingPrefs = remember { getSharedPreferences("call_screener_onboarding", Context.MODE_PRIVATE) }
+                var isOnboardingCompleted by remember {
+                    mutableStateOf(onboardingPrefs.getBoolean("onboarding_completed", false))
+                }
+
+                if (!isOnboardingCompleted) {
+                    PixelOnboardingScreen(
+                        isDefaultDialer = isDefault,
+                        onRequestDefaultDialer = { requestDefaultDialer() },
+                        onComplete = {
+                            isOnboardingCompleted = true
+                        }
+                    )
+                } else {
+                    MainDashboard(
+                        isDefaultDialer = isDefault,
+                        onRequestDefaultDialer = { requestDefaultDialer() },
+                        onStartSimulation = {
+                            val sessionManager = CallSessionManager.getInstance(this)
+                            sessionManager.startSimulatedCall()
+                            startActivity(Intent(this, ScreeningCallActivity::class.java))
+                        }
+                    )
+                }
             }
         }
     }
@@ -364,7 +390,7 @@ class MainActivity : ComponentActivity() {
             } catch (e2: Exception) {
                 Toast.makeText(
                     this,
-                    "Please set Call Screener as Default Phone App in Settings -> Apps -> Default Apps",
+                    "Please set Resonix as Default Phone App in Settings -> Apps -> Default Apps",
                     Toast.LENGTH_LONG
                 ).show()
             }
@@ -541,27 +567,49 @@ fun MainDashboard(
                 targetState = currentTab,
                 transitionSpec = {
                     val isForward = targetState.ordinal > initialState.ordinal
+                    val slideDistance = { fullWidth: Int -> (fullWidth * 0.14f).toInt() }
+
                     (fadeIn(
-                        animationSpec = tween(durationMillis = 180)
+                        animationSpec = tween(
+                            durationMillis = 200,
+                            delayMillis = 60,
+                            easing = LinearOutSlowInEasing
+                        )
                     ) + slideInHorizontally(
                         animationSpec = spring(
-                            dampingRatio = 0.85f,
+                            dampingRatio = 0.82f,
                             stiffness = Spring.StiffnessMediumLow
                         ),
                         initialOffsetX = { fullWidth ->
-                            if (isForward) fullWidth / 8 else -fullWidth / 8
+                            if (isForward) slideDistance(fullWidth) else -slideDistance(fullWidth)
                         }
+                    ) + scaleIn(
+                        animationSpec = tween(
+                            durationMillis = 200,
+                            delayMillis = 60,
+                            easing = FastOutSlowInEasing
+                        ),
+                        initialScale = 0.95f
                     )).togetherWith(
                         fadeOut(
-                            animationSpec = tween(durationMillis = 100)
+                            animationSpec = tween(
+                                durationMillis = 110,
+                                easing = FastOutLinearInEasing
+                            )
                         ) + slideOutHorizontally(
                             animationSpec = spring(
-                                dampingRatio = 0.85f,
+                                dampingRatio = 0.82f,
                                 stiffness = Spring.StiffnessMediumLow
                             ),
                             targetOffsetX = { fullWidth ->
-                                if (isForward) -fullWidth / 8 else fullWidth / 8
+                                if (isForward) -slideDistance(fullWidth) else slideDistance(fullWidth)
                             }
+                        ) + scaleOut(
+                            animationSpec = tween(
+                                durationMillis = 110,
+                                easing = FastOutLinearInEasing
+                            ),
+                            targetScale = 0.97f
                         )
                     )
                 },
@@ -572,6 +620,7 @@ fun MainDashboard(
                     DialerTab.RECENTS -> RecentsScreen(
                         callLogs = callLogs,
                         isLoading = isLoadingLogs,
+                        contacts = contacts,
                         presets = presets,
                         onPlayPreset = { sessionManager.playAudioPreset(it) },
                         onCall = { number -> DialerRepository.placeCall(context, number) },
@@ -661,6 +710,23 @@ fun MainDashboard(
                     )
                     context.startActivity(Intent(context, ScreeningCallActivity::class.java))
                     selectedContactForDetails = null
+                },
+                onToggleFavorite = { updatedContact, isStarred ->
+                    contacts = contacts.map {
+                        if (it.id == updatedContact.id || it.number == updatedContact.number) {
+                            it.copy(isStarred = isStarred)
+                        } else it
+                    }
+                },
+                onPhotoUpdated = { newPhotoPath ->
+                    val cleanTarget = contact.number.filter { it.isDigit() }
+                    val tail7 = if (cleanTarget.length >= 7) cleanTarget.takeLast(7) else cleanTarget
+                    contacts = contacts.map {
+                        val cClean = it.number.filter { c -> c.isDigit() }
+                        val isMatch = (cClean.isNotEmpty() && cClean == cleanTarget) ||
+                                (tail7.length >= 7 && cClean.length >= 7 && cClean.takeLast(7) == tail7)
+                        if (isMatch) it.copy(photoUri = newPhotoPath) else it
+                    }
                 }
             )
         }
@@ -688,6 +754,7 @@ fun MainDashboard(
             PresetManagementScreen(
                 presetManager = sessionManager.presetManager,
                 quickReplyManager = sessionManager.quickReplyManager,
+                monetColors = monetColors,
                 onDismiss = { isPresetManagerOpen = false }
             )
         }
@@ -747,7 +814,7 @@ fun LiquidGlassBottomBar(
             Triple(DialerTab.RECENTS, Icons.Rounded.History, "Recents"),
             Triple(DialerTab.CONTACTS, Icons.Rounded.People, "Contacts"),
             Triple(DialerTab.KEYPAD, Icons.Rounded.Dialpad, "Keypad"),
-            Triple(DialerTab.ASSISTANT, Icons.Rounded.AutoAwesome, "Assistant")
+            Triple(DialerTab.ASSISTANT, Icons.Rounded.GraphicEq, "Assistant")
         )
     }
 
@@ -762,40 +829,37 @@ fun LiquidGlassBottomBar(
     var swipeOffsetPx by remember { mutableFloatStateOf(0f) }
     var hoveredIndex by remember { mutableIntStateOf(selectedIndex) }
 
+    var prevSelectedIndex by remember { mutableIntStateOf(selectedIndex) }
+    val isMovingRight = selectedIndex >= prevSelectedIndex
+
     LaunchedEffect(selectedIndex) {
+        prevSelectedIndex = selectedIndex
         if (!isSwiping) {
             hoveredIndex = selectedIndex
         }
     }
 
-    // Outer Floating Material You Capsule Dock Container
+    // Outer Floating Material You Capsule Dock Container - Solid opaque background, comfortably sized
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .widthIn(max = 410.dp)
+            .padding(horizontal = 16.dp)
+            .widthIn(max = 420.dp)
             .shadow(
-                elevation = 12.dp,
-                shape = RoundedCornerShape(32.dp),
-                spotColor = Color(0x55000000),
-                ambientColor = Color(0x22000000)
+                elevation = 14.dp,
+                shape = CircleShape,
+                spotColor = Color(0x66000000),
+                ambientColor = Color(0x33000000)
             )
-            .clip(RoundedCornerShape(32.dp))
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        monetColors.surfaceContainerHigh.copy(alpha = 0.94f),
-                        monetColors.surfaceContainer.copy(alpha = 0.98f)
-                    )
-                )
-            )
+            .clip(CircleShape)
+            .background(monetColors.surfaceContainerHigh)
             .border(
                 width = 1.dp,
-                color = monetColors.outlineVariant.copy(alpha = 0.35f),
-                shape = RoundedCornerShape(32.dp)
+                color = monetColors.outlineVariant.copy(alpha = 0.40f),
+                shape = CircleShape
             )
     ) {
-        // Subtle top specular hairline
+        // Subtle top specular hairline for premium depth
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -804,7 +868,7 @@ fun LiquidGlassBottomBar(
                     Brush.horizontalGradient(
                         listOf(
                             Color.Transparent,
-                            monetColors.primary.copy(alpha = 0.28f),
+                            monetColors.primary.copy(alpha = 0.35f),
                             Color.Transparent
                         )
                     )
@@ -816,63 +880,75 @@ fun LiquidGlassBottomBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(72.dp)
-                .padding(horizontal = 6.dp, vertical = 6.dp)
+                .padding(horizontal = 6.dp, vertical = 2.dp)
         ) {
             val totalWidthPx = constraints.maxWidth.toFloat()
             val totalTabs = tabs.size
             val tabWidthPx = totalWidthPx / totalTabs.toFloat()
 
-            val standardPillWidthDp = 58.dp
-
-            val widthExpansion by animateDpAsState(
-                targetValue = if (isSwiping) 8.dp else 0.dp,
-                animationSpec = spring(
-                    dampingRatio = 0.80f,
-                    stiffness = Spring.StiffnessMediumLow
-                ),
-                label = "dockPillWidthExpansion"
-            )
-
-            val pillWidthDp = standardPillWidthDp + widthExpansion
+            val standardPillWidthDp = 64.dp
+            val halfPillPx = with(density) { (standardPillWidthDp / 2f).toPx() }
+            val pillTopY = with(density) { 6.dp.roundToPx() }
 
             // Center of the active tab
-            val targetCenterPx = if (isSwiping) {
-                swipeOffsetPx
+            val activeTabCenterPx = tabWidthPx * (selectedIndex + 0.5f)
+
+            val targetLeftPx = if (isSwiping) {
+                swipeOffsetPx - halfPillPx - with(density) { 4.dp.toPx() }
             } else {
-                tabWidthPx * (selectedIndex + 0.5f)
+                activeTabCenterPx - halfPillPx
             }
 
-            val targetLeftDp = with(density) {
-                (targetCenterPx - (with(density) { pillWidthDp.toPx() } / 2f)).toDp()
+            val targetRightPx = if (isSwiping) {
+                swipeOffsetPx + halfPillPx + with(density) { 4.dp.toPx() }
+            } else {
+                activeTabCenterPx + halfPillPx
             }
 
-            val indicatorOffset by animateDpAsState(
-                targetValue = targetLeftDp,
+            // Authentic Material 3 Expressive morphing pill (leading edge expands forward, trailing follows)
+            val animLeftPx by animateFloatAsState(
+                targetValue = targetLeftPx,
                 animationSpec = if (isSwiping) {
-                    spring(dampingRatio = 0.92f, stiffness = Spring.StiffnessHigh)
+                    spring(dampingRatio = 0.90f, stiffness = Spring.StiffnessHigh)
+                } else if (isMovingRight) {
+                    spring(dampingRatio = 0.86f, stiffness = 380f) // Trailing edge follows
                 } else {
-                    spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
+                    spring(dampingRatio = 0.78f, stiffness = 560f) // Leading edge leaps forward
                 },
-                label = "dockIndicatorOffset"
+                label = "dockPillLeft"
             )
 
-            // Sleek Material 3 Expressive Active Indicator Pill (centered behind the icon)
+            val animRightPx by animateFloatAsState(
+                targetValue = targetRightPx,
+                animationSpec = if (isSwiping) {
+                    spring(dampingRatio = 0.90f, stiffness = Spring.StiffnessHigh)
+                } else if (isMovingRight) {
+                    spring(dampingRatio = 0.78f, stiffness = 560f) // Leading edge leaps forward
+                } else {
+                    spring(dampingRatio = 0.86f, stiffness = 380f) // Trailing edge follows
+                },
+                label = "dockPillRight"
+            )
+
+            val pillWidthDp = with(density) { (animRightPx - animLeftPx).coerceAtLeast(halfPillPx * 2f).toDp() }
+
+            // Sleek Material 3 Expressive Active Indicator Pill (morphing dynamically behind active tab)
             Box(
                 modifier = Modifier
                     .offset {
                         IntOffset(
-                            x = indicatorOffset.roundToPx(),
-                            y = with(density) { 5.dp.roundToPx() }
+                            x = animLeftPx.roundToInt(),
+                            y = pillTopY
                         )
                     }
                     .width(pillWidthDp)
-                    .height(32.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .height(34.dp)
+                    .clip(CircleShape)
                     .background(monetColors.secondaryContainer)
                     .border(
                         width = 0.8.dp,
                         color = monetColors.outlineVariant.copy(alpha = 0.25f),
-                        shape = RoundedCornerShape(16.dp)
+                        shape = CircleShape
                     )
             )
 
@@ -944,28 +1020,47 @@ fun LiquidGlassBottomBar(
                 tabs.forEachIndexed { index, (_, icon, label) ->
                     val isTargetActive = if (isSwiping) (hoveredIndex == index) else (selectedIndex == index)
 
-                    val iconScale by animateFloatAsState(
-                        targetValue = if (isTargetActive) 1.08f else 0.94f,
+                    // Dial style: Inactive icons are large (28dp) and centered in the bar.
+                    // Active icons morph down from large (28dp) to compact (22dp) and move up to leave plenty of room for label.
+                    val iconSize by animateDpAsState(
+                        targetValue = if (isTargetActive) 22.dp else 28.dp,
                         animationSpec = spring(
-                            dampingRatio = 0.78f,
+                            dampingRatio = 0.65f, // Tactile smooth morph ("bade se chote hoke")
                             stiffness = Spring.StiffnessMediumLow
                         ),
-                        label = "tabIconScale_$index"
+                        label = "tabIconSize_$index"
+                    )
+
+                    // Active icon smoothly moves up by 12dp (from centerY = 0 to -12dp) so label fits comfortably below with airy padding
+                    val iconOffsetY by animateDpAsState(
+                        targetValue = if (isTargetActive) (-12).dp else 0.dp,
+                        animationSpec = spring(
+                            dampingRatio = 0.72f,
+                            stiffness = Spring.StiffnessMediumLow
+                        ),
+                        label = "tabIconOffsetY_$index"
                     )
 
                     val iconTint by animateColorAsState(
-                        targetValue = if (isTargetActive) monetColors.onSecondaryContainer else monetColors.onSurfaceVariant.copy(alpha = 0.8f),
-                        animationSpec = tween(durationMillis = 150),
+                        targetValue = if (isTargetActive) monetColors.onSecondaryContainer else monetColors.onSurfaceVariant.copy(alpha = 0.85f),
+                        animationSpec = tween(durationMillis = 180),
                         label = "tabIconTint_$index"
                     )
 
                     val labelColor by animateColorAsState(
-                        targetValue = if (isTargetActive) monetColors.onSurface else monetColors.onSurfaceVariant.copy(alpha = 0.75f),
-                        animationSpec = tween(durationMillis = 150),
+                        targetValue = monetColors.onSurface,
+                        animationSpec = tween(durationMillis = 180),
                         label = "tabLabelColor_$index"
                     )
 
-                    val labelWeight = if (isTargetActive) FontWeight.SemiBold else FontWeight.Medium
+                    val labelAlpha by animateFloatAsState(
+                        targetValue = if (isTargetActive) 1f else 0f,
+                        animationSpec = tween(
+                            durationMillis = if (isTargetActive) 200 else 100,
+                            easing = if (isTargetActive) FastOutSlowInEasing else FastOutLinearInEasing
+                        ),
+                        label = "tabLabelAlpha_$index"
+                    )
 
                     Box(
                         modifier = Modifier
@@ -973,33 +1068,38 @@ fun LiquidGlassBottomBar(
                             .fillMaxHeight(),
                         contentAlignment = Alignment.Center
                     ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                            modifier = Modifier.fillMaxHeight()
+                        // Icon element: positioned at dead center when inactive, moves up when active inside the pill
+                        Box(
+                            modifier = Modifier
+                                .offset(y = iconOffsetY)
+                                .size(width = 64.dp, height = 34.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(
-                                modifier = Modifier.size(width = 58.dp, height = 32.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = icon,
-                                    contentDescription = label,
-                                    tint = iconTint,
-                                    modifier = Modifier
-                                        .size(22.dp)
-                                        .scale(iconScale)
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(3.dp))
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = label,
+                                tint = iconTint,
+                                modifier = Modifier.size(iconSize)
+                            )
+                        }
+
+                        // Label element: smoothly fades in below the active indicator pill with spacious breathing room
+                        if (labelAlpha > 0.01f) {
                             Text(
                                 text = label,
                                 color = labelColor,
                                 fontSize = 11.5.sp,
                                 fontFamily = GoogleSans,
-                                fontWeight = labelWeight,
-                                letterSpacing = if (isTargetActive) 0.1.sp else 0.sp,
-                                maxLines = 1
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 0.2.sp,
+                                maxLines = 1,
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(bottom = 7.dp)
+                                    .graphicsLayer {
+                                        alpha = labelAlpha
+                                        translationY = (1f - labelAlpha) * 8f
+                                    }
                             )
                         }
                     }
@@ -1053,6 +1153,61 @@ private fun getContactInitials(name: String): String {
 }
 
 /**
+ * Unified Material You / Pixel Expressive Contact Avatar Composable
+ * Automatically resolves and prioritizes manual gallery photos, system phonebook photos,
+ * and falls back to dynamic Monet pastel avatars with initials.
+ */
+@Composable
+fun ContactAvatar(
+    name: String,
+    number: String,
+    modifier: Modifier = Modifier,
+    photoUri: String? = null,
+    size: Dp = 44.dp,
+    shape: Shape = CircleShape,
+    monetColors: ColorScheme,
+    fontSize: TextUnit = (size.value * 0.36f).sp
+) {
+    val context = LocalContext.current
+    val (avatarBg, avatarFg) = remember(name, monetColors) {
+        getMonetAvatarColors(name, monetColors)
+    }
+    val initials = remember(name) {
+        getContactInitials(name)
+    }
+    val photoVersion = CallerProfileManager.photoVersionState.intValue
+    val resolvedPhoto = remember(number, photoUri, photoVersion) {
+        CallerProfileManager.getCustomPhotoPath(context, number) ?: photoUri
+    }
+    val contactBitmap = rememberContactPhotoBitmap(resolvedPhoto, reloadKey = photoVersion)
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(shape)
+            .background(avatarBg),
+        contentAlignment = Alignment.Center
+    ) {
+        if (contactBitmap != null) {
+            Image(
+                bitmap = contactBitmap,
+                contentDescription = name,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Text(
+                text = initials,
+                color = avatarFg,
+                fontSize = fontSize,
+                fontFamily = GoogleSans,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+/**
  * Screen 1: Recents (Material You / Expressive Pixel Call History, Dynamic Monet Squircles & Direction Badges)
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -1060,6 +1215,7 @@ private fun getContactInitials(name: String): String {
 fun RecentsScreen(
     callLogs: List<CallLogItem>,
     isLoading: Boolean,
+    contacts: List<ContactItem> = emptyList(),
     presets: List<AudioPreset> = emptyList(),
     onPlayPreset: (AudioPreset) -> Unit = {},
     onCall: (String) -> Unit,
@@ -1090,6 +1246,19 @@ fun RecentsScreen(
         } else {
             getPixelMonetDarkColorScheme()
         }
+    }
+
+    val contactsPhotoMap = remember(contacts, CallerProfileManager.photoVersionState.intValue) {
+        val map = HashMap<String, String>()
+        for (c in contacts) {
+            val d = c.number.filter { it.isDigit() }
+            val photo = c.photoUri ?: CallerProfileManager.getCustomPhotoPath(context, c.number)
+            if (d.isNotEmpty() && !photo.isNullOrBlank()) {
+                map[d] = photo
+                if (d.length >= 7) map[d.takeLast(7)] = photo
+            }
+        }
+        map
     }
 
     val filteredLogs = remember(callLogs, selectedFilter, searchQuery) {
@@ -1140,22 +1309,15 @@ fun RecentsScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.padding(horizontal = 32.dp)
                 ) {
-                    Box(
+                    Image(
+                        painter = painterResource(id = com.callscreener.app.R.drawable.oneplus_empty_call_log_illustration),
+                        contentDescription = null,
                         modifier = Modifier
-                            .size(72.dp)
-                            .clip(CircleShape)
-                            .background(monetColors.primaryContainer.copy(alpha = 0.6f))
-                            .border(1.dp, monetColors.primary.copy(alpha = 0.4f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = if (searchQuery.isNotEmpty()) Icons.Filled.Search else Icons.Rounded.Schedule,
-                            contentDescription = null,
-                            tint = monetColors.primary,
-                            modifier = Modifier.size(34.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
+                            .size(160.dp)
+                            .padding(bottom = 6.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = if (searchQuery.isNotEmpty()) "No Matching Calls"
                             else if (selectedFilter == "Missed") "No Missed Calls"
@@ -1280,22 +1442,19 @@ fun RecentsScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Dynamic Monet Pastel Avatar
-                                Box(
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .clip(CircleShape)
-                                        .background(avatarBg),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = initials,
-                                        color = avatarFg,
-                                        fontSize = 15.sp,
-                                        fontFamily = GoogleSans,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
+                                val logDigits = log.number.filter { it.isDigit() }
+                                val resolvedLogPhoto = CallerProfileManager.getCustomPhotoPath(context, log.number)
+                                    ?: contactsPhotoMap[logDigits]
+                                    ?: if (logDigits.length >= 7) contactsPhotoMap[logDigits.takeLast(7)] else null
+
+                                // Dynamic Monet Pastel Avatar or Custom/Contact Photo
+                                ContactAvatar(
+                                    name = callerName,
+                                    number = log.number,
+                                    photoUri = resolvedLogPhoto,
+                                    size = 44.dp,
+                                    monetColors = monetColors
+                                )
 
                                 Spacer(modifier = Modifier.width(12.dp))
 
@@ -1414,10 +1573,17 @@ fun RecentsScreen(
                                                 interactionSource = infoInteraction,
                                                 indication = null,
                                                 onClick = {
-                                                    val contact = ContactItem(
+                                                    val logDigits = log.number.filter { it.isDigit() }
+                                                    val matchedContact = contacts.firstOrNull { c ->
+                                                        val cDigits = c.number.filter { it.isDigit() }
+                                                        (cDigits.isNotEmpty() && cDigits == logDigits) ||
+                                                        (cDigits.length >= 7 && logDigits.length >= 7 && cDigits.takeLast(7) == logDigits.takeLast(7))
+                                                    }
+                                                    val contact = matchedContact ?: ContactItem(
                                                         id = log.id,
                                                         name = log.name ?: log.number,
-                                                        number = log.number
+                                                        number = log.number,
+                                                        photoUri = resolvedLogPhoto
                                                     )
                                                     onOpenDetails(contact)
                                                 }
@@ -1588,6 +1754,7 @@ fun RecentsScreen(
         CallLogDetailsDialog(
             log = log,
             presets = presets,
+            contacts = contacts,
             onPlayPreset = onPlayPreset,
             onDismiss = { selectedLogForDetails = null },
             onCall = onCall,
@@ -1597,7 +1764,7 @@ fun RecentsScreen(
 }
 
 /**
- * Pixel Expressive / Material You Minimalist Contact Info Modal Sheet
+ * Pixel Expressive / Material You Minimalist Full-Screen Caller & Contact Details Screen
  */
 @Composable
 fun Ios26LiquidContactDetailsSheet(
@@ -1607,11 +1774,17 @@ fun Ios26LiquidContactDetailsSheet(
     onPlayPreset: (AudioPreset) -> Unit = {},
     onDismiss: () -> Unit,
     onCall: (String) -> Unit,
-    onScreen: (String, String) -> Unit
+    onScreen: (String, String) -> Unit,
+    onToggleFavorite: ((ContactItem, Boolean) -> Unit)? = null,
+    onPhotoUpdated: ((String?) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
+
+    var isStarredState by remember(contact.id, contact.number, contact.isStarred) {
+        mutableStateOf(contact.isStarred)
+    }
 
     val monetColors: ColorScheme = remember(context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -1635,24 +1808,26 @@ fun Ios26LiquidContactDetailsSheet(
         DialerRepository.formatPhoneNumber(contact.number)
     }
 
-    val isUnknownNumber = remember(contact.number, contact.name) {
-        val cleanName = contact.name.trim()
-        val cleanNum = contact.number.trim()
-        val isNameNumber = cleanName == cleanNum || cleanName.isBlank() ||
-                cleanName.equals("Unknown Caller", ignoreCase = true) ||
-                cleanName.equals("Unknown", ignoreCase = true)
-        if (isNameNumber) {
-            !DialerRepository.isNumberInContacts(context, cleanNum)
+    val isContactSaved = remember(contact.number, contact.name) {
+        val inContacts = DialerRepository.isNumberInContacts(context, contact.number.trim())
+        if (inContacts) {
+            true
         } else {
-            false
+            val cleanName = contact.name.trim()
+            val cleanNum = contact.number.trim()
+            cleanName.isNotBlank() && cleanName != cleanNum &&
+                    !cleanName.equals("Unknown Caller", ignoreCase = true) &&
+                    !cleanName.equals("Unknown", ignoreCase = true)
         }
     }
+    val isUnknownNumber = !isContactSaved
 
     // Custom Profile Photo Management
-    var customPhotoPath by remember(contact.number) {
+    val photoVer = CallerProfileManager.photoVersionState.intValue
+    var customPhotoPath by remember(contact.number, photoVer) {
         mutableStateOf(CallerProfileManager.getCustomPhotoPath(context, contact.number) ?: contact.photoUri)
     }
-    val contactPhotoBitmap = rememberContactPhotoBitmap(customPhotoPath)
+    val contactPhotoBitmap = rememberContactPhotoBitmap(customPhotoPath, reloadKey = photoVer)
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -1662,6 +1837,7 @@ fun Ios26LiquidContactDetailsSheet(
                 val saved = CallerProfileManager.saveCustomPhotoFromUri(context, contact.number, uri)
                 if (saved != null) {
                     customPhotoPath = saved
+                    onPhotoUpdated?.invoke(saved)
                     Toast.makeText(context, "Custom photo updated", Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(context, "Failed to save photo", Toast.LENGTH_SHORT).show()
@@ -1715,376 +1891,315 @@ fun Ios26LiquidContactDetailsSheet(
         }
     }
 
-    Dialog(
-        onDismissRequest = { animateDismiss() },
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
-        )
+    BackHandler(enabled = isVisible) {
+        animateDismiss()
+    }
+
+    AnimatedVisibility(
+        visible = isVisible,
+        enter = slideInHorizontally(
+            initialOffsetX = { fullWidth -> fullWidth },
+            animationSpec = spring(
+                dampingRatio = 0.85f,
+                stiffness = Spring.StiffnessMediumLow
+            )
+        ) + fadeIn(animationSpec = tween(200)),
+        exit = slideOutHorizontally(
+            targetOffsetX = { fullWidth -> fullWidth },
+            animationSpec = tween(180, easing = FastOutLinearInEasing)
+        ) + fadeOut(animationSpec = tween(140))
     ) {
-        val view = LocalView.current
-        SideEffect {
-            var parent: Any? = view.parent
-            var dialogWindow: android.view.Window? = null
-            while (parent != null) {
-                if (parent is DialogWindowProvider) {
-                    dialogWindow = parent.window
-                    break
-                }
-                parent = (parent as? android.view.View)?.parent
-            }
-            if (dialogWindow == null) {
-                dialogWindow = (view.rootView.parent as? DialogWindowProvider)?.window
-            }
-
-            dialogWindow?.let { win ->
-                win.setDimAmount(0f)
-                win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-                win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
-                win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION)
-                win.addFlags(android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
-                win.setLayout(
-                    android.view.WindowManager.LayoutParams.MATCH_PARENT,
-                    android.view.WindowManager.LayoutParams.MATCH_PARENT
-                )
-                win.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
-                WindowCompat.setDecorFitsSystemWindows(win, false)
-                win.statusBarColor = android.graphics.Color.TRANSPARENT
-                win.navigationBarColor = android.graphics.Color.TRANSPARENT
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    win.isNavigationBarContrastEnforced = false
-                    win.isStatusBarContrastEnforced = false
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    win.attributes = win.attributes.apply {
-                        layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-                    }
-                }
-                val insets = WindowCompat.getInsetsController(win, win.decorView)
-                insets.isAppearanceLightStatusBars = false
-                insets.isAppearanceLightNavigationBars = false
-                win.decorView.fitsSystemWindows = false
-                (win.decorView as? android.view.ViewGroup)?.clipToPadding = false
-            }
-            (view.parent as? android.view.View)?.fitsSystemWindows = false
-            (view as? android.view.View)?.fitsSystemWindows = false
-        }
-
-        val scrimAlpha by animateFloatAsState(
-            targetValue = if (isVisible) 0.60f else 0f,
-            animationSpec = tween(durationMillis = 200, easing = LinearOutSlowInEasing),
-            label = "detailsScrimAlpha"
-        )
-
-        BackHandler(enabled = isVisible) {
-            animateDismiss()
-        }
-
-        BoxWithConstraints(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = scrimAlpha))
-                .clickable { animateDismiss() },
-            contentAlignment = Alignment.BottomCenter
+                .background(monetColors.background)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) {}
         ) {
-            val maxSheetHeight = maxHeight * 0.92f
-
-            AnimatedVisibility(
-                visible = isVisible,
-                enter = slideInVertically(
-                    initialOffsetY = { fullHeight -> fullHeight },
-                    animationSpec = spring(
-                        dampingRatio = 0.82f,
-                        stiffness = Spring.StiffnessMediumLow
-                    )
-                ) + fadeIn(animationSpec = tween(180)),
-                exit = slideOutVertically(
-                    targetOffsetY = { fullHeight -> fullHeight },
-                    animationSpec = tween(180, easing = FastOutLinearInEasing)
-                ) + fadeOut(animationSpec = tween(140))
+            Column(
+                modifier = Modifier.fillMaxSize()
             ) {
+                // 1. Pixel Expressive Top App Bar
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = maxSheetHeight)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) {}
-                        .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                        .background(monetColors.surfaceContainerHigh)
+                        .background(monetColors.background)
                 ) {
-                    Column(
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 20.dp)
-                            .padding(top = 10.dp)
-                            .verticalScroll(rememberScrollState()),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                            .statusBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // 1. Pixel OEM Drag Handle
-                        Box(
+                        // Back Navigation Button
+                        IconButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                animateDismiss()
+                            },
                             modifier = Modifier
-                                .width(36.dp)
-                                .height(4.dp)
+                                .size(44.dp)
                                 .clip(CircleShape)
-                                .background(monetColors.outlineVariant.copy(alpha = 0.40f))
+                                .background(monetColors.surfaceVariant.copy(alpha = 0.60f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = "Back",
+                                tint = monetColors.onSurface,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        // Title (Properly start-aligned next to back button, never pushed by trailing action buttons)
+                        Text(
+                            text = if (isUnknownNumber) "Caller details" else "Contact info",
+                            color = monetColors.onSurface,
+                            fontSize = 20.sp,
+                            fontFamily = GoogleSans,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = (-0.3).sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .padding(start = 14.dp)
+                                .weight(1f)
                         )
 
-                        // 2. Redesigned Pixel OEM Top App Bar Header
+                        // Top Bar Action Buttons - Well-spaced, clean circular action pills with no overlap
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Back / Close Button (Pixel tonal disc)
+                            if (isContactSaved) {
+                                // Star / Favorite Button
+                                val starContainerBg by animateColorAsState(
+                                    targetValue = if (isStarredState) Color(0xFFFFB74D).copy(alpha = 0.22f)
+                                    else monetColors.surfaceContainerHighest.copy(alpha = 0.85f),
+                                    animationSpec = tween(200),
+                                    label = "starContainerBg"
+                                )
+                                val starTint by animateColorAsState(
+                                    targetValue = if (isStarredState) Color(0xFFFFB74D) else monetColors.onSurfaceVariant.copy(alpha = 0.75f),
+                                    animationSpec = tween(200),
+                                    label = "starTint"
+                                )
+
+                                IconButton(
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        val newStarred = !isStarredState
+                                        isStarredState = newStarred
+                                        coroutineScope.launch {
+                                            DialerRepository.setContactStarred(
+                                                context = context,
+                                                contactId = contact.id,
+                                                phoneNumber = contact.number,
+                                                starred = newStarred
+                                            )
+                                            onToggleFavorite?.invoke(contact, newStarred)
+                                        }
+                                        Toast.makeText(
+                                            context,
+                                            if (newStarred) "Added to favorites" else "Removed from favorites",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    },
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .clip(CircleShape)
+                                        .background(starContainerBg)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isStarredState) Icons.Filled.Star else Icons.Filled.StarOutline,
+                                        contentDescription = if (isStarredState) "Remove from favorites" else "Add to favorites",
+                                        tint = starTint,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+
+                                // Edit Contact Button
+                                IconButton(
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        try {
+                                            val intent = Intent(Intent.ACTION_EDIT).apply {
+                                                setDataAndType(
+                                                    ContactsContract.Contacts.CONTENT_URI,
+                                                    ContactsContract.Contacts.CONTENT_ITEM_TYPE
+                                                )
+                                                putExtra(ContactsContract.Intents.Insert.PHONE, contact.number)
+                                                putExtra(ContactsContract.Intents.Insert.NAME, contact.name)
+                                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                            }
+                                            context.startActivity(intent)
+                                        } catch (_: Exception) {
+                                            DialerRepository.openSystemSaveContact(context, contact.number, contact.name)
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .clip(CircleShape)
+                                        .background(monetColors.surfaceContainerHighest.copy(alpha = 0.85f))
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Edit,
+                                        contentDescription = "Edit Contact",
+                                        tint = monetColors.onSurface,
+                                        modifier = Modifier.size(19.dp)
+                                    )
+                                }
+                            }
+
+                            // Share Action Button (Clean, single icon for sharing)
+                            IconButton(
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_SUBJECT, contact.name)
+                                        putExtra(Intent.EXTRA_TEXT, if (isUnknownNumber) contact.number else "${contact.name}: ${contact.number}")
+                                    }
+                                    context.startActivity(Intent.createChooser(shareIntent, "Share"))
+                                },
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .clip(CircleShape)
+                                    .background(monetColors.surfaceContainerHighest.copy(alpha = 0.85f))
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Share,
+                                    contentDescription = "Share",
+                                    tint = monetColors.onSurface,
+                                    modifier = Modifier.size(19.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // 2. Main Scrollable Content
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Hero Avatar & Identity Section
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Box(
+                            modifier = Modifier.size(104.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Box(
                                 modifier = Modifier
-                                    .size(40.dp)
+                                    .size(98.dp)
                                     .clip(CircleShape)
-                                    .background(monetColors.surfaceContainerHighest.copy(alpha = 0.70f))
+                                    .background(avatarBg)
                                     .clickable {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        animateDismiss()
+                                        photoPickerLauncher.launch("image/*")
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (contactPhotoBitmap != null) {
+                                    Image(
+                                        bitmap = contactPhotoBitmap,
+                                        contentDescription = contact.name,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                } else {
+                                    Text(
+                                        text = initials,
+                                        color = avatarFg,
+                                        fontSize = 36.sp,
+                                        fontFamily = GoogleSans,
+                                        fontWeight = FontWeight.SemiBold,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+                            }
+
+                            // Small Camera Pill at Bottom-Right
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(monetColors.primary)
+                                    .border(2.dp, monetColors.background, CircleShape)
+                                    .clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        photoPickerLauncher.launch("image/*")
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                    contentDescription = "Back",
-                                    tint = monetColors.onSurface,
-                                    modifier = Modifier.size(20.dp)
+                                    imageVector = Icons.Rounded.CameraAlt,
+                                    contentDescription = "Set photo",
+                                    tint = monetColors.onPrimary,
+                                    modifier = Modifier.size(16.dp)
                                 )
-                            }
-
-                            Text(
-                                text = if (isUnknownNumber) "Caller details" else "Contact info",
-                                color = monetColors.onSurface,
-                                fontSize = 17.5.sp,
-                                fontFamily = GoogleSans,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = (-0.2).sp
-                            )
-
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                if (isUnknownNumber) {
-                                    // Add to contacts button
-                                    Box(
-                                        modifier = Modifier
-                                            .size(40.dp)
-                                            .clip(CircleShape)
-                                            .background(monetColors.primaryContainer)
-                                            .clickable {
-                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                DialerRepository.openSystemSaveContact(
-                                                    context,
-                                                    contact.number,
-                                                    if (contact.name != contact.number && !contact.name.equals("Unknown Caller", true) && !contact.name.equals("Unknown", true)) contact.name else null
-                                                )
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.PersonAdd,
-                                            contentDescription = "Add Contact",
-                                            tint = monetColors.onPrimaryContainer,
-                                            modifier = Modifier.size(19.dp)
-                                        )
-                                    }
-                                } else {
-                                    // Star / Favorite
-                                    Box(
-                                        modifier = Modifier
-                                            .size(40.dp)
-                                            .clip(CircleShape)
-                                            .background(
-                                                if (contact.isStarred) Color(0xFFFFB74D).copy(alpha = 0.20f)
-                                                else monetColors.surfaceContainerHighest.copy(alpha = 0.70f)
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.Star,
-                                            contentDescription = if (contact.isStarred) "Starred" else "Not starred",
-                                            tint = if (contact.isStarred) Color(0xFFFFB74D) else monetColors.onSurfaceVariant.copy(alpha = 0.60f),
-                                            modifier = Modifier.size(19.dp)
-                                        )
-                                    }
-
-                                    // Edit Contact
-                                    Box(
-                                        modifier = Modifier
-                                            .size(40.dp)
-                                            .clip(CircleShape)
-                                            .background(monetColors.surfaceContainerHighest.copy(alpha = 0.70f))
-                                            .clickable {
-                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                try {
-                                                    val intent = Intent(Intent.ACTION_EDIT).apply {
-                                                        setDataAndType(
-                                                            ContactsContract.Contacts.CONTENT_URI,
-                                                            ContactsContract.Contacts.CONTENT_ITEM_TYPE
-                                                        )
-                                                        putExtra(ContactsContract.Intents.Insert.PHONE, contact.number)
-                                                        putExtra(ContactsContract.Intents.Insert.NAME, contact.name)
-                                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                                    }
-                                                    context.startActivity(intent)
-                                                } catch (_: Exception) {
-                                                    DialerRepository.openSystemSaveContact(context, contact.number, contact.name)
-                                                }
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Edit,
-                                            contentDescription = "Edit Contact",
-                                            tint = monetColors.onSurface,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                }
-
-                                // Share Contact
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(CircleShape)
-                                        .background(monetColors.surfaceContainerHighest.copy(alpha = 0.70f))
-                                        .clickable {
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                                type = "text/plain"
-                                                putExtra(Intent.EXTRA_SUBJECT, contact.name)
-                                                putExtra(Intent.EXTRA_TEXT, "${contact.name}: ${contact.number}")
-                                            }
-                                            context.startActivity(Intent.createChooser(shareIntent, "Share Contact"))
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Share,
-                                        contentDescription = "Share",
-                                        tint = monetColors.onSurface,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
                             }
                         }
 
-                        // 3. Pixel Hero Avatar & Identity Section
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier.size(100.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(96.dp)
-                                        .clip(CircleShape)
-                                        .background(avatarBg)
-                                        .clickable {
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            photoPickerLauncher.launch("image/*")
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (contactPhotoBitmap != null) {
-                                        Image(
-                                            bitmap = contactPhotoBitmap,
-                                            contentDescription = contact.name,
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                    } else {
-                                        Text(
-                                            text = initials,
-                                            color = avatarFg,
-                                            fontSize = 34.sp,
-                                            fontFamily = GoogleSans,
-                                            fontWeight = FontWeight.SemiBold,
-                                            letterSpacing = 0.5.sp
-                                        )
+                        if (customPhotoPath != null) {
+                            Row(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(monetColors.surfaceContainerHighest.copy(alpha = 0.60f))
+                                    .clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        CallerProfileManager.removeCustomPhoto(context, contact.number)
+                                        customPhotoPath = null
+                                        onPhotoUpdated?.invoke(null)
+                                        Toast.makeText(context, "Custom photo removed", Toast.LENGTH_SHORT).show()
                                     }
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.BottomEnd)
-                                        .size(30.dp)
-                                        .clip(CircleShape)
-                                        .background(monetColors.primary)
-                                        .border(2.dp, monetColors.surfaceContainerHigh, CircleShape)
-                                        .clickable {
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            photoPickerLauncher.launch("image/*")
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.CameraAlt,
-                                        contentDescription = "Set photo",
-                                        tint = monetColors.onPrimary,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                }
+                                    .padding(horizontal = 10.dp, vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Close,
+                                    contentDescription = null,
+                                    tint = monetColors.error,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Text(
+                                    text = "Remove custom photo",
+                                    color = monetColors.onSurfaceVariant,
+                                    fontSize = 11.5.sp,
+                                    fontFamily = GoogleSans,
+                                    fontWeight = FontWeight.Medium
+                                )
                             }
+                        }
 
-                            if (customPhotoPath != null) {
-                                Row(
-                                    modifier = Modifier
-                                        .clip(CircleShape)
-                                        .background(monetColors.surfaceContainerHighest.copy(alpha = 0.60f))
-                                        .clickable {
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            CallerProfileManager.removeCustomPhoto(context, contact.number)
-                                            customPhotoPath = null
-                                            Toast.makeText(context, "Custom photo removed", Toast.LENGTH_SHORT).show()
-                                        }
-                                        .padding(horizontal = 10.dp, vertical = 3.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Close,
-                                        contentDescription = null,
-                                        tint = monetColors.error,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                    Text(
-                                        text = "Remove custom photo",
-                                        color = monetColors.onSurfaceVariant,
-                                        fontSize = 11.5.sp,
-                                        fontFamily = GoogleSans,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                            }
+                        // Headline & Subtitle
+                        Text(
+                            text = if (isUnknownNumber) formattedNum else contact.name,
+                            color = monetColors.onSurface,
+                            fontSize = 24.sp,
+                            fontFamily = GoogleSans,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            letterSpacing = (-0.4).sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
 
-                            Text(
-                                text = contact.name,
-                                color = monetColors.onSurface,
-                                fontSize = 24.sp,
-                                fontFamily = GoogleSans,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center,
-                                letterSpacing = (-0.4).sp,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-
+                        if (!isUnknownNumber) {
                             Text(
                                 text = formattedNum,
                                 color = monetColors.onSurfaceVariant,
@@ -2093,492 +2208,375 @@ fun Ios26LiquidContactDetailsSheet(
                                 fontWeight = FontWeight.Normal,
                                 textAlign = TextAlign.Center
                             )
+                        }
+
+                        // Status Badge Pill
+                        Box(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(monetColors.surfaceContainerHighest.copy(alpha = 0.70f))
+                                .padding(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(7.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (isUnknownNumber) monetColors.onSurfaceVariant.copy(alpha = 0.50f)
+                                            else Color(0xFF2EAA55)
+                                        )
+                                )
+                                Text(
+                                    text = if (isUnknownNumber) "Unsaved Number" else "Mobile • Saved Contact",
+                                    color = monetColors.onSurfaceVariant,
+                                    fontSize = 12.sp,
+                                    fontFamily = GoogleSans,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+
+                        // Single, Elegant "Save to contacts" Action for Unsaved Contacts
+                        if (isUnknownNumber) {
+                            Button(
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    DialerRepository.openSystemSaveContact(
+                                        context,
+                                        contact.number,
+                                        if (contact.name != contact.number &&
+                                            !contact.name.equals("Unknown Caller", true) &&
+                                            !contact.name.equals("Unknown", true)
+                                        ) contact.name else null
+                                    )
+                                },
+                                shape = RoundedCornerShape(24.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = monetColors.primary,
+                                    contentColor = monetColors.onPrimary
+                                ),
+                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 0.dp),
+                                contentPadding = PaddingValues(horizontal = 22.dp, vertical = 10.dp),
+                                modifier = Modifier.padding(top = 4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.PersonAdd,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Save contact",
+                                    fontSize = 14.sp,
+                                    fontFamily = GoogleSans,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+
+                    // 3. Pixel Expressive Tactile Action Row (Call, Message, Screen AI, WhatsApp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        ContactHeroActionPill(
+                            icon = Icons.Filled.Call,
+                            label = "Call",
+                            accentColor = Color.White,
+                            buttonBg = Color(0xFF2EAA55),
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onCall(contact.number)
+                            }
+                        )
+
+                        ContactHeroActionPill(
+                            icon = Icons.Rounded.Chat,
+                            label = "Message",
+                            accentColor = monetColors.onSurface,
+                            buttonBg = monetColors.surfaceContainerHighest,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                DialerRepository.sendSms(context, contact.number)
+                            }
+                        )
+
+                        ContactHeroActionPill(
+                            icon = Icons.Rounded.Security,
+                            label = "Screen",
+                            accentColor = monetColors.onPrimaryContainer,
+                            buttonBg = monetColors.primaryContainer,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onScreen(contact.number, contact.name)
+                            }
+                        )
+
+                        ContactHeroActionPill(
+                            painter = painterResource(id = com.callscreener.app.R.drawable.ic_whatsapp),
+                            label = "WhatsApp",
+                            buttonBg = monetColors.surfaceContainerHighest,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                val digits = contact.number.filter { it.isDigit() }
+                                val waIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$digits"))
+                                try {
+                                    context.startActivity(waIntent)
+                                } catch (_: Exception) {
+                                    Toast.makeText(context, "WhatsApp is not installed", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        )
+                    }
+
+                    // Card 1: Phone Details Card
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(22.dp))
+                            .background(monetColors.surfaceContainerHighest.copy(alpha = 0.50f))
+                            .padding(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .clip(CircleShape)
+                                        .background(monetColors.surfaceContainerHighest),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Call,
+                                        contentDescription = null,
+                                        tint = monetColors.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+
+                                Column {
+                                    Text(
+                                        text = formattedNum,
+                                        color = monetColors.onSurface,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontFamily = GoogleSans
+                                    )
+                                    Text(
+                                        text = "Mobile • Cellular",
+                                        color = monetColors.onSurfaceVariant,
+                                        fontSize = 12.sp,
+                                        fontFamily = GoogleSans
+                                    )
+                                }
+                            }
 
                             Box(
                                 modifier = Modifier
+                                    .size(38.dp)
                                     .clip(CircleShape)
-                                    .background(monetColors.surfaceContainerHighest.copy(alpha = 0.70f))
-                                    .padding(horizontal = 10.dp, vertical = 3.5.dp)
+                                    .background(monetColors.surfaceContainerHighest)
+                                    .clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        DialerRepository.copyToClipboard(context, "Phone Number", contact.number)
+                                        Toast.makeText(context, "Number copied", Toast.LENGTH_SHORT).show()
+                                    },
+                                contentAlignment = Alignment.Center
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(6.dp)
-                                            .clip(CircleShape)
-                                            .background(
-                                                if (isUnknownNumber) monetColors.onSurfaceVariant.copy(alpha = 0.50f)
-                                                else Color(0xFF2EAA55)
-                                            )
-                                    )
+                                Icon(
+                                    imageVector = Icons.Rounded.ContentCopy,
+                                    contentDescription = "Copy number",
+                                    tint = monetColors.onSurface,
+                                    modifier = Modifier.size(17.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Card 2: Call Screener AI Options Card
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(22.dp))
+                            .background(monetColors.surfaceContainerHighest.copy(alpha = 0.50f))
+                            .padding(16.dp)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Security,
+                                    contentDescription = null,
+                                    tint = monetColors.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "CALL SCREENER",
+                                    color = monetColors.primary,
+                                    fontSize = 11.sp,
+                                    fontFamily = GoogleSans,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.8.sp
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = if (isUnknownNumber) "Not in contacts" else "Mobile • Carrier Verified",
-                                        color = monetColors.onSurfaceVariant,
-                                        fontSize = 11.5.sp,
+                                        text = "Always screen this caller",
+                                        color = monetColors.onSurface,
+                                        fontSize = 14.sp,
                                         fontFamily = GoogleSans,
                                         fontWeight = FontWeight.Medium
                                     )
-                                }
-                            }
-                        }
-
-                        // 4. Pixel Expressive Tactile Action Row (Call, Message, Screen AI, WhatsApp)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            ContactHeroActionPill(
-                                icon = Icons.Filled.Call,
-                                label = "Call",
-                                accentColor = Color.White,
-                                buttonBg = Color(0xFF2EAA55),
-                                onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    onCall(contact.number)
-                                }
-                            )
-
-                            ContactHeroActionPill(
-                                icon = Icons.Rounded.Chat,
-                                label = "Message",
-                                accentColor = monetColors.onSurface,
-                                buttonBg = monetColors.surfaceContainerHighest,
-                                onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    DialerRepository.sendSms(context, contact.number)
-                                }
-                            )
-
-                            ContactHeroActionPill(
-                                icon = Icons.Rounded.AutoAwesome,
-                                label = "Screen AI",
-                                accentColor = monetColors.onPrimaryContainer,
-                                buttonBg = monetColors.primaryContainer,
-                                onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    onScreen(contact.number, contact.name)
-                                }
-                            )
-
-                            ContactHeroActionPill(
-                                icon = Icons.Rounded.Chat,
-                                label = "WhatsApp",
-                                accentColor = Color(0xFF25D366),
-                                buttonBg = monetColors.surfaceContainerHighest,
-                                onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    val digits = contact.number.filter { it.isDigit() }
-                                    val waIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$digits"))
-                                    try { context.startActivity(waIntent) } catch (_: Exception) {}
-                                }
-                            )
-                        }
-
-                        // Card 1: Phone Details Card
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(monetColors.surfaceContainerHighest.copy(alpha = 0.50f))
-                                .padding(16.dp)
-                        ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(40.dp)
-                                                .clip(CircleShape)
-                                                .background(monetColors.surfaceContainerHighest),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Filled.Call,
-                                                contentDescription = null,
-                                                tint = monetColors.primary,
-                                                modifier = Modifier.size(19.dp)
-                                            )
-                                        }
-
-                                        Column {
-                                            Text(
-                                                text = formattedNum,
-                                                color = monetColors.onSurface,
-                                                fontSize = 16.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                fontFamily = GoogleSans
-                                            )
-                                            Text(
-                                                text = "Mobile",
-                                                color = monetColors.onSurfaceVariant,
-                                                fontSize = 12.sp,
-                                                fontFamily = GoogleSans
-                                            )
-                                        }
-                                    }
-
-                                    Box(
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .clip(CircleShape)
-                                            .background(monetColors.surfaceContainerHighest)
-                                            .clickable {
-                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                DialerRepository.copyToClipboard(context, "Phone Number", contact.number)
-                                                Toast.makeText(context, "Number copied", Toast.LENGTH_SHORT).show()
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.ContentCopy,
-                                            contentDescription = "Copy number",
-                                            tint = monetColors.onSurface,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-
-                                if (isUnknownNumber) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(0.6.dp)
-                                            .background(monetColors.outlineVariant.copy(alpha = 0.25f))
-                                    )
-
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                DialerRepository.openSystemSaveContact(
-                                                    context,
-                                                    contact.number,
-                                                    if (contact.name != contact.number && !contact.name.equals("Unknown Caller", true) && !contact.name.equals("Unknown", true)) contact.name else null
-                                                )
-                                            }
-                                            .padding(vertical = 4.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.PersonAdd,
-                                                contentDescription = null,
-                                                tint = monetColors.primary,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                            Text(
-                                                text = "Add to contacts",
-                                                color = monetColors.primary,
-                                                fontSize = 14.sp,
-                                                fontFamily = GoogleSans,
-                                                fontWeight = FontWeight.Medium
-                                            )
-                                        }
-
-                                        Icon(
-                                            imageVector = Icons.Rounded.ChevronRight,
-                                            contentDescription = null,
-                                            tint = monetColors.onSurfaceVariant,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        // Card 2: Call Screener AI Options Card
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(monetColors.surfaceContainerHighest.copy(alpha = 0.50f))
-                                .padding(16.dp)
-                        ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.AutoAwesome,
-                                        contentDescription = null,
-                                        tint = monetColors.primary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
                                     Text(
-                                        text = "CALL SCREENER AI",
-                                        color = monetColors.primary,
-                                        fontSize = 11.sp,
-                                        fontFamily = GoogleSans,
-                                        fontWeight = FontWeight.Bold,
-                                        letterSpacing = 0.8.sp
+                                        text = "AI assistant intercepts before phone rings",
+                                        color = monetColors.onSurfaceVariant,
+                                        fontSize = 11.5.sp,
+                                        fontFamily = GoogleSans
                                     )
                                 }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "Always screen this caller",
-                                            color = monetColors.onSurface,
-                                            fontSize = 14.sp,
-                                            fontFamily = GoogleSans,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                        Text(
-                                            text = "AI assistant intercepts before phone rings",
-                                            color = monetColors.onSurfaceVariant,
-                                            fontSize = 11.5.sp,
-                                            fontFamily = GoogleSans
-                                        )
-                                    }
-                                    Switch(
-                                        checked = autoScreenThisContact,
-                                        onCheckedChange = {
-                                            autoScreenThisContact = it
-                                            persistProfile(it, isVipBypass, selectedPersona)
-                                        },
-                                        colors = SwitchDefaults.colors(
-                                            checkedThumbColor = Color.White,
-                                            checkedTrackColor = Color(0xFF2EAA55),
-                                            uncheckedThumbColor = monetColors.onSurfaceVariant,
-                                            uncheckedTrackColor = monetColors.surfaceContainerHighest
-                                        )
+                                Switch(
+                                    checked = autoScreenThisContact,
+                                    onCheckedChange = {
+                                        autoScreenThisContact = it
+                                        persistProfile(it, isVipBypass, selectedPersona)
+                                    },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color.White,
+                                        checkedTrackColor = Color(0xFF2EAA55),
+                                        uncheckedThumbColor = monetColors.onSurfaceVariant,
+                                        uncheckedTrackColor = monetColors.surfaceContainerHighest
                                     )
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(0.6.dp)
-                                        .background(monetColors.outlineVariant.copy(alpha = 0.25f))
                                 )
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "VIP caller (Never screen)",
-                                            color = monetColors.onSurface,
-                                            fontSize = 14.sp,
-                                            fontFamily = GoogleSans,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                        Text(
-                                            text = "Calls ring through directly without screening",
-                                            color = monetColors.onSurfaceVariant,
-                                            fontSize = 11.5.sp,
-                                            fontFamily = GoogleSans
-                                        )
-                                    }
-                                    Switch(
-                                        checked = isVipBypass,
-                                        onCheckedChange = {
-                                            isVipBypass = it
-                                            persistProfile(autoScreenThisContact, it, selectedPersona)
-                                        },
-                                        colors = SwitchDefaults.colors(
-                                            checkedThumbColor = Color.White,
-                                            checkedTrackColor = monetColors.primary,
-                                            uncheckedThumbColor = monetColors.onSurfaceVariant,
-                                            uncheckedTrackColor = monetColors.surfaceContainerHighest
-                                        )
-                                    )
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(0.6.dp)
-                                        .background(monetColors.outlineVariant.copy(alpha = 0.25f))
-                                )
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text(
-                                            text = "Screening Persona",
-                                            color = monetColors.onSurface,
-                                            fontSize = 13.5.sp,
-                                            fontFamily = GoogleSans,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                        Text(
-                                            text = "Voice applied to this caller",
-                                            color = monetColors.onSurfaceVariant,
-                                            fontSize = 11.sp,
-                                            fontFamily = GoogleSans
-                                        )
-                                    }
-
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(monetColors.primaryContainer)
-                                            .clickable {
-                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                val all = VoicePersona.ALL_PERSONAS
-                                                val nextIdx = (all.indexOf(selectedPersona) + 1) % all.size
-                                                selectedPersona = all[nextIdx]
-                                                persistProfile(autoScreenThisContact, isVipBypass, selectedPersona)
-                                            }
-                                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                                    ) {
-                                        Text(
-                                            text = "${selectedPersona.name} (${selectedPersona.code})",
-                                            color = monetColors.onPrimaryContainer,
-                                            fontSize = 12.sp,
-                                            fontFamily = GoogleSans,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
                             }
-                        }
 
-                        // Card 3: Recent Call History Card (only if records exist)
-                        if (callHistory.isNotEmpty()) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .background(monetColors.surfaceContainerHighest.copy(alpha = 0.50f))
-                                    .padding(16.dp)
+                                    .height(0.6.dp)
+                                    .background(monetColors.outlineVariant.copy(alpha = 0.25f))
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.History,
-                                                contentDescription = null,
-                                                tint = monetColors.primary,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                            Text(
-                                                text = "RECENT CALLS",
-                                                color = monetColors.primary,
-                                                fontSize = 11.sp,
-                                                fontFamily = GoogleSans,
-                                                fontWeight = FontWeight.Bold,
-                                                letterSpacing = 0.8.sp
-                                            )
-                                        }
-                                        Text(
-                                            text = "${callHistory.size} recorded",
-                                            color = monetColors.onSurfaceVariant,
-                                            fontSize = 11.sp,
-                                            fontFamily = GoogleSans
-                                        )
-                                    }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "VIP caller (Never screen)",
+                                        color = monetColors.onSurface,
+                                        fontSize = 14.sp,
+                                        fontFamily = GoogleSans,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "Calls ring through directly without screening",
+                                        color = monetColors.onSurfaceVariant,
+                                        fontSize = 11.5.sp,
+                                        fontFamily = GoogleSans
+                                    )
+                                }
+                                Switch(
+                                    checked = isVipBypass,
+                                    onCheckedChange = {
+                                        isVipBypass = it
+                                        persistProfile(autoScreenThisContact, it, selectedPersona)
+                                    },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color.White,
+                                        checkedTrackColor = monetColors.primary,
+                                        uncheckedThumbColor = monetColors.onSurfaceVariant,
+                                        uncheckedTrackColor = monetColors.surfaceContainerHighest
+                                    )
+                                )
+                            }
 
-                                    callHistory.take(4).forEach { log ->
-                                        val isMissed = log.type == CallLog.Calls.MISSED_TYPE || log.type == CallLog.Calls.REJECTED_TYPE
-                                        val isOut = log.type == CallLog.Calls.OUTGOING_TYPE
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                            ) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(28.dp)
-                                                        .clip(CircleShape)
-                                                        .background(
-                                                            if (isMissed) Color(0xFFF44336).copy(alpha = 0.15f)
-                                                            else if (isOut) Color(0xFF2196F3).copy(alpha = 0.15f)
-                                                            else Color(0xFF4CAF50).copy(alpha = 0.15f)
-                                                        ),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Icon(
-                                                        imageVector = if (isMissed) Icons.Filled.CallMissed else if (isOut) Icons.Filled.CallMade else Icons.Filled.CallReceived,
-                                                        contentDescription = null,
-                                                        tint = if (isMissed) Color(0xFFF44336) else if (isOut) Color(0xFF2196F3) else Color(0xFF4CAF50),
-                                                        modifier = Modifier.size(15.dp)
-                                                    )
-                                                }
-                                                Column {
-                                                    Text(
-                                                        text = if (isMissed) "Missed" else if (isOut) "Outgoing" else "Incoming",
-                                                        color = if (isMissed) Color(0xFFF44336) else monetColors.onSurface,
-                                                        fontSize = 13.sp,
-                                                        fontFamily = GoogleSans,
-                                                        fontWeight = FontWeight.Medium
-                                                    )
-                                                    if (!isMissed && log.durationSeconds > 0) {
-                                                        Text(
-                                                            text = formatDuration(log.durationSeconds),
-                                                            color = monetColors.onSurfaceVariant,
-                                                            fontSize = 11.sp,
-                                                            fontFamily = GoogleSans
-                                                        )
-                                                    }
-                                                }
-                                            }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(0.6.dp)
+                                    .background(monetColors.outlineVariant.copy(alpha = 0.25f))
+                            )
 
-                                            Text(
-                                                text = formatCallDate(log.timestamp),
-                                                color = monetColors.onSurfaceVariant,
-                                                fontSize = 11.5.sp,
-                                                fontFamily = GoogleSans
-                                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "Screening Persona",
+                                        color = monetColors.onSurface,
+                                        fontSize = 13.5.sp,
+                                        fontFamily = GoogleSans,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "Voice applied to this caller",
+                                        color = monetColors.onSurfaceVariant,
+                                        fontSize = 11.sp,
+                                        fontFamily = GoogleSans
+                                    )
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(monetColors.primaryContainer)
+                                        .clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            val all = VoicePersona.ALL_PERSONAS
+                                            val nextIdx = (all.indexOf(selectedPersona) + 1) % all.size
+                                            selectedPersona = all[nextIdx]
+                                            persistProfile(autoScreenThisContact, isVipBypass, selectedPersona)
                                         }
-                                    }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        text = "${selectedPersona.name} (${selectedPersona.code})",
+                                        color = monetColors.onPrimaryContainer,
+                                        fontSize = 12.sp,
+                                        fontFamily = GoogleSans,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
                             }
                         }
+                    }
 
-                        // Card 4: Security (Block & Report Spam)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(monetColors.surfaceContainerHighest.copy(alpha = 0.50f))
-                                .clickable {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    Toast.makeText(context, "${contact.name} added to Auto-Screen blocklist", Toast.LENGTH_SHORT).show()
-                                    animateDismiss()
-                                }
-                                .padding(16.dp)
-                        ) {
+                    // Card 3: Recent Call History Card
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(22.dp))
+                            .background(monetColors.surfaceContainerHighest.copy(alpha = 0.50f))
+                            .padding(16.dp)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -2586,44 +2584,170 @@ fun Ios26LiquidContactDetailsSheet(
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .clip(CircleShape)
-                                            .background(Color(0xFFF44336).copy(alpha = 0.15f)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Block,
-                                            contentDescription = null,
-                                            tint = Color(0xFFF44336),
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
+                                    Icon(
+                                        imageVector = Icons.Rounded.History,
+                                        contentDescription = null,
+                                        tint = monetColors.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                     Text(
-                                        text = "Block & report spam",
-                                        color = Color(0xFFF44336),
-                                        fontSize = 14.sp,
+                                        text = "CALL HISTORY",
+                                        color = monetColors.primary,
+                                        fontSize = 11.sp,
                                         fontFamily = GoogleSans,
-                                        fontWeight = FontWeight.Medium
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.8.sp
                                     )
                                 }
+                                if (callHistory.isNotEmpty()) {
+                                    Text(
+                                        text = "${callHistory.size} calls",
+                                        color = monetColors.onSurfaceVariant,
+                                        fontSize = 11.sp,
+                                        fontFamily = GoogleSans
+                                    )
+                                }
+                            }
 
-                                Icon(
-                                    imageVector = Icons.Rounded.ChevronRight,
-                                    contentDescription = null,
-                                    tint = Color(0xFFF44336).copy(alpha = 0.70f),
-                                    modifier = Modifier.size(18.dp)
+                            if (callHistory.isNotEmpty()) {
+                                callHistory.take(5).forEach { log ->
+                                    val isMissed = log.type == CallLog.Calls.MISSED_TYPE || log.type == CallLog.Calls.REJECTED_TYPE
+                                    val isOut = log.type == CallLog.Calls.OUTGOING_TYPE
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(30.dp)
+                                                    .clip(CircleShape)
+                                                    .background(
+                                                        if (isMissed) Color(0xFFF44336).copy(alpha = 0.15f)
+                                                        else if (isOut) Color(0xFF2196F3).copy(alpha = 0.15f)
+                                                        else Color(0xFF4CAF50).copy(alpha = 0.15f)
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (isMissed) Icons.Filled.CallMissed else if (isOut) Icons.Filled.CallMade else Icons.Filled.CallReceived,
+                                                    contentDescription = null,
+                                                    tint = if (isMissed) Color(0xFFF44336) else if (isOut) Color(0xFF2196F3) else Color(0xFF4CAF50),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                            Column {
+                                                Text(
+                                                    text = if (isMissed) "Missed" else if (isOut) "Outgoing" else "Incoming",
+                                                    color = if (isMissed) Color(0xFFF44336) else monetColors.onSurface,
+                                                    fontSize = 13.5.sp,
+                                                    fontFamily = GoogleSans,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                                if (!isMissed && log.durationSeconds > 0) {
+                                                    Text(
+                                                        text = formatDuration(log.durationSeconds),
+                                                        color = monetColors.onSurfaceVariant,
+                                                        fontSize = 11.sp,
+                                                        fontFamily = GoogleSans
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        Text(
+                                            text = formatCallDate(log.timestamp),
+                                            color = monetColors.onSurfaceVariant,
+                                            fontSize = 11.5.sp,
+                                            fontFamily = GoogleSans
+                                        )
+                                    }
+                                }
+                            } else {
+                                Text(
+                                    text = "No recent call history with this number",
+                                    color = monetColors.onSurfaceVariant.copy(alpha = 0.70f),
+                                    fontSize = 12.5.sp,
+                                    fontFamily = GoogleSans
                                 )
                             }
                         }
-
-                        // Bottom Spacer for Gesture Navigation Bar
-                        Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
-                        Spacer(modifier = Modifier.height(8.dp))
                     }
+
+                    // Card 4: Security (Block & Report Spam / Unblock)
+                    val blockManager = remember { com.callscreener.app.engine.CallBlockManager.getInstance(context) }
+                    var isContactBlocked by remember { mutableStateOf(blockManager.isBlocked(contact.number)) }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(22.dp))
+                            .background(monetColors.surfaceContainerHighest.copy(alpha = 0.50f))
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                if (isContactBlocked) {
+                                    blockManager.unblockNumber(contact.number)
+                                    isContactBlocked = false
+                                    Toast.makeText(context, "Unblocked ${contact.name}", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    blockManager.blockNumber(contact.number, contact.name)
+                                    isContactBlocked = true
+                                    Toast.makeText(context, "${contact.name} added to blocked list", Toast.LENGTH_SHORT).show()
+                                }
+                                animateDismiss()
+                            }
+                            .padding(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFF44336).copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Block,
+                                        contentDescription = null,
+                                        tint = Color(0xFFF44336),
+                                        modifier = Modifier.size(19.dp)
+                                    )
+                                }
+                                Text(
+                                    text = if (isContactBlocked) "Unblock this contact" else "Block number & report spam",
+                                    color = Color(0xFFF44336),
+                                    fontSize = 14.sp,
+                                    fontFamily = GoogleSans,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+
+                            Icon(
+                                imageVector = Icons.Rounded.ChevronRight,
+                                contentDescription = null,
+                                tint = Color(0xFFF44336).copy(alpha = 0.70f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+
+                    // Bottom Spacer for Gesture Navigation Bar
+                    Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
+                    Spacer(modifier = Modifier.height(24.dp))
                 }
             }
         }
@@ -2681,18 +2805,84 @@ fun ContactHeroActionPill(
     }
 }
 
+@Composable
+fun ContactHeroActionPill(
+    painter: androidx.compose.ui.graphics.painter.Painter,
+    label: String,
+    accentColor: Color = Color.Unspecified,
+    buttonBg: Color = Color(0x1EFFFFFF),
+    onClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.90f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
+        label = "heroActionScalePainter"
+    )
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .scale(scale)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+    ) {
+        Box(
+            modifier = Modifier
+                .size(54.dp)
+                .clip(CircleShape)
+                .background(if (isPressed) buttonBg.copy(alpha = 0.75f) else buttonBg),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = painter,
+                contentDescription = label,
+                tint = if (accentColor == Color.Unspecified) Color.Unspecified else accentColor,
+                modifier = Modifier.size(26.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = label,
+            color = Color(0xFFE2E2E6),
+            fontSize = 11.5.sp,
+            fontFamily = GoogleSans,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
 
 @Composable
 fun CallLogDetailsDialog(
     log: CallLogItem,
     presets: List<AudioPreset> = emptyList(),
+    contacts: List<ContactItem> = emptyList(),
     onPlayPreset: (AudioPreset) -> Unit = {},
     onDismiss: () -> Unit,
     onCall: (String) -> Unit,
-    onScreen: (CallLogItem) -> Unit
+    onScreen: (CallLogItem) -> Unit,
+    onPhotoUpdated: ((String?) -> Unit)? = null
 ) {
-    val contact = remember(log) {
-        ContactItem(id = log.id, name = log.name ?: log.number, number = log.number)
+    val context = LocalContext.current
+    val contact = remember(log, contacts, CallerProfileManager.photoVersionState.intValue) {
+        val logDigits = log.number.filter { it.isDigit() }
+        val matched = contacts.firstOrNull { c ->
+            val cDigits = c.number.filter { it.isDigit() }
+            (cDigits.isNotEmpty() && cDigits == logDigits) ||
+            (cDigits.length >= 7 && logDigits.length >= 7 && cDigits.takeLast(7) == logDigits.takeLast(7))
+        }
+        val customPhoto = CallerProfileManager.getCustomPhotoPath(context, log.number)
+        matched?.copy(photoUri = customPhoto ?: matched.photoUri) ?: ContactItem(
+            id = log.id,
+            name = log.name ?: log.number,
+            number = log.number,
+            photoUri = customPhoto
+        )
     }
     Ios26LiquidContactDetailsSheet(
         contact = contact,
@@ -2701,7 +2891,8 @@ fun CallLogDetailsDialog(
         onPlayPreset = onPlayPreset,
         onDismiss = onDismiss,
         onCall = onCall,
-        onScreen = { _, _ -> onScreen(log) }
+        onScreen = { _, _ -> onScreen(log) },
+        onPhotoUpdated = onPhotoUpdated
     )
 }
 
@@ -2870,7 +3061,7 @@ fun ContactsScreen(
     }
 
     // Intelligent Frequent Contacts: Starred Contacts + Highest Call Frequency & Recency
-    val frequentContacts = remember(contacts, callLogs) {
+    val frequentContacts = remember(contacts, callLogs, CallerProfileManager.photoVersionState.intValue) {
         if (contacts.isEmpty()) return@remember emptyList<ContactItem>()
 
         fun norm(num: String): String {
@@ -2954,22 +3145,15 @@ fun ContactsScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.padding(horizontal = 32.dp)
                 ) {
-                    Box(
+                    Image(
+                        painter = painterResource(id = com.callscreener.app.R.drawable.oneplus_empty_contacts_illustration),
+                        contentDescription = null,
                         modifier = Modifier
-                            .size(72.dp)
-                            .clip(CircleShape)
-                            .background(monetColors.primaryContainer.copy(alpha = 0.6f))
-                            .border(1.dp, monetColors.primary.copy(alpha = 0.4f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Person,
-                            contentDescription = null,
-                            tint = monetColors.primary,
-                            modifier = Modifier.size(34.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
+                            .size(160.dp)
+                            .padding(bottom = 6.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = if (searchQuery.isNotEmpty()) "No Matching Contacts" else "No Contacts Yet",
                         color = monetColors.onSurface,
@@ -3094,7 +3278,10 @@ fun ContactsScreen(
                                             .clickable(
                                                 interactionSource = favInteraction,
                                                 indication = null,
-                                                onClick = { onOpenDetails(contact) }
+                                                onClick = {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    onOpenDetails(contact)
+                                                }
                                             )
                                             .padding(horizontal = 10.dp, vertical = 10.dp),
                                         horizontalAlignment = Alignment.CenterHorizontally
@@ -3103,21 +3290,13 @@ fun ContactsScreen(
                                             modifier = Modifier.size(42.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(42.dp)
-                                                    .clip(CircleShape)
-                                                    .background(avatarBg),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = favInitials,
-                                                    color = avatarFg,
-                                                    fontSize = 14.sp,
-                                                    fontFamily = GoogleSans,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
+                                            ContactAvatar(
+                                                name = contact.name,
+                                                number = contact.number,
+                                                photoUri = contact.photoUri,
+                                                size = 42.dp,
+                                                monetColors = monetColors
+                                            )
                                             if (contact.isStarred) {
                                                 Box(
                                                     modifier = Modifier
@@ -3272,32 +3451,13 @@ fun ContactsScreen(
                                     modifier = Modifier.size(44.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    if (contactPhotoBitmap != null) {
-                                        Image(
-                                            bitmap = contactPhotoBitmap,
-                                            contentDescription = contact.name,
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier
-                                                .size(44.dp)
-                                                .clip(CircleShape)
-                                        )
-                                    } else {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(44.dp)
-                                                .clip(CircleShape)
-                                                .background(avatarBg),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = initials,
-                                                color = avatarFg,
-                                                fontSize = 15.sp,
-                                                fontFamily = GoogleSans,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                    }
+                                    ContactAvatar(
+                                        name = contact.name,
+                                        number = contact.number,
+                                        photoUri = contact.photoUri,
+                                        size = 44.dp,
+                                        monetColors = monetColors
+                                    )
                                     if (contact.isStarred) {
                                         Box(
                                             modifier = Modifier
@@ -3718,13 +3878,6 @@ fun PixelDialerSearchBar(
                     modifier = Modifier.size(18.dp)
                 )
             }
-        } else {
-            Icon(
-                imageVector = Icons.Filled.Mic,
-                contentDescription = "Voice Search",
-                tint = monetColors.onSurfaceVariant.copy(alpha = 0.85f),
-                modifier = Modifier.size(20.dp)
-            )
         }
 
         Spacer(modifier = Modifier.width(4.dp))
@@ -4334,7 +4487,7 @@ fun KeypadScreen(
                         }
                     } else {
                         // Premium Pixel Expressive Favorites & Recent Contacts
-                        val keypadRecents = remember(callLogs, contacts) {
+                        val keypadRecents = remember(callLogs, contacts, CallerProfileManager.photoVersionState.intValue) {
                             val list = mutableListOf<KeypadRecentItem>()
                             val seen = HashSet<String>()
 
@@ -4347,6 +4500,7 @@ fun KeypadScreen(
                             for (c in contacts.filter { it.isStarred }) {
                                 val digits = norm(c.number)
                                 if (digits.isNotEmpty() && seen.add(digits)) {
+                                    val customPhoto = CallerProfileManager.getCustomPhotoPath(context, c.number)
                                     list.add(
                                         KeypadRecentItem(
                                             id = c.id,
@@ -4355,7 +4509,7 @@ fun KeypadScreen(
                                             type = CallLog.Calls.OUTGOING_TYPE,
                                             timestamp = 0L,
                                             isStarred = true,
-                                            photoUri = c.photoUri
+                                            photoUri = customPhoto ?: c.photoUri
                                         )
                                     )
                                     if (list.size >= 5) break
@@ -4367,6 +4521,7 @@ fun KeypadScreen(
                                 val digits = norm(log.number)
                                 if (seen.add(digits)) {
                                     val matched = contacts.firstOrNull { c -> norm(c.number) == digits }
+                                    val customPhoto = CallerProfileManager.getCustomPhotoPath(context, log.number)
                                     list.add(
                                         KeypadRecentItem(
                                             id = log.id,
@@ -4375,7 +4530,7 @@ fun KeypadScreen(
                                             type = log.type,
                                             timestamp = log.timestamp,
                                             isStarred = matched?.isStarred ?: false,
-                                            photoUri = matched?.photoUri
+                                            photoUri = customPhoto ?: matched?.photoUri
                                         )
                                     )
                                     if (list.size >= 12) break
@@ -4385,6 +4540,7 @@ fun KeypadScreen(
                             // 3. Fallback to contacts if call history is empty
                             if (list.isEmpty()) {
                                 contacts.take(8).map { c ->
+                                    val customPhoto = CallerProfileManager.getCustomPhotoPath(context, c.number)
                                     KeypadRecentItem(
                                         id = c.id,
                                         name = c.name,
@@ -4392,7 +4548,7 @@ fun KeypadScreen(
                                         type = CallLog.Calls.OUTGOING_TYPE,
                                         timestamp = 0L,
                                         isStarred = c.isStarred,
-                                        photoUri = c.photoUri
+                                        photoUri = customPhoto ?: c.photoUri
                                     )
                                 }
                             } else {
@@ -4489,7 +4645,17 @@ fun KeypadScreen(
                                                 indication = null,
                                                 onClick = {
                                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                    typedNumber = item.number
+                                                    val matchedContact = contacts.find {
+                                                        val cleanTarget = it.number.filter { c -> c.isDigit() }
+                                                        val cleanItem = item.number.filter { c -> c.isDigit() }
+                                                        (cleanTarget.isNotEmpty() && cleanTarget == cleanItem) || it.id == item.id
+                                                    } ?: ContactItem(
+                                                        id = item.id,
+                                                        name = item.name,
+                                                        number = item.number,
+                                                        isStarred = item.isStarred
+                                                    )
+                                                    onOpenDetails(matchedContact)
                                                 }
                                             )
                                             .padding(horizontal = 11.dp, vertical = 9.dp),
@@ -4501,30 +4667,13 @@ fun KeypadScreen(
                                             modifier = Modifier.size(44.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(44.dp)
-                                                    .clip(CircleShape)
-                                                    .background(avatarBg),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                if (contactPhotoBitmap != null) {
-                                                    androidx.compose.foundation.Image(
-                                                        bitmap = contactPhotoBitmap,
-                                                        contentDescription = item.name,
-                                                        modifier = Modifier.fillMaxSize(),
-                                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                                                    )
-                                                } else {
-                                                    Text(
-                                                        text = itemInitials,
-                                                        color = avatarFg,
-                                                        fontSize = 15.sp,
-                                                        fontFamily = GoogleSans,
-                                                        fontWeight = FontWeight.Bold
-                                                    )
-                                                }
-                                            }
+                                            ContactAvatar(
+                                                name = item.name,
+                                                number = item.number,
+                                                photoUri = item.photoUri,
+                                                size = 44.dp,
+                                                monetColors = monetColors
+                                            )
                                             if (item.isStarred) {
                                                 Box(
                                                     modifier = Modifier
@@ -4624,6 +4773,43 @@ fun KeypadScreen(
                                                 modifier = Modifier.size(15.dp)
                                             )
                                         }
+                                    }
+                                }
+                            }
+                        } else {
+                            // OnePlus Empty Speed Dial / Favorites illustration
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                    modifier = Modifier.padding(horizontal = 20.dp)
+                                ) {
+                                    Image(
+                                        painter = painterResource(id = com.callscreener.app.R.drawable.oneplus_empty_speed_dial_illustration),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(90.dp),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                    Column {
+                                        Text(
+                                            text = "No speed dial numbers",
+                                            fontFamily = GoogleSans,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = monetColors.onSurface
+                                        )
+                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Text(
+                                            text = "Your frequent contacts will appear here for 1-tap calling",
+                                            fontFamily = GoogleSans,
+                                            fontSize = 11.5.sp,
+                                            color = monetColors.onSurfaceVariant
+                                        )
                                     }
                                 }
                             }
@@ -4735,7 +4921,7 @@ fun KeypadScreen(
                                     letterSpacing = 0.6.sp
                                 )
                                 Text(
-                                    text = "Tap to call",
+                                    text = "Tap profile for info",
                                     fontFamily = GoogleSans,
                                     fontSize = 10.5.sp,
                                     color = monetColors.onSurfaceVariant
@@ -4785,7 +4971,7 @@ fun KeypadScreen(
                                                 indication = null,
                                                 onClick = {
                                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                    onCall(match.number)
+                                                    onOpenDetails(match)
                                                 }
                                             )
                                             .padding(horizontal = 10.dp),
@@ -4796,21 +4982,13 @@ fun KeypadScreen(
                                             modifier = Modifier.size(36.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(36.dp)
-                                                    .clip(CircleShape)
-                                                    .background(avatarBg),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = matchInitials,
-                                                    color = avatarFg,
-                                                    fontSize = 12.sp,
-                                                    fontFamily = GoogleSans,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
+                                            ContactAvatar(
+                                                name = match.name,
+                                                number = match.number,
+                                                photoUri = match.photoUri,
+                                                size = 36.dp,
+                                                monetColors = monetColors
+                                            )
                                             if (match.isStarred) {
                                                 Box(
                                                     modifier = Modifier
@@ -5152,7 +5330,7 @@ fun AssistantTabScreen(
                 icon = Icons.Rounded.Headphones,
                 iconTint = Color(0xFF81C995),
                 iconBgColor = Color(0xFF81C995).copy(alpha = 0.16f),
-                title = "Call Screener Simulator",
+                title = "Resonix Simulator",
                 subtitle = "Test speech relay with Bluetooth earbuds or speaker",
                 monetColors = monetColors,
                 trailingContent = {
@@ -5689,7 +5867,7 @@ fun GlassRootPowerCard() {
                         text = if (isModuleInstalled)
                             "Module configuration created. Tap 'Restart Device Now' so Android system_server mounts the application into /system/priv-app."
                         else if (isRootAvailable)
-                            "Root access verified. Tap below to generate a systemless Magisk/KernelSU module that places Call Screener into /system/priv-app with direct audio routing privileges."
+                            "Root access verified. Tap below to generate a systemless Magisk/KernelSU module that places Resonix into /system/priv-app with direct audio routing privileges."
                         else
                             "Standard Telecom mode active. Grant root access to unlock direct digital cellular injection.",
                         color = TextSecondary,
@@ -5811,7 +5989,7 @@ fun GlassSimulatorCard(onStartSimulation: () -> Unit) {
 
                 Column {
                     Text(
-                        text = "Call Screener Simulator",
+                        text = "Resonix Simulator",
                         color = TextPrimary,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -6042,23 +6220,6 @@ fun GlassVoiceStudioCard(
                 }
             }
 
-            // Description Showcase of selected persona
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(monetColors.surfaceContainerHigh.copy(alpha = 0.4f))
-                    .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
-                    .padding(12.dp)
-            ) {
-                Text(
-                    text = "${selectedPersona.name} • ${selectedPersona.tag}: ${selectedPersona.description}",
-                    color = monetColors.onSurfaceVariant,
-                    fontSize = 11.5.sp,
-                    lineHeight = 16.sp,
-                    fontFamily = GoogleSans
-                )
-            }
 
             // Live AI Voice Relay Transcript Capsule
             AnimatedVisibility(visible = sessionState.isListeningToUserSpeech || sessionState.userLiveTranscript.isNotBlank()) {
@@ -6204,6 +6365,7 @@ fun GlassAudioPresetsCard(
     val coroutineScope = rememberCoroutineScope()
     val presets by presetManager.presets.collectAsState()
     val currentlyPlayingId by presetManager.currentlyPlayingId.collectAsState()
+    val isPresetPaused by presetManager.isPaused.collectAsState()
 
     var showAddTextDialog by remember { mutableStateOf(false) }
     var textPresetTitle by remember { mutableStateOf("") }
@@ -6307,45 +6469,15 @@ fun GlassAudioPresetsCard(
                         )
                     }
                 }
-
-                // Manage / Reorder Pill Button
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(monetColors.primary.copy(alpha = 0.15f))
-                        .border(0.8.dp, monetColors.primary.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
-                        .clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onOpenManager()
-                        }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Tune,
-                            contentDescription = "Manage",
-                            tint = monetColors.primary,
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Text(
-                            text = "Arrange",
-                            color = monetColors.primary,
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = GoogleSans
-                        )
-                    }
-                }
             }
 
             // Quick Access Preview (Top 3 Presets in Clean Pixel Squircles)
             val previewPresets = remember(presets) { presets.take(3) }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 previewPresets.forEach { preset ->
-                    val isPlaying = currentlyPlayingId == preset.id
+                    val isCurrent = currentlyPlayingId == preset.id
+                    val isPlaying = isCurrent && !isPresetPaused
+                    val isPaused = isCurrent && isPresetPaused
 
                     Box(
                         modifier = Modifier
@@ -6353,11 +6485,14 @@ fun GlassAudioPresetsCard(
                             .clip(RoundedCornerShape(16.dp))
                             .background(
                                 if (isPlaying) monetColors.primaryContainer.copy(alpha = 0.7f)
+                                else if (isPaused) Color(0x30FFA726)
                                 else monetColors.surfaceContainerHigh.copy(alpha = 0.5f)
                             )
                             .border(
                                 0.8.dp,
-                                if (isPlaying) monetColors.primary else monetColors.outlineVariant.copy(alpha = 0.25f),
+                                if (isPlaying) monetColors.primary
+                                else if (isPaused) Color(0xFFFFA726)
+                                else monetColors.outlineVariant.copy(alpha = 0.25f),
                                 RoundedCornerShape(16.dp)
                             )
                             .padding(horizontal = 12.dp, vertical = 9.dp)
@@ -6376,7 +6511,7 @@ fun GlassAudioPresetsCard(
                                 Icon(
                                     imageVector = if (preset.isAudioFile) Icons.Rounded.GraphicEq else Icons.AutoMirrored.Rounded.VolumeUp,
                                     contentDescription = null,
-                                    tint = monetColors.onSurfaceVariant,
+                                    tint = if (isPaused) Color(0xFFFFA726) else monetColors.onSurfaceVariant,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
@@ -6385,8 +6520,8 @@ fun GlassAudioPresetsCard(
 
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = preset.title,
-                                    color = monetColors.onSurface,
+                                    text = if (isPaused) "${preset.title} (Paused)" else preset.title,
+                                    color = if (isPaused) Color(0xFFFFB74D) else monetColors.onSurface,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = GoogleSans,
@@ -6411,12 +6546,17 @@ fun GlassAudioPresetsCard(
                                     .clip(CircleShape)
                                     .background(
                                         if (isPlaying) Color(0xFFF28B82)
+                                        else if (isPaused) Color(0xFFFFB74D)
                                         else monetColors.primary
                                     )
                                     .clickable {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        if (isPlaying) {
-                                            presetManager.stopPreview()
+                                        if (isCurrent) {
+                                            if (!isPresetPaused) {
+                                                presetManager.pausePreview()
+                                            } else {
+                                                presetManager.resumePreview()
+                                            }
                                         } else {
                                             presetManager.previewPreset(preset)
                                         }
@@ -6424,9 +6564,9 @@ fun GlassAudioPresetsCard(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = if (isPlaying) Icons.Filled.Stop else Icons.Filled.PlayArrow,
-                                    contentDescription = "Preview",
-                                    tint = if (isPlaying) Color.White else monetColors.onPrimary,
+                                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                    contentDescription = if (isPlaying) "Pause" else if (isPaused) "Resume" else "Preview",
+                                    tint = if (isPlaying) Color.White else if (isPaused) Color.Black else monetColors.onPrimary,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
@@ -7176,6 +7316,62 @@ fun SettingsDivider(
     )
 }
 
+@Composable
+private fun DeveloperSocialPill(
+    iconRes: Int,
+    label: String,
+    containerColor: Color,
+    borderColor: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.93f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "pill_scale"
+    )
+
+    Box(
+        modifier = modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(RoundedCornerShape(16.dp))
+            .background(containerColor)
+            .border(1.dp, borderColor, RoundedCornerShape(16.dp))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+            .height(44.dp)
+            .padding(horizontal = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Image(
+                painter = painterResource(id = iconRes),
+                contentDescription = label,
+                modifier = Modifier.size(20.dp)
+            )
+            Text(
+                text = label,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+                fontFamily = GoogleSans,
+                maxLines = 1
+            )
+        }
+    }
+}
+
 /**
  * Dedicated Dialer & System Settings Modal Sheet
  * Opened via 3-dots in Keypad header.
@@ -7214,10 +7410,18 @@ fun DialerSettingsSheet(
     var showCallStatsScreen by remember { mutableStateOf(false) }
     var showRecordingsDialog by remember { mutableStateOf(false) }
     var showSpeechJammerDialog by remember { mutableStateOf(false) }
+    var showBlockedNumbersScreen by remember { mutableStateOf(false) }
     var rootAvailable by remember { mutableStateOf(RootPrivilegeManager.isRootAvailable()) }
     var isPrivileged by remember { mutableStateOf(RootPrivilegeManager.isPrivilegedApp(context)) }
     var isModuleInstalled by remember { mutableStateOf(RootPrivilegeManager.isMagiskModuleInstalled()) }
     var isInstalling by remember { mutableStateOf(false) }
+
+    // OTA Update System States
+    val otaCheckStatus by OtaUpdateManager.checkStatus.collectAsState()
+    val otaDownloadStatus by OtaUpdateManager.downloadStatus.collectAsState()
+    var showUpdateDialog by remember { mutableStateOf(false) }
+    val currentVersionName = remember { OtaUpdateManager.getCurrentVersionName(context) }
+    val currentVersionCode = remember { OtaUpdateManager.getCurrentVersionCode(context) }
 
     var isVisible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -7445,6 +7649,30 @@ fun DialerSettingsSheet(
                                     )
                                 }
                             )
+
+                            SettingsDivider(monetColors = monetColors)
+
+                            // Row 4: Blocked Numbers Management
+                            SettingsItemRow(
+                                icon = Icons.Rounded.Block,
+                                iconTint = Color(0xFFFF5252),
+                                iconBgColor = Color(0xFFFF5252).copy(alpha = 0.16f),
+                                title = "Blocked Numbers",
+                                subtitle = "Manage blocked numbers and spam callers",
+                                monetColors = monetColors,
+                                trailingContent = {
+                                    Icon(
+                                        imageVector = Icons.Rounded.ChevronRight,
+                                        contentDescription = "Manage Blocked Numbers",
+                                        tint = monetColors.onSurfaceVariant.copy(alpha = 0.7f),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                modifier = Modifier.clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    showBlockedNumbersScreen = true
+                                }
+                            )
                         }
 
                         // ==========================================
@@ -7657,90 +7885,56 @@ fun DialerSettingsSheet(
                         // ==========================================
                         SettingsSectionHeader(title = "OPERATING PROFILE & PRIVILEGES", monetColors = monetColors)
                         SettingsGroupCard(monetColors = monetColors) {
-                            // Row 1: Profile Summary & Status Pill
-                            SettingsItemRow(
-                                icon = if (operationMode == AppOperationMode.ROOT_ENHANCED) Icons.Rounded.Security else Icons.Filled.Call,
-                                iconTint = monetColors.primary,
-                                iconBgColor = monetColors.primary.copy(alpha = 0.14f),
-                                title = "Operating Profile",
-                                subtitle = if (operationMode == AppOperationMode.ROOT_ENHANCED)
-                                    "Root Superpowers & Direct Audio Uplink"
-                                else
-                                    "Standard Non-Root Telecom Profile",
-                                monetColors = monetColors,
-                                trailingContent = {
-                                    val badgeText = if (operationMode == AppOperationMode.ROOT_ENHANCED) {
-                                        if (rootAvailable) "ROOT READY" else "SU NEEDED"
-                                    } else {
-                                        "STANDARD"
-                                    }
-                                    val badgeColor = if (operationMode == AppOperationMode.ROOT_ENHANCED) {
-                                        if (rootAvailable) Color(0xFF81C995) else Color(0xFFFFB74D)
-                                    } else {
-                                        monetColors.primary
-                                    }
-
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .background(badgeColor.copy(alpha = 0.18f))
-                                            .padding(horizontal = 9.dp, vertical = 5.dp)
-                                    ) {
-                                        Text(
-                                            text = badgeText,
-                                            color = badgeColor,
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = GoogleSans
-                                        )
-                                    }
-                                }
-                            )
-
-                            SettingsDivider(monetColors = monetColors)
-
-                            // Segmented Pixel Mode Selector Pill
+                            // Minimal Expressive Segmented Pill Switcher
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .background(monetColors.surfaceVariant.copy(alpha = 0.45f))
+                                    .padding(4.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .background(monetColors.surfaceVariant.copy(alpha = 0.5f))
-                                        .padding(4.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
+                                Row(modifier = Modifier.fillMaxWidth()) {
                                     val isStandard = operationMode == AppOperationMode.STANDARD
                                     Box(
                                         modifier = Modifier
                                             .weight(1f)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(if (isStandard) monetColors.primary else Color.Transparent)
+                                            .height(40.dp)
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(if (isStandard) monetColors.surfaceContainerHighest else Color.Transparent)
                                             .clickable {
                                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                                 onSelectMode(AppOperationMode.STANDARD)
-                                            }
-                                            .padding(vertical = 10.dp),
+                                            },
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text(
-                                            text = "Standard (Non-Root)",
-                                            color = if (isStandard) monetColors.onPrimary else monetColors.onSurfaceVariant,
-                                            fontSize = 12.sp,
-                                            fontWeight = if (isStandard) FontWeight.SemiBold else FontWeight.Medium,
-                                            fontFamily = GoogleSans
-                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Call,
+                                                contentDescription = null,
+                                                tint = if (isStandard) monetColors.primary else monetColors.onSurfaceVariant,
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                            Text(
+                                                text = "Standard",
+                                                color = if (isStandard) monetColors.onSurface else monetColors.onSurfaceVariant,
+                                                fontSize = 13.sp,
+                                                fontWeight = if (isStandard) FontWeight.SemiBold else FontWeight.Medium,
+                                                fontFamily = GoogleSans
+                                            )
+                                        }
                                     }
 
                                     val isRoot = operationMode == AppOperationMode.ROOT_ENHANCED
                                     Box(
                                         modifier = Modifier
                                             .weight(1f)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(if (isRoot) Color(0xFFFFB74D).copy(alpha = 0.28f) else Color.Transparent)
+                                            .height(40.dp)
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(if (isRoot) monetColors.surfaceContainerHighest else Color.Transparent)
                                             .clickable {
                                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                                 onSelectMode(AppOperationMode.ROOT_ENHANCED)
@@ -7749,95 +7943,102 @@ fun DialerSettingsSheet(
                                                     isPrivileged = RootPrivilegeManager.isPrivilegedApp(context)
                                                     isModuleInstalled = RootPrivilegeManager.isMagiskModuleInstalled()
                                                 }
-                                            }
-                                            .padding(vertical = 10.dp),
+                                            },
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text(
-                                            text = "Root Enhanced",
-                                            color = if (isRoot) Color(0xFFFFB74D) else monetColors.onSurfaceVariant,
-                                            fontSize = 12.sp,
-                                            fontWeight = if (isRoot) FontWeight.SemiBold else FontWeight.Medium,
-                                            fontFamily = GoogleSans
-                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Security,
+                                                contentDescription = null,
+                                                tint = if (isRoot) Color(0xFFFFB74D) else monetColors.onSurfaceVariant,
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                            Text(
+                                                text = "Root Enhanced",
+                                                color = if (isRoot) monetColors.onSurface else monetColors.onSurfaceVariant,
+                                                fontSize = 13.sp,
+                                                fontWeight = if (isRoot) FontWeight.SemiBold else FontWeight.Medium,
+                                                fontFamily = GoogleSans
+                                            )
+                                        }
                                     }
                                 }
                             }
 
-                            // Feature Bullets Card
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 6.dp)
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(monetColors.surfaceVariant.copy(alpha = 0.35f))
-                                    .padding(14.dp)
-                            ) {
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    if (operationMode == AppOperationMode.STANDARD) {
-                                        Text(
-                                            text = "Standard Mode is built for normal everyday calling on any Android phone. Calls use your natural microphone directly with zero root modifications, zero risk, and maximum stability.",
-                                            color = monetColors.onSurfaceVariant,
-                                            fontSize = 12.sp,
-                                            lineHeight = 16.sp,
-                                            fontFamily = GoogleSans
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        ModeFeatureRow(text = "Standard Telecom framework (works on all devices)", isIncluded = true)
-                                        ModeFeatureRow(text = "Instant call screening & neural AI assistant", isIncluded = true)
-                                        ModeFeatureRow(text = "Zero unlocked bootloader or root required", isIncluded = true)
-                                    } else {
-                                        Text(
-                                            text = "Root Enhanced Mode unlocks privileged digital audio routing, zero-noise digital cellular injection, and system priv-app integration via Magisk or KernelSU.",
-                                            color = Color(0xFFFFB74D),
-                                            fontSize = 12.sp,
-                                            lineHeight = 16.sp,
-                                            fontFamily = GoogleSans
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        ModeFeatureRow(text = "Direct cellular uplink audio injection (zero mic noise)", isIncluded = true)
-                                        ModeFeatureRow(text = "High-fidelity dual-side in-call audio recording", isIncluded = true)
-                                        ModeFeatureRow(text = "Magisk / KernelSU system priv-app integration", isIncluded = true)
+                            SettingsDivider(monetColors = monetColors)
+
+                            if (operationMode == AppOperationMode.STANDARD) {
+                                SettingsItemRow(
+                                    icon = Icons.Rounded.Check,
+                                    iconTint = Color(0xFF81C995),
+                                    iconBgColor = Color(0xFF81C995).copy(alpha = 0.14f),
+                                    title = "Standard Telecom Profile",
+                                    subtitle = "Direct microphone audio • Works on all devices • Zero root required",
+                                    monetColors = monetColors,
+                                    trailingContent = {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(monetColors.primary.copy(alpha = 0.15f))
+                                                .padding(horizontal = 9.dp, vertical = 5.dp)
+                                        ) {
+                                            Text(
+                                                text = "ACTIVE",
+                                                color = monetColors.primary,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                fontFamily = GoogleSans
+                                            )
+                                        }
                                     }
-                                }
-                            }
-
-                            // Root Actions & Module Management
-                            if (operationMode == AppOperationMode.ROOT_ENHANCED) {
-                                SettingsDivider(monetColors = monetColors)
-
+                                )
+                            } else {
                                 SettingsItemRow(
                                     icon = Icons.Rounded.Extension,
-                                    iconTint = monetColors.primary,
-                                    iconBgColor = monetColors.primary.copy(alpha = 0.14f),
+                                    iconTint = if (isPrivileged) Color(0xFF81C995) else Color(0xFFFFB74D),
+                                    iconBgColor = (if (isPrivileged) Color(0xFF81C995) else Color(0xFFFFB74D)).copy(alpha = 0.14f),
                                     title = when {
-                                        isPrivileged -> "System Priv-App: Active"
-                                        isModuleInstalled -> "Module Installed (Pending Reboot)"
-                                        else -> "Magisk / KernelSU Module"
+                                        isPrivileged -> "System Priv-App Active"
+                                        isModuleInstalled -> "Reboot Required"
+                                        rootAvailable -> "Root Ready"
+                                        else -> "Superuser (su) Needed"
                                     },
                                     subtitle = when {
-                                        isPrivileged -> "Verified in /system/priv-app with CAPTURE_AUDIO_OUTPUT"
-                                        isModuleInstalled -> "Restart device to finish mounting into system_server"
-                                        rootAvailable -> "Tap below to build and activate systemless module"
-                                        else -> "Grant root (su) access to unlock digital injection"
+                                        isPrivileged -> "Hardware HAL direct digital uplink active"
+                                        isModuleInstalled -> "Restart to mount into /system/priv-app"
+                                        rootAvailable -> "Magisk / KernelSU module available"
+                                        else -> "Grant root access to activate HAL injection"
                                     },
                                     monetColors = monetColors,
                                     trailingContent = {
-                                        if (isPrivileged) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(10.dp))
-                                                    .background(Color(0xFF81C995).copy(alpha = 0.18f))
-                                                    .padding(horizontal = 9.dp, vertical = 5.dp)
-                                            ) {
-                                                Text(
-                                                    text = "PRIV-APP",
-                                                    color = Color(0xFF81C995),
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontFamily = GoogleSans
-                                                )
-                                            }
+                                        val badgeText = when {
+                                            isPrivileged -> "ACTIVE"
+                                            isModuleInstalled -> "REBOOT"
+                                            rootAvailable -> "READY"
+                                            else -> "NO ROOT"
+                                        }
+                                        val badgeColor = when {
+                                            isPrivileged -> Color(0xFF81C995)
+                                            isModuleInstalled -> Color(0xFFFFB74D)
+                                            rootAvailable -> monetColors.primary
+                                            else -> monetColors.error
+                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(badgeColor.copy(alpha = 0.18f))
+                                                .padding(horizontal = 9.dp, vertical = 5.dp)
+                                        ) {
+                                            Text(
+                                                text = badgeText,
+                                                color = badgeColor,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                fontFamily = GoogleSans
+                                            )
                                         }
                                     }
                                 )
@@ -7845,7 +8046,7 @@ fun DialerSettingsSheet(
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                                        .padding(horizontal = 16.dp, vertical = 8.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     if (isPrivileged) {
@@ -7858,9 +8059,9 @@ fun DialerSettingsSheet(
                                                     Toast.makeText(context, result.second, Toast.LENGTH_SHORT).show()
                                                 }
                                             },
-                                            shape = RoundedCornerShape(16.dp),
+                                            shape = RoundedCornerShape(14.dp),
                                             colors = ButtonDefaults.outlinedButtonColors(contentColor = monetColors.onSurfaceVariant),
-                                            modifier = Modifier.fillMaxWidth().height(42.dp)
+                                            modifier = Modifier.fillMaxWidth().height(40.dp)
                                         ) {
                                             Text("Uninstall System Module", fontSize = 12.sp, fontFamily = GoogleSans)
                                         }
@@ -7873,10 +8074,10 @@ fun DialerSettingsSheet(
                                                     }
                                                 },
                                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFB74D)),
-                                                shape = RoundedCornerShape(16.dp),
-                                                modifier = Modifier.fillMaxWidth().height(44.dp)
+                                                shape = RoundedCornerShape(14.dp),
+                                                modifier = Modifier.fillMaxWidth().height(42.dp)
                                             ) {
-                                                Text("Restart Device Now", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold, fontSize = 13.sp, fontFamily = GoogleSans)
+                                                Text("Restart Device Now", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold, fontSize = 12.5.sp, fontFamily = GoogleSans)
                                             }
                                         }
 
@@ -7893,14 +8094,14 @@ fun DialerSettingsSheet(
                                             },
                                             enabled = !isInstalling,
                                             colors = ButtonDefaults.buttonColors(containerColor = monetColors.primary),
-                                            shape = RoundedCornerShape(16.dp),
-                                            modifier = Modifier.fillMaxWidth().height(44.dp)
+                                            shape = RoundedCornerShape(14.dp),
+                                            modifier = Modifier.fillMaxWidth().height(42.dp)
                                         ) {
                                             Text(
-                                                text = if (isInstalling) "Configuring Module..." else if (isModuleInstalled) "Re-install / Update Module" else "Activate Priv-App Module",
+                                                text = if (isInstalling) "Configuring Module..." else if (isModuleInstalled) "Re-install Module" else "Activate Priv-App Module",
                                                 color = monetColors.onPrimary,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                fontSize = 12.5.sp,
                                                 fontFamily = GoogleSans
                                             )
                                         }
@@ -7914,37 +8115,297 @@ fun DialerSettingsSheet(
                                                         Toast.makeText(context, result.second, Toast.LENGTH_SHORT).show()
                                                     }
                                                 },
-                                                shape = RoundedCornerShape(16.dp),
+                                                shape = RoundedCornerShape(14.dp),
                                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = monetColors.onSurfaceVariant),
-                                                modifier = Modifier.fillMaxWidth().height(42.dp)
+                                                modifier = Modifier.fillMaxWidth().height(38.dp)
                                             ) {
                                                 Text("Uninstall Module", fontSize = 12.sp, fontFamily = GoogleSans)
                                             }
                                         }
                                     }
                                 }
+                            }
+                        }
 
-                                SettingsDivider(monetColors = monetColors)
+                        // ==========================================
+                        // GROUP 5: SYSTEM & OTA UPDATES
+                        // ==========================================
+                        SettingsSectionHeader(title = "SYSTEM & OTA UPDATES", monetColors = monetColors)
+                        SettingsGroupCard(monetColors = monetColors) {
+                            // Row 1: Check for Updates
+                            SettingsItemRow(
+                                icon = Icons.Rounded.SystemUpdate,
+                                iconTint = monetColors.primary,
+                                iconBgColor = monetColors.primary.copy(alpha = 0.16f),
+                                title = "Check for Updates",
+                                subtitle = when (val status = otaCheckStatus) {
+                                    is UpdateCheckStatus.Checking -> "Checking for updates online..."
+                                    is UpdateCheckStatus.UpdateAvailable -> "Update available: ${status.info.versionName} • Tap to view & install"
+                                    is UpdateCheckStatus.UpToDate -> "Resonix is up to date • v$currentVersionName"
+                                    is UpdateCheckStatus.Error -> "Check failed (${status.message}) • Tap to retry"
+                                    UpdateCheckStatus.Idle -> "Resonix v$currentVersionName (Build $currentVersionCode) • Tap to check"
+                                },
+                                monetColors = monetColors,
+                                modifier = Modifier.clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    if (otaCheckStatus is UpdateCheckStatus.UpdateAvailable) {
+                                        showUpdateDialog = true
+                                    } else {
+                                        coroutineScope.launch {
+                                            val res = OtaUpdateManager.checkForUpdates(context)
+                                            when (res) {
+                                                is UpdateCheckStatus.UpdateAvailable -> {
+                                                    showUpdateDialog = true
+                                                }
+                                                is UpdateCheckStatus.UpToDate -> {
+                                                    Toast.makeText(context, "Resonix is up to date (v$currentVersionName)", Toast.LENGTH_SHORT).show()
+                                                }
+                                                is UpdateCheckStatus.Error -> {
+                                                    Toast.makeText(context, "Update check failed: ${res.message}", Toast.LENGTH_LONG).show()
+                                                }
+                                                else -> {}
+                                            }
+                                        }
+                                    }
+                                },
+                                trailingContent = {
+                                    when (otaCheckStatus) {
+                                        is UpdateCheckStatus.Checking -> {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(20.dp),
+                                                strokeWidth = 2.2.dp,
+                                                color = monetColors.primary
+                                            )
+                                        }
+                                        is UpdateCheckStatus.UpdateAvailable -> {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(10.dp))
+                                                    .background(monetColors.primary)
+                                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                                            ) {
+                                                Text(
+                                                    text = "UPDATE",
+                                                    color = monetColors.onPrimary,
+                                                    fontSize = 10.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontFamily = GoogleSans
+                                                )
+                                            }
+                                        }
+                                        is UpdateCheckStatus.UpToDate -> {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(10.dp))
+                                                    .background(Color(0xFF81C995).copy(alpha = 0.18f))
+                                                    .padding(horizontal = 9.dp, vertical = 5.dp)
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Rounded.Check,
+                                                        contentDescription = null,
+                                                        tint = Color(0xFF81C995),
+                                                        modifier = Modifier.size(13.dp)
+                                                    )
+                                                    Text(
+                                                        text = "LATEST",
+                                                        color = Color(0xFF81C995),
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontFamily = GoogleSans
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        else -> {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(12.dp))
+                                                    .background(monetColors.surfaceVariant.copy(alpha = 0.7f))
+                                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "Check",
+                                                        color = monetColors.onSurface,
+                                                        fontSize = 11.5.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        fontFamily = GoogleSans
+                                                    )
+                                                    Icon(
+                                                        imageVector = Icons.Rounded.Refresh,
+                                                        contentDescription = null,
+                                                        tint = monetColors.onSurfaceVariant,
+                                                        modifier = Modifier.size(13.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            )
+                        }
 
+                        // ==========================================
+                        // GROUP 6: ABOUT DEVELOPER
+                        // ==========================================
+                        SettingsSectionHeader(title = "ABOUT DEVELOPER", monetColors = monetColors)
+                        SettingsGroupCard(monetColors = monetColors) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                // Developer Profile Row
                                 Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                                    verticalAlignment = Alignment.Top,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Info,
-                                        contentDescription = null,
-                                        tint = monetColors.onSurfaceVariant.copy(alpha = 0.7f),
-                                        modifier = Modifier.size(16.dp).padding(top = 1.dp)
+                                    // Spiderman/Developer Avatar with glowing Monet border
+                                    Box(
+                                        modifier = Modifier
+                                            .size(58.dp)
+                                            .shadow(
+                                                elevation = 8.dp,
+                                                shape = CircleShape,
+                                                spotColor = monetColors.primary.copy(alpha = 0.5f)
+                                            )
+                                            .clip(CircleShape)
+                                            .border(
+                                                width = 2.dp,
+                                                brush = Brush.linearGradient(
+                                                    listOf(monetColors.primary, monetColors.tertiary)
+                                                ),
+                                                shape = CircleShape
+                                            )
+                                    ) {
+                                        Image(
+                                            painter = painterResource(id = com.callscreener.app.R.drawable.developer_avatar),
+                                            contentDescription = "Developer Profile",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
+
+                                    Column(
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(
+                                                text = "hunterdp11",
+                                                fontSize = 17.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White,
+                                                fontFamily = GoogleSans
+                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(monetColors.primary.copy(alpha = 0.22f))
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = "AUTHOR",
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = monetColors.primary,
+                                                    letterSpacing = 0.6.sp
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "Developer & Open-Source Maintainer",
+                                            fontSize = 12.sp,
+                                            color = monetColors.onSurfaceVariant,
+                                            fontFamily = GoogleSans
+                                        )
+                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Text(
+                                            text = "Building clean, high-performance Android tools for everyone.",
+                                            fontSize = 11.5.sp,
+                                            color = monetColors.onSurfaceVariant.copy(alpha = 0.8f),
+                                            fontFamily = GoogleSans
+                                        )
+                                    }
+                                }
+
+                                // Interactive Quick Links (GitHub, Telegram, Gmail)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    // GitHub
+                                    DeveloperSocialPill(
+                                        iconRes = com.callscreener.app.R.drawable.ic_github,
+                                        label = "GitHub",
+                                        containerColor = Color(0xFF24292E).copy(alpha = 0.7f),
+                                        borderColor = Color(0x33FFFFFF),
+                                        modifier = Modifier.weight(1f),
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            try {
+                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/hunterdp11"))
+                                                context.startActivity(intent)
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "Unable to open link", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
                                     )
-                                    Text(
-                                        text = "Android security isolates cellular voice channels from user apps. System priv-app installation mounts Call Screener into /system/priv-app with CAPTURE_AUDIO_OUTPUT permissions, bypassing loudspeaker audio loopback.",
-                                        color = monetColors.onSurfaceVariant.copy(alpha = 0.7f),
-                                        fontSize = 11.5.sp,
-                                        lineHeight = 15.sp,
-                                        fontFamily = GoogleSans
+
+                                    // Telegram
+                                    DeveloperSocialPill(
+                                        iconRes = com.callscreener.app.R.drawable.ic_telegram,
+                                        label = "Telegram",
+                                        containerColor = Color(0xFF2AABEE).copy(alpha = 0.16f),
+                                        borderColor = Color(0xFF2AABEE).copy(alpha = 0.45f),
+                                        modifier = Modifier.weight(1f),
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            try {
+                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/Dp_Xarma"))
+                                                context.startActivity(intent)
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "Unable to open Telegram", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    )
+
+                                    // Gmail
+                                    DeveloperSocialPill(
+                                        iconRes = com.callscreener.app.R.drawable.ic_gmail,
+                                        label = "Email",
+                                        containerColor = Color(0xFFEA4335).copy(alpha = 0.12f),
+                                        borderColor = Color(0xFFEA4335).copy(alpha = 0.35f),
+                                        modifier = Modifier.weight(1f),
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            try {
+                                                val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                                    data = Uri.parse("mailto:dpsarma83@gmail.com")
+                                                    putExtra(Intent.EXTRA_SUBJECT, "CallScreener Inquiry")
+                                                }
+                                                context.startActivity(intent)
+                                            } catch (e: Exception) {
+                                                try {
+                                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("mailto:dpsarma83@gmail.com"))
+                                                    context.startActivity(intent)
+                                                } catch (e2: Exception) {
+                                                    Toast.makeText(context, "dpsarma83@gmail.com", Toast.LENGTH_LONG).show()
+                                                }
+                                            }
+                                        }
                                     )
                                 }
                             }
@@ -7959,12 +8420,16 @@ fun DialerSettingsSheet(
         val jammerEngine = remember { com.callscreener.app.engine.SpeechJammerEngine.getInstance(context) }
         SpeechJammerDialog(
             engine = jammerEngine,
+            monetColors = monetColors,
             onDismiss = { showSpeechJammerDialog = false }
         )
     }
 
     if (showRecordingsDialog) {
-        SavedRecordingsDialog(onDismiss = { showRecordingsDialog = false })
+        SavedRecordingsDialog(
+            onDismiss = { showRecordingsDialog = false },
+            monetColors = monetColors
+        )
     }
 
     if (showCallStatsScreen) {
@@ -7974,6 +8439,47 @@ fun DialerSettingsSheet(
             onDismiss = { showCallStatsScreen = false },
             onCall = { number ->
                 DialerRepository.placeCall(context, number)
+            }
+        )
+    }
+
+    if (showBlockedNumbersScreen) {
+        PixelBlockedNumbersScreen(
+            onDismiss = { showBlockedNumbersScreen = false },
+            monetColors = monetColors
+        )
+    }
+
+    if (showUpdateDialog && otaCheckStatus is UpdateCheckStatus.UpdateAvailable) {
+        val info = (otaCheckStatus as UpdateCheckStatus.UpdateAvailable).info
+        PixelExpressiveUpdateDialog(
+            updateInfo = info,
+            downloadStatus = otaDownloadStatus,
+            monetColors = monetColors,
+            onDismiss = { showUpdateDialog = false },
+            onStartDownload = {
+                coroutineScope.launch {
+                    val res = OtaUpdateManager.downloadUpdate(context, info)
+                    if (res.isFailure) {
+                        Toast.makeText(context, "Download failed: ${res.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            },
+            onInstallStandard = { file ->
+                val res = OtaUpdateManager.installUpdateStandard(context, file)
+                if (res.isFailure) {
+                    Toast.makeText(context, res.exceptionOrNull()?.message ?: "Install failed", Toast.LENGTH_LONG).show()
+                }
+            },
+            onInstallRoot = { file ->
+                coroutineScope.launch {
+                    val res = OtaUpdateManager.installUpdateRoot(context, file)
+                    if (res.isSuccess) {
+                        Toast.makeText(context, res.getOrNull(), Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(context, res.exceptionOrNull()?.message ?: "Root install failed", Toast.LENGTH_LONG).show()
+                    }
+                }
             }
         )
     }
@@ -8040,64 +8546,9 @@ fun CallStatsScreen(
         }
     }
 
-    Dialog(
-        onDismissRequest = { animateDismiss() },
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
-        )
-    ) {
-        val view = LocalView.current
-        SideEffect {
-            var parent: Any? = view.parent
-            var dialogWindow: android.view.Window? = null
-            while (parent != null) {
-                if (parent is DialogWindowProvider) {
-                    dialogWindow = parent.window
-                    break
-                }
-                parent = (parent as? android.view.View)?.parent
-            }
-            if (dialogWindow == null) {
-                dialogWindow = (view.rootView.parent as? DialogWindowProvider)?.window
-            }
-
-            dialogWindow?.let { win ->
-                win.setDimAmount(0f)
-                win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-                win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
-                win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION)
-                win.addFlags(android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
-                win.setLayout(
-                    android.view.WindowManager.LayoutParams.MATCH_PARENT,
-                    android.view.WindowManager.LayoutParams.MATCH_PARENT
-                )
-                win.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
-                WindowCompat.setDecorFitsSystemWindows(win, false)
-                win.statusBarColor = android.graphics.Color.TRANSPARENT
-                win.navigationBarColor = android.graphics.Color.TRANSPARENT
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    win.isNavigationBarContrastEnforced = false
-                    win.isStatusBarContrastEnforced = false
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    win.attributes = win.attributes.apply {
-                        layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-                    }
-                }
-                val insets = WindowCompat.getInsetsController(win, win.decorView)
-                insets.isAppearanceLightStatusBars = false
-                insets.isAppearanceLightNavigationBars = false
-                win.decorView.fitsSystemWindows = false
-                (win.decorView as? android.view.ViewGroup)?.clipToPadding = false
-            }
-            (view.parent as? android.view.View)?.fitsSystemWindows = false
-            (view as? android.view.View)?.fitsSystemWindows = false
-        }
-
-        BackHandler(enabled = isVisible) {
-            animateDismiss()
-        }
+    BackHandler(enabled = isVisible) {
+        animateDismiss()
+    }
 
         var selectedDateRange by remember { mutableStateOf(StatsDateRange.ALL_TIME) }
         var selectedCallType by remember { mutableStateOf(StatsCallType.ALL) }
@@ -8200,84 +8651,82 @@ fun CallStatsScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(monetColors.background)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {} // Intercept touches
             ) {
                 Column(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     // Pixel Expressive Top Bar
-                    Box(
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(monetColors.background)
+                            .statusBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
+                        IconButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                animateDismiss()
+                            },
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .statusBarsPadding()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(monetColors.surfaceContainerHigh.copy(alpha = 0.8f))
                         ) {
-                            IconButton(
-                                onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    animateDismiss()
-                                },
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(CircleShape)
-                                    .background(monetColors.surfaceVariant.copy(alpha = 0.6f))
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                    contentDescription = "Back",
-                                    tint = monetColors.onSurface,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
-
-                            Text(
-                                text = "Call statistics",
-                                style = androidx.compose.ui.text.TextStyle(
-                                    fontSize = 22.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = GoogleSans,
-                                    color = monetColors.onSurface
-                                ),
-                                modifier = Modifier
-                                    .padding(start = 16.dp)
-                                    .weight(1f)
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = "Back",
+                                tint = monetColors.onSurface,
+                                modifier = Modifier.size(20.dp)
                             )
+                        }
 
-                            if (selectedDateRange != StatsDateRange.ALL_TIME || selectedCallType != StatsCallType.ALL) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(CircleShape)
-                                        .background(monetColors.primaryContainer.copy(alpha = 0.6f))
-                                        .clickable {
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            selectedDateRange = StatsDateRange.ALL_TIME
-                                            selectedCallType = StatsCallType.ALL
-                                        }
-                                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Close,
-                                            contentDescription = "Reset filter",
-                                            tint = monetColors.onPrimaryContainer,
-                                            modifier = Modifier.size(13.dp)
-                                        )
-                                        Text(
-                                            text = "Reset",
-                                            color = monetColors.onPrimaryContainer,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontFamily = GoogleSans
-                                        )
+                        Text(
+                            text = "Call statistics",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = GoogleSans,
+                            letterSpacing = (-0.3).sp,
+                            color = monetColors.onSurface,
+                            modifier = Modifier
+                                .padding(start = 14.dp)
+                                .weight(1f)
+                        )
+
+                        if (selectedDateRange != StatsDateRange.ALL_TIME || selectedCallType != StatsCallType.ALL) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(monetColors.primaryContainer.copy(alpha = 0.7f))
+                                    .border(0.8.dp, monetColors.primary.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+                                    .clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        selectedDateRange = StatsDateRange.ALL_TIME
+                                        selectedCallType = StatsCallType.ALL
                                     }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Close,
+                                        contentDescription = "Reset filter",
+                                        tint = monetColors.onPrimaryContainer,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Text(
+                                        text = "Reset",
+                                        color = monetColors.onPrimaryContainer,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontFamily = GoogleSans
+                                    )
                                 }
                             }
                         }
@@ -8358,7 +8807,7 @@ fun CallStatsScreen(
                                     Box(
                                         modifier = Modifier
                                             .clip(CircleShape)
-                                            .background(monetColors.surfaceVariant)
+                                            .background(monetColors.surfaceContainerHigh)
                                             .padding(horizontal = 8.dp, vertical = 2.dp)
                                     ) {
                                         Text(
@@ -8380,7 +8829,8 @@ fun CallStatsScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(24.dp))
-                                        .background(monetColors.surfaceVariant.copy(alpha = 0.35f))
+                                        .background(monetColors.surfaceContainer.copy(alpha = 0.5f))
+                                        .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.2f), RoundedCornerShape(24.dp))
                                         .padding(32.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -8388,12 +8838,13 @@ fun CallStatsScreen(
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         verticalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Schedule,
+                                        Image(
+                                            painter = painterResource(id = com.callscreener.app.R.drawable.oneplus_empty_call_log_illustration),
                                             contentDescription = null,
-                                            tint = monetColors.onSurfaceVariant.copy(alpha = 0.5f),
-                                            modifier = Modifier.size(40.dp)
+                                            modifier = Modifier.size(130.dp),
+                                            contentScale = ContentScale.Fit
                                         )
+                                        Spacer(modifier = Modifier.height(4.dp))
                                         Text(
                                             text = "No calls found",
                                             fontFamily = GoogleSans,
@@ -8435,7 +8886,6 @@ fun CallStatsScreen(
                 }
             }
         }
-    }
 }
 
 /**
@@ -8462,9 +8912,18 @@ fun <T> StatsChoiceRow(
             val isSelected = item == selectedItem
             Box(
                 modifier = Modifier
-                    .height(38.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(if (isSelected) monetColors.primaryContainer else monetColors.surfaceVariant.copy(alpha = 0.45f))
+                    .height(36.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(
+                        if (isSelected) monetColors.primaryContainer
+                        else monetColors.surfaceContainerHigh.copy(alpha = 0.5f)
+                    )
+                    .border(
+                        width = 0.8.dp,
+                        color = if (isSelected) monetColors.primary.copy(alpha = 0.35f)
+                                else monetColors.outlineVariant.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(18.dp)
+                    )
                     .clickable {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onItemSelected(item)
@@ -8474,8 +8933,8 @@ fun <T> StatsChoiceRow(
             ) {
                 Text(
                     text = labelProvider(item),
-                    fontSize = 13.5.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    fontSize = 12.5.sp,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                     color = if (isSelected) monetColors.onPrimaryContainer else monetColors.onSurfaceVariant,
                     fontFamily = GoogleSans
                 )
@@ -8500,37 +8959,143 @@ fun StatsSummaryCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
-            .background(monetColors.primaryContainer.copy(alpha = 0.75f))
-            .padding(22.dp)
+            .clip(RoundedCornerShape(26.dp))
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        monetColors.surfaceContainerHighest,
+                        monetColors.surfaceContainerHigh
+                    )
+                )
+            )
+            .border(
+                0.8.dp,
+                monetColors.outlineVariant.copy(alpha = 0.35f),
+                RoundedCornerShape(26.dp)
+            )
+            .padding(20.dp)
     ) {
         Column(
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "${dateRange.label.uppercase(java.util.Locale.ROOT)} · ${callType.label.uppercase(java.util.Locale.ROOT)}",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp,
-                color = monetColors.onPrimaryContainer.copy(alpha = 0.75f),
-                fontFamily = GoogleSans
-            )
+            // Filter Tag Pill
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(monetColors.primary.copy(alpha = 0.14f))
+                        .padding(horizontal = 9.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "${dateRange.label.uppercase(java.util.Locale.ROOT)} • ${callType.label.uppercase(java.util.Locale.ROOT)}",
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp,
+                        color = monetColors.primary,
+                        fontFamily = GoogleSans
+                    )
+                }
+            }
 
-            Text(
-                text = formatCallDuration(totalDuration),
-                fontSize = 36.sp,
-                lineHeight = 40.sp,
-                fontWeight = FontWeight.Bold,
-                color = monetColors.onPrimaryContainer,
-                fontFamily = GoogleSans
-            )
+            // Hero Duration
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = "Total Call Time",
+                    fontSize = 12.sp,
+                    color = monetColors.onSurfaceVariant,
+                    fontFamily = GoogleSans
+                )
+                Text(
+                    text = formatCallDuration(totalDuration),
+                    fontSize = 38.sp,
+                    lineHeight = 42.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.5).sp,
+                    color = monetColors.onSurface,
+                    fontFamily = GoogleSans
+                )
+            }
 
-            Text(
-                text = "$callCount matching calls • Avg ${formatCallDuration(avgDuration)}",
-                fontSize = 13.5.sp,
-                color = monetColors.onPrimaryContainer.copy(alpha = 0.85f),
-                fontFamily = GoogleSans
-            )
+            // Stat Capsules Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(monetColors.surfaceContainer.copy(alpha = 0.6f))
+                        .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.2f), RoundedCornerShape(14.dp))
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Call,
+                            contentDescription = null,
+                            tint = monetColors.primary,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Column {
+                            Text(
+                                text = "$callCount calls",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = monetColors.onSurface,
+                                fontFamily = GoogleSans
+                            )
+                            Text(
+                                text = "Filtered volume",
+                                fontSize = 10.5.sp,
+                                color = monetColors.onSurfaceVariant,
+                                fontFamily = GoogleSans
+                            )
+                        }
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(monetColors.surfaceContainer.copy(alpha = 0.6f))
+                        .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.2f), RoundedCornerShape(14.dp))
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Schedule,
+                            contentDescription = null,
+                            tint = monetColors.tertiary,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Column {
+                            Text(
+                                text = formatCallDuration(avgDuration),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = monetColors.onSurface,
+                                fontFamily = GoogleSans
+                            )
+                            Text(
+                                text = "Average length",
+                                fontSize = 10.5.sp,
+                                color = monetColors.onSurfaceVariant,
+                                fontFamily = GoogleSans
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -8597,22 +9162,31 @@ fun StatsMetricMiniCard(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(monetColors.surfaceVariant.copy(alpha = 0.45f))
-            .padding(horizontal = 12.dp, vertical = 14.dp)
+            .background(monetColors.surfaceContainer.copy(alpha = 0.7f))
+            .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.22f), RoundedCornerShape(20.dp))
+            .padding(horizontal = 12.dp, vertical = 13.dp)
     ) {
         Column(
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = accentColor,
-                    modifier = Modifier.size(16.dp)
-                )
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(accentColor.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
                 Text(
                     text = title,
                     fontSize = 11.5.sp,
@@ -8625,7 +9199,7 @@ fun StatsMetricMiniCard(
 
             Text(
                 text = "$count",
-                fontSize = 20.sp,
+                fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 color = monetColors.onSurface,
                 fontFamily = GoogleSans
@@ -8633,7 +9207,7 @@ fun StatsMetricMiniCard(
 
             Text(
                 text = duration,
-                fontSize = 11.5.sp,
+                fontSize = 11.sp,
                 color = monetColors.onSurfaceVariant.copy(alpha = 0.8f),
                 fontFamily = GoogleSans,
                 maxLines = 1
@@ -8668,12 +9242,13 @@ fun ContactMetricCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(monetColors.surfaceVariant.copy(alpha = 0.35f))
+            .background(monetColors.surfaceContainer.copy(alpha = 0.65f))
+            .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.22f), RoundedCornerShape(20.dp))
             .clickable {
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onClick()
             }
-            .padding(16.dp)
+            .padding(14.dp)
     ) {
         Column(
             verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -8682,25 +9257,13 @@ fun ContactMetricCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                val initial = remember(contact.name, contact.number) {
-                    val displayName = contact.name.ifBlank { contact.number }
-                    displayName.firstOrNull { it.isLetterOrDigit() }?.uppercaseChar()?.toString() ?: "#"
-                }
-                Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(CircleShape)
-                        .background(monetColors.primaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = initial,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = monetColors.onPrimaryContainer,
-                        fontFamily = GoogleSans
-                    )
-                }
+                ContactAvatar(
+                    name = contact.name.ifBlank { contact.number },
+                    number = contact.number,
+                    size = 42.dp,
+                    shape = RoundedCornerShape(14.dp),
+                    monetColors = monetColors
+                )
 
                 Spacer(modifier = Modifier.width(12.dp))
 
@@ -8728,10 +9291,11 @@ fun ContactMetricCard(
                     }
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(10.dp))
 
                 Column(
-                    horizontalAlignment = Alignment.End
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Text(
                         text = formatCallDuration(contact.totalDuration),
@@ -8740,28 +9304,54 @@ fun ContactMetricCard(
                         color = monetColors.onSurface,
                         fontFamily = GoogleSans
                     )
-                    Text(
-                        text = "${contact.callCount} calls",
-                        fontSize = 11.5.sp,
-                        color = monetColors.onSurfaceVariant,
-                        fontFamily = GoogleSans
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(monetColors.surfaceContainerHighest.copy(alpha = 0.8f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "${contact.callCount} calls",
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = monetColors.onSurfaceVariant,
+                            fontFamily = GoogleSans
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // Quick Call Action Pill
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(monetColors.primary.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Call,
+                        contentDescription = "Call",
+                        tint = monetColors.primary,
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
 
-            // Duration Progress Bar (Google Dialer style)
+            // Duration Progress Bar (Pixel Expressive Rounded Track)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(monetColors.surfaceVariant.copy(alpha = 0.7f))
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(monetColors.surfaceContainerHighest.copy(alpha = 0.6f))
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(progress)
                         .fillMaxHeight()
-                        .clip(RoundedCornerShape(3.dp))
+                        .clip(RoundedCornerShape(2.dp))
                         .background(monetColors.primary)
                 )
             }
@@ -8773,16 +9363,37 @@ fun ContactMetricCard(
  * Saved Call Recordings Manager Dialog with In-App Media Playback & Sharing
  */
 @Composable
-fun SavedRecordingsDialog(onDismiss: () -> Unit) {
+fun SavedRecordingsDialog(
+    onDismiss: () -> Unit,
+    monetColors: ColorScheme = getPixelMonetDarkColorScheme()
+) {
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     val sessionManager = remember { CallSessionManager.getInstance(context) }
     var recordings by remember { mutableStateOf<List<RecordedCallItem>>(emptyList()) }
     var playingId by remember { mutableStateOf<String?>(null) }
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     val scope = rememberCoroutineScope()
+    var isVisible by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
+        isVisible = true
         recordings = sessionManager.recordingEngine.getSavedRecordings()
+    }
+
+    fun animateDismiss() {
+        if (!isVisible) return
+        scope.launch {
+            isVisible = false
+            delay(180)
+            try {
+                mediaPlayer?.stop()
+                mediaPlayer?.release()
+                mediaPlayer = null
+                playingId = null
+            } catch (_: Exception) {}
+            onDismiss()
+        }
     }
 
     DisposableEffect(Unit) {
@@ -8790,148 +9401,232 @@ fun SavedRecordingsDialog(onDismiss: () -> Unit) {
             try {
                 mediaPlayer?.stop()
                 mediaPlayer?.release()
+                mediaPlayer = null
             } catch (_: Exception) {}
         }
     }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
-        )
-    ) {
-        val view = LocalView.current
-        SideEffect {
-            var parent: Any? = view.parent
-            var dialogWindow: android.view.Window? = null
-            while (parent != null) {
-                if (parent is DialogWindowProvider) {
-                    dialogWindow = parent.window
-                    break
-                }
-                parent = (parent as? android.view.View)?.parent
-            }
-            if (dialogWindow == null) {
-                dialogWindow = (view.rootView.parent as? DialogWindowProvider)?.window
-            }
+    BackHandler(enabled = isVisible) {
+        animateDismiss()
+    }
 
-            dialogWindow?.let { win ->
-                win.setDimAmount(0f)
-                win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-                win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
-                win.clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION)
-                win.addFlags(android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
-                win.setLayout(
-                    android.view.WindowManager.LayoutParams.MATCH_PARENT,
-                    android.view.WindowManager.LayoutParams.MATCH_PARENT
-                )
-                win.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
-                WindowCompat.setDecorFitsSystemWindows(win, false)
-                win.statusBarColor = android.graphics.Color.TRANSPARENT
-                win.navigationBarColor = android.graphics.Color.TRANSPARENT
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    win.isNavigationBarContrastEnforced = false
-                    win.isStatusBarContrastEnforced = false
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    win.attributes = win.attributes.apply {
-                        layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-                    }
-                }
-                val insets = WindowCompat.getInsetsController(win, win.decorView)
-                insets.isAppearanceLightStatusBars = false
-                insets.isAppearanceLightNavigationBars = false
-                win.decorView.fitsSystemWindows = false
-                (win.decorView as? android.view.ViewGroup)?.clipToPadding = false
+    val totalDuration = remember(recordings) { recordings.sumOf { it.durationSeconds } }
+        val totalBytes = remember(recordings) { recordings.sumOf { it.file.length() } }
+        val totalSizeFormatted = remember(totalBytes) {
+            when {
+                totalBytes >= 1024 * 1024 -> String.format(Locale.getDefault(), "%.1f MB", totalBytes / (1024f * 1024f))
+                totalBytes >= 1024 -> String.format(Locale.getDefault(), "%.1f KB", totalBytes / 1024f)
+                else -> "$totalBytes B"
             }
-            (view.parent as? android.view.View)?.fitsSystemWindows = false
-            (view as? android.view.View)?.fitsSystemWindows = false
         }
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0x95000000))
-                .clickable { onDismiss() },
-            contentAlignment = Alignment.BottomCenter
+        AnimatedVisibility(
+            visible = isVisible,
+            enter = slideInHorizontally(
+                initialOffsetX = { fullWidth -> fullWidth },
+                animationSpec = spring(
+                    dampingRatio = 0.85f,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            ) + fadeIn(animationSpec = tween(200)),
+            exit = slideOutHorizontally(
+                targetOffsetX = { fullWidth -> fullWidth },
+                animationSpec = tween(180, easing = FastOutLinearInEasing)
+            ) + fadeOut(animationSpec = tween(140))
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .fillMaxSize()
+                    .background(monetColors.background)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
-                    ) {}
-                    .shadow(elevation = 28.dp, shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp), spotColor = Color(0xB5000000))
-                    .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0xFA141824),
-                                Color(0xF50D111A)
-                            )
-                        )
-                    )
-                    .border(
-                        1.2.dp,
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0x60FFFFFF),
-                                Color(0x18FFFFFF)
-                            )
-                        ),
-                        RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
-                    )
+                    ) {} // Intercept touches
             ) {
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 12.dp)
-                        .navigationBarsPadding()
-                        .padding(bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                        .fillMaxSize()
+                        .statusBarsPadding()
                 ) {
-                    // Drag Handle Pill
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .width(42.dp)
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(Color(0x40FFFFFF))
-                    )
-
-                    // Header Row
+                    // Pixel Expressive Top Bar
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
-                            Text(
-                                text = "Call Recordings",
-                                color = TextPrimary,
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = (-0.4).sp
-                            )
-                            Text(
-                                text = "${recordings.size} files recorded • Root Audio HAL",
-                                color = TextSecondary,
-                                fontSize = 12.sp
+                        IconButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                animateDismiss()
+                            },
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(monetColors.surfaceContainerHigh)
+                                .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.35f), CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = "Back",
+                                tint = monetColors.onSurface,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
-                        IconButton(
-                            onClick = onDismiss,
+                        Spacer(modifier = Modifier.width(14.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Saved Recordings",
+                                color = monetColors.onSurface,
+                                fontSize = 21.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = GoogleSans,
+                                letterSpacing = (-0.3).sp
+                            )
+                            Text(
+                                text = "${recordings.size} files recorded • Root Audio HAL",
+                                color = monetColors.onSurfaceVariant,
+                                fontSize = 12.sp,
+                                fontFamily = GoogleSans
+                            )
+                        }
+
+                        if (recordings.isNotEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(monetColors.primaryContainer.copy(alpha = 0.65f))
+                                    .border(0.8.dp, monetColors.primary.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                            ) {
+                                Text(
+                                    text = totalSizeFormatted,
+                                    color = monetColors.onPrimaryContainer,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
+                    }
+
+                    if (recordings.isNotEmpty()) {
+                        // Quick Metric Overview Pills
+                        Row(
                             modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Color(0x1AFFFFFF))
-                                .border(0.8.dp, Color(0x30FFFFFF), CircleShape)
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(Icons.Rounded.Close, contentDescription = "Close", tint = Color.White, modifier = Modifier.size(18.dp))
+                            // Pill 1: Total Files
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(monetColors.surfaceContainerHigh)
+                                    .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.30f), RoundedCornerShape(14.dp))
+                                    .padding(vertical = 8.dp, horizontal = 10.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Mic,
+                                        contentDescription = null,
+                                        tint = monetColors.primary,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Column {
+                                        Text(
+                                            text = "${recordings.size}",
+                                            color = monetColors.onSurface,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = GoogleSans
+                                        )
+                                        Text(
+                                            text = "Recordings",
+                                            color = monetColors.onSurfaceVariant,
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Pill 2: Total Duration
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(monetColors.surfaceContainerHigh)
+                                    .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.30f), RoundedCornerShape(14.dp))
+                                    .padding(vertical = 8.dp, horizontal = 10.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Schedule,
+                                        contentDescription = null,
+                                        tint = monetColors.tertiary,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Column {
+                                        Text(
+                                            text = formatDuration(totalDuration),
+                                            color = monetColors.onSurface,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                        Text(
+                                            text = "Total Time",
+                                            color = monetColors.onSurfaceVariant,
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Pill 3: Audio Format
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(monetColors.surfaceContainerHigh)
+                                    .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.30f), RoundedCornerShape(14.dp))
+                                    .padding(vertical = 8.dp, horizontal = 10.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.GraphicEq,
+                                        contentDescription = null,
+                                        tint = Color(0xFF2EAA55),
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Column {
+                                        Text(
+                                            text = "WAV",
+                                            color = monetColors.onSurface,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = GoogleSans
+                                        )
+                                        Text(
+                                            text = "Uncompressed",
+                                            color = monetColors.onSurfaceVariant,
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -8939,202 +9634,298 @@ fun SavedRecordingsDialog(onDismiss: () -> Unit) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(160.dp),
+                                .weight(1f),
                             contentAlignment = Alignment.Center
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Filled.Mic, contentDescription = null, tint = TextMuted, modifier = Modifier.size(32.dp))
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text("No Call Recordings Yet", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                                Text("Recorded calls will appear here in uncompressed WAV", color = TextTertiary, fontSize = 12.sp)
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.padding(32.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(80.dp)
+                                        .clip(CircleShape)
+                                        .background(monetColors.surfaceContainerHighest)
+                                        .border(1.dp, monetColors.outlineVariant.copy(alpha = 0.35f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Mic,
+                                        contentDescription = null,
+                                        tint = monetColors.primary,
+                                        modifier = Modifier.size(36.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(18.dp))
+                                Text(
+                                    text = "No Call Recordings Yet",
+                                    color = monetColors.onSurface,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontFamily = GoogleSans
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "Calls recorded with auto-record or the in-call Record button will be saved here in uncompressed 16-bit WAV.",
+                                    color = monetColors.onSurfaceVariant,
+                                    fontSize = 13.sp,
+                                    textAlign = TextAlign.Center,
+                                    fontFamily = GoogleSans,
+                                    lineHeight = 18.sp
+                                )
                             }
                         }
                     } else {
                         LazyColumn(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 420.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                                .weight(1f),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 48.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             itemsIndexed(recordings, key = { index, item -> "rec_${item.id}_$index" }) { _, item ->
                                 val isPlaying = playingId == item.id
                                 val formattedDate = remember(item.timestamp) {
-                                    SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()).format(Date(item.timestamp))
+                                    SimpleDateFormat("MMM d, yyyy • h:mm a", Locale.getDefault()).format(Date(item.timestamp))
                                 }
+                                val contactName = remember(item.callerNumber) {
+                                    DialerRepository.lookupContactName(context, item.callerNumber)
+                                }
+                                val formattedNumber = remember(item.callerNumber) {
+                                    DialerRepository.formatPhoneNumber(item.callerNumber)
+                                }
+                                val displayTitle = if (!contactName.isNullOrBlank()) contactName else formattedNumber
 
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clip(RoundedCornerShape(18.dp))
-                                        .background(if (isPlaying) AppleRed.copy(alpha = 0.15f) else Color(0x14FFFFFF))
-                                        .border(
-                                            1.dp,
-                                            if (isPlaying) Brush.verticalGradient(listOf(AppleRed, AppleRed.copy(alpha = 0.4f)))
-                                            else LiquidGlassBorderSubtle,
-                                            RoundedCornerShape(18.dp)
+                                        .shadow(
+                                            elevation = if (isPlaying) 6.dp else 2.dp,
+                                            shape = RoundedCornerShape(22.dp),
+                                            spotColor = if (isPlaying) monetColors.primary.copy(alpha = 0.25f) else Color.Transparent
                                         )
-                                        .padding(horizontal = 14.dp, vertical = 12.dp)
+                                        .clip(RoundedCornerShape(22.dp))
+                                        .background(
+                                            if (isPlaying) monetColors.primaryContainer.copy(alpha = 0.32f)
+                                            else monetColors.surfaceContainerHigh
+                                        )
+                                        .border(
+                                            width = if (isPlaying) 1.5.dp else 0.8.dp,
+                                            color = if (isPlaying) monetColors.primary.copy(alpha = 0.70f)
+                                            else monetColors.outlineVariant.copy(alpha = 0.35f),
+                                            shape = RoundedCornerShape(22.dp)
+                                        )
+                                        .padding(16.dp)
                                 ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically
+                                    Column(
+                                        verticalArrangement = Arrangement.spacedBy(12.dp)
                                     ) {
-                                        // Play / Pause Circle with Liquid Sheen
-                                        Box(
-                                            modifier = Modifier
-                                                .size(42.dp)
-                                                .shadow(
-                                                    elevation = if (isPlaying) 8.dp else 3.dp,
-                                                    shape = CircleShape,
-                                                    spotColor = if (isPlaying) AppleRed else Color.Black
-                                                )
-                                                .clip(CircleShape)
-                                                .background(
-                                                    if (isPlaying) {
-                                                        Brush.verticalGradient(
-                                                            listOf(
-                                                                AppleRed,
-                                                                Color(0xFFD70015)
-                                                            )
-                                                        )
-                                                    } else {
-                                                        Brush.verticalGradient(
-                                                            listOf(
-                                                                Color(0x38FFFFFF),
-                                                                Color(0x18FFFFFF)
-                                                            )
-                                                        )
-                                                    }
-                                                )
-                                                .border(
-                                                    1.dp,
-                                                    if (isPlaying) Color.White.copy(alpha = 0.5f) else Color(0x40FFFFFF),
-                                                    CircleShape
-                                                )
-                                                .clickable {
-                                                    if (isPlaying) {
-                                                        try {
-                                                            mediaPlayer?.pause()
-                                                            playingId = null
-                                                        } catch (_: Exception) {}
-                                                    } else {
-                                                        try {
-                                                            mediaPlayer?.release()
-                                                            mediaPlayer = MediaPlayer().apply {
-                                                                setDataSource(item.file.absolutePath)
-                                                                prepare()
-                                                                start()
-                                                                setOnCompletionListener {
-                                                                    playingId = null
-                                                                }
-                                                            }
-                                                            playingId = item.id
-                                                        } catch (e: Exception) {
-                                                            Toast.makeText(context, "Cannot play recording", Toast.LENGTH_SHORT).show()
-                                                        }
-                                                    }
-                                                },
-                                            contentAlignment = Alignment.Center
+                                        // Header Row: Avatar, Name/Number, Timestamp
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Icon(
-                                                imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                                contentDescription = if (isPlaying) "Pause" else "Play",
-                                                tint = Color.White,
-                                                modifier = Modifier.size(22.dp)
-                                            )
-                                        }
-
-                                        Spacer(modifier = Modifier.width(12.dp))
-
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = DialerRepository.formatPhoneNumber(item.callerNumber),
-                                                color = TextPrimary,
-                                                fontSize = 15.sp,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                            Spacer(modifier = Modifier.height(3.dp))
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            // Avatar Disc
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(42.dp)
+                                                    .clip(CircleShape)
+                                                    .background(
+                                                        if (isPlaying) monetColors.primary.copy(alpha = 0.25f)
+                                                        else monetColors.surfaceContainerHighest
+                                                    ),
+                                                contentAlignment = Alignment.Center
                                             ) {
-                                                Text(
-                                                    text = formattedDate,
-                                                    color = TextSecondary,
-                                                    fontSize = 11.sp
+                                                Icon(
+                                                    imageVector = if (isPlaying) Icons.Rounded.GraphicEq else Icons.Rounded.Person,
+                                                    contentDescription = null,
+                                                    tint = if (isPlaying) monetColors.primary else monetColors.onSurfaceVariant,
+                                                    modifier = Modifier.size(20.dp)
                                                 )
-                                                Box(
-                                                    modifier = Modifier
-                                                        .clip(RoundedCornerShape(6.dp))
-                                                        .background(if (isPlaying) AppleRed.copy(alpha = 0.25f) else AppleTeal.copy(alpha = 0.2f))
-                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                                ) {
+                                            }
+
+                                            Spacer(modifier = Modifier.width(12.dp))
+
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = displayTitle,
+                                                    color = monetColors.onSurface,
+                                                    fontSize = 15.5.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    fontFamily = GoogleSans,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                if (!contactName.isNullOrBlank() && contactName != formattedNumber) {
                                                     Text(
-                                                        text = formatDuration(item.durationSeconds),
-                                                        color = if (isPlaying) AppleRed else AppleTeal,
-                                                        fontSize = 10.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        fontFamily = FontFamily.Monospace
+                                                        text = formattedNumber,
+                                                        color = monetColors.onSurfaceVariant,
+                                                        fontSize = 12.sp,
+                                                        fontFamily = GoogleSans
                                                     )
                                                 }
                                                 Text(
-                                                    text = item.fileSizeFormatted,
-                                                    color = TextTertiary,
-                                                    fontSize = 10.sp
+                                                    text = formattedDate,
+                                                    color = monetColors.onSurfaceVariant.copy(alpha = 0.80f),
+                                                    fontSize = 11.5.sp,
+                                                    fontFamily = GoogleSans
                                                 )
                                             }
                                         }
 
-                                        // Share Button
-                                        IconButton(
-                                            onClick = {
-                                                try {
-                                                    val uri = FileProvider.getUriForFile(
-                                                        context,
-                                                        "${context.packageName}.fileprovider",
-                                                        item.file
+                                        // Badges & Action Bar
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            // Duration & Size Badges
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(
+                                                            if (isPlaying) monetColors.primary.copy(alpha = 0.20f)
+                                                            else monetColors.surfaceContainerHighest
+                                                        )
+                                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                ) {
+                                                    Text(
+                                                        text = formatDuration(item.durationSeconds),
+                                                        color = if (isPlaying) monetColors.primary else monetColors.onSurface,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontFamily = FontFamily.Monospace
                                                     )
-                                                    val intent = Intent(Intent.ACTION_SEND).apply {
-                                                        type = "audio/wav"
-                                                        putExtra(Intent.EXTRA_STREAM, uri)
-                                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                    }
-                                                    context.startActivity(Intent.createChooser(intent, "Share Call Recording"))
-                                                } catch (e: Exception) {
-                                                    Toast.makeText(context, "Error sharing recording: ${e.message}", Toast.LENGTH_SHORT).show()
                                                 }
-                                            },
-                                            modifier = Modifier
-                                                .size(36.dp)
-                                                .clip(CircleShape)
-                                                .background(Color(0x18FFFFFF))
-                                                .border(0.8.dp, Color(0x30FFFFFF), CircleShape)
-                                        ) {
-                                            Icon(Icons.Filled.Share, contentDescription = "Share", tint = AppleTeal, modifier = Modifier.size(16.dp))
-                                        }
 
-                                        Spacer(modifier = Modifier.width(6.dp))
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(monetColors.surfaceContainerHighest)
+                                                        .padding(horizontal = 7.dp, vertical = 3.dp)
+                                                ) {
+                                                    Text(
+                                                        text = item.fileSizeFormatted,
+                                                        color = monetColors.onSurfaceVariant,
+                                                        fontSize = 10.5.sp,
+                                                        fontFamily = GoogleSans
+                                                    )
+                                                }
+                                            }
 
-                                        // Delete Button
-                                        IconButton(
-                                            onClick = {
-                                                if (isPlaying) {
-                                                    try { mediaPlayer?.stop() } catch (_: Exception) {}
-                                                    playingId = null
+                                            // Media & Share/Delete Action Buttons
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                // Play / Pause Circle
+                                                IconButton(
+                                                    onClick = {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                        if (isPlaying) {
+                                                            try {
+                                                                mediaPlayer?.pause()
+                                                                playingId = null
+                                                            } catch (_: Exception) {}
+                                                        } else {
+                                                            try {
+                                                                mediaPlayer?.release()
+                                                                mediaPlayer = MediaPlayer().apply {
+                                                                    setDataSource(item.file.absolutePath)
+                                                                    prepare()
+                                                                    start()
+                                                                    setOnCompletionListener {
+                                                                        playingId = null
+                                                                    }
+                                                                }
+                                                                playingId = item.id
+                                                            } catch (e: Exception) {
+                                                                Toast.makeText(context, "Cannot play recording", Toast.LENGTH_SHORT).show()
+                                                            }
+                                                        }
+                                                    },
+                                                    modifier = Modifier
+                                                        .size(38.dp)
+                                                        .clip(CircleShape)
+                                                        .background(
+                                                            if (isPlaying) monetColors.primary
+                                                            else monetColors.surfaceContainerHighest
+                                                        )
+                                                ) {
+                                                    Icon(
+                                                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                                        contentDescription = if (isPlaying) "Pause" else "Play",
+                                                        tint = if (isPlaying) monetColors.onPrimary else monetColors.onSurface,
+                                                        modifier = Modifier.size(19.dp)
+                                                    )
                                                 }
-                                                scope.launch {
-                                                    sessionManager.recordingEngine.deleteRecording(item.file)
-                                                    recordings = sessionManager.recordingEngine.getSavedRecordings()
+
+                                                // Share Button
+                                                IconButton(
+                                                    onClick = {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                        try {
+                                                            val uri = FileProvider.getUriForFile(
+                                                                context,
+                                                                "${context.packageName}.fileprovider",
+                                                                item.file
+                                                            )
+                                                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                                                type = "audio/wav"
+                                                                putExtra(Intent.EXTRA_STREAM, uri)
+                                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                            }
+                                                            context.startActivity(Intent.createChooser(intent, "Share Call Recording"))
+                                                        } catch (e: Exception) {
+                                                            Toast.makeText(context, "Error sharing recording: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    },
+                                                    modifier = Modifier
+                                                        .size(38.dp)
+                                                        .clip(CircleShape)
+                                                        .background(monetColors.surfaceContainerHighest)
+                                                        .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.35f), CircleShape)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.Share,
+                                                        contentDescription = "Share",
+                                                        tint = monetColors.onSurfaceVariant,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
                                                 }
-                                            },
-                                            modifier = Modifier
-                                                .size(36.dp)
-                                                .clip(CircleShape)
-                                                .background(Color(0x18FFFFFF))
-                                                .border(0.8.dp, AppleRed.copy(alpha = 0.35f), CircleShape)
-                                        ) {
-                                            Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = AppleRed.copy(alpha = 0.9f), modifier = Modifier.size(16.dp))
+
+                                                // Delete Button
+                                                IconButton(
+                                                    onClick = {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                        if (isPlaying) {
+                                                            try { mediaPlayer?.stop() } catch (_: Exception) {}
+                                                            playingId = null
+                                                        }
+                                                        scope.launch {
+                                                            sessionManager.recordingEngine.deleteRecording(item.file)
+                                                            recordings = sessionManager.recordingEngine.getSavedRecordings()
+                                                        }
+                                                    },
+                                                    modifier = Modifier
+                                                        .size(38.dp)
+                                                        .clip(CircleShape)
+                                                        .background(Color(0xFFFF2D55).copy(alpha = 0.12f))
+                                                        .border(0.8.dp, Color(0xFFFF2D55).copy(alpha = 0.35f), CircleShape)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.Delete,
+                                                        contentDescription = "Delete",
+                                                        tint = Color(0xFFFF2D55),
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -9144,7 +9935,6 @@ fun SavedRecordingsDialog(onDismiss: () -> Unit) {
                 }
             }
         }
-    }
 }
 
 /**

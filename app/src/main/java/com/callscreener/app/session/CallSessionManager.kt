@@ -55,6 +55,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
     val presetManager = AudioPresetManager(appContext)
     val quickReplyManager = QuickReplyManager(appContext)
     val speechJammerEngine = com.callscreener.app.engine.SpeechJammerEngine.getInstance(appContext)
+    val proximityManager = com.callscreener.app.telephony.CallProximityManager(appContext)
     private var recordingTimerJob: Job? = null
     private val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
@@ -66,6 +67,13 @@ class CallSessionManager private constructor(private val appContext: Context) {
         scope.launch {
             speechJammerEngine.isJammerActive.collect { active ->
                 _sessionState.update { it.copy(isSpeechJammerActive = active) }
+            }
+        }
+
+        // Observe Speech Jammer Echo User Voice state
+        scope.launch {
+            speechJammerEngine.isEchoUserVoiceFlow.collect { echoUser ->
+                _sessionState.update { it.copy(isEchoUserVoiceEnabled = echoUser) }
             }
         }
 
@@ -295,6 +303,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
      */
     fun playDtmf(digit: Char) {
         try {
+            com.callscreener.app.telephony.CallVibrator.vibrateClick(appContext)
             activeTelecomCall?.playDtmfTone(digit)
             activeTelecomCall?.stopDtmfTone()
         } catch (e: Exception) {
@@ -405,6 +414,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
      * Triggered when the carrier phone call becomes ACTIVE or Simulator initiates audio.
      */
     fun onCallConnected() {
+        com.callscreener.app.telephony.CallVibrator.vibrateCallConnected(appContext)
         scope.launch {
             val isSim = _sessionState.value.isSimulated
             val num = _sessionState.value.callerNumber
@@ -640,21 +650,70 @@ class CallSessionManager private constructor(private val appContext: Context) {
         localMonitorPlayer = null
     }
 
+    fun pauseLocalAudioMonitor() {
+        try {
+            if (localMonitorPlayer?.isPlaying == true) {
+                localMonitorPlayer?.pause()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to pause local audio monitor", e)
+        }
+    }
+
+    fun resumeLocalAudioMonitor() {
+        try {
+            localMonitorPlayer?.start()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to resume local audio monitor", e)
+        }
+    }
+
+    private var customAudioJob: Job? = null
+
     /**
      * Injects an Audio Preset directly into active call or simulator.
      * Uses Root Call Audio Injector for 100% digital playback with ZERO physical mic noise!
      */
     fun playAudioPreset(preset: AudioPreset) {
         val isSim = _sessionState.value.isSimulated
+
+        // Check if user tapped the currently active custom audio preset
+        if (preset.isAudioFile && _sessionState.value.playingAudioPresetId == preset.id) {
+            if (_sessionState.value.isAudioPresetPlaying && !_sessionState.value.isAudioPresetPaused) {
+                // Currently playing: pause it!
+                pauseCustomAudio()
+                return
+            } else if (_sessionState.value.isAudioPresetPaused) {
+                // Currently paused: resume it!
+                resumeCustomAudio()
+                return
+            }
+        }
+
+        // Otherwise (tapped a different preset or never paused):
+        // Stop any currently playing/paused audio cleanly so the new one plays instantly without conflict!
+        stopCustomAudio()
+
         addMessage(MessageSender.USER_TTS, "[Preset] ${preset.title}")
 
         if (preset.isAudioFile) {
             val audioFile = File(preset.textOrPath)
             if (audioFile.exists()) {
-                scope.launch {
+                _sessionState.update {
+                    it.copy(
+                        playingAudioPresetId = preset.id,
+                        playingAudioPresetTitle = preset.title,
+                        isAudioPresetPlaying = true,
+                        isAudioPresetPaused = false
+                    )
+                }
+
+                customAudioJob = scope.launch {
                     aiVoiceRelayManager.stopListening()
                     if (isSim) {
-                        presetManager.previewPreset(preset)
+                        presetManager.previewPreset(preset) {
+                            onCustomAudioFinished(preset.id)
+                        }
                     } else {
                         // Play gentle local sidetone monitor so user can hear what is playing at ~20% volume
                         playLocalAudioMonitor(audioFile, volume = 0.20f)
@@ -662,6 +721,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
                         speechManager.injector.injectAudioFile(audioFile) { success ->
                             stopLocalAudioMonitor()
                             Log.i(TAG, "Audio preset injected into call: $success")
+                            onCustomAudioFinished(preset.id)
                             if (_sessionState.value.status == CallStatus.SCREENING_ACTIVE &&
                                 _sessionState.value.audioCallMode == AudioCallMode.AI_TYPE_SPEAK &&
                                 _sessionState.value.isAutoRelayEnabled
@@ -677,6 +737,65 @@ class CallSessionManager private constructor(private val appContext: Context) {
         } else {
             // Text-based preset: synthesize via neural AI voice directly into call stream
             sendUserReply(preset.textOrPath)
+        }
+    }
+
+    fun pauseCustomAudio() {
+        val isSim = _sessionState.value.isSimulated
+        if (isSim) {
+            presetManager.pausePreview()
+        } else {
+            speechManager.injector.pauseInjection()
+            pauseLocalAudioMonitor()
+        }
+        _sessionState.update { it.copy(isAudioPresetPaused = true) }
+        Log.i(TAG, "Custom audio paused: ${_sessionState.value.playingAudioPresetId}")
+    }
+
+    fun resumeCustomAudio() {
+        val isSim = _sessionState.value.isSimulated
+        if (isSim) {
+            presetManager.resumePreview()
+        } else {
+            speechManager.injector.resumeInjection()
+            resumeLocalAudioMonitor()
+        }
+        _sessionState.update { it.copy(isAudioPresetPaused = false, isAudioPresetPlaying = true) }
+        Log.i(TAG, "Custom audio resumed: ${_sessionState.value.playingAudioPresetId}")
+    }
+
+    fun stopCustomAudio() {
+        val isSim = _sessionState.value.isSimulated
+        if (isSim) {
+            presetManager.stopPreview()
+        } else {
+            speechManager.injector.stopInjection()
+            stopLocalAudioMonitor()
+        }
+        customAudioJob?.cancel()
+        customAudioJob = null
+        _sessionState.update {
+            it.copy(
+                playingAudioPresetId = null,
+                playingAudioPresetTitle = null,
+                isAudioPresetPlaying = false,
+                isAudioPresetPaused = false
+            )
+        }
+        Log.i(TAG, "Custom audio stopped")
+    }
+
+    private fun onCustomAudioFinished(presetId: String) {
+        if (_sessionState.value.playingAudioPresetId == presetId) {
+            _sessionState.update {
+                it.copy(
+                    playingAudioPresetId = null,
+                    playingAudioPresetTitle = null,
+                    isAudioPresetPlaying = false,
+                    isAudioPresetPaused = false
+                )
+            }
+            customAudioJob = null
         }
     }
 
@@ -719,6 +838,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
      */
     fun hangUp() {
         com.callscreener.app.telephony.RingtonePlayer.stop(appContext)
+        com.callscreener.app.telephony.CallVibrator.vibrateCallEnded(appContext)
         com.callscreener.app.notification.NotificationHelper.cancelCallNotification(appContext)
         if (_sessionState.value.isIncoming && _sessionState.value.status == CallStatus.RINGING) {
             val num = _sessionState.value.callerNumber
@@ -731,6 +851,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
             stopRecording()
         }
         speechManager.stop()
+        stopCustomAudio()
         speechManager.isSimulatorMode = false
         aiVoiceRelayManager.release()
         stopLocalAudioMonitor()
@@ -749,6 +870,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
 
     fun onCallEnded() {
         com.callscreener.app.telephony.RingtonePlayer.stop(appContext)
+        com.callscreener.app.telephony.CallVibrator.vibrateCallEnded(appContext)
         com.callscreener.app.notification.NotificationHelper.cancelCallNotification(appContext)
         if (_sessionState.value.isIncoming && _sessionState.value.status == CallStatus.RINGING) {
             val num = _sessionState.value.callerNumber
@@ -761,6 +883,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
             stopRecording()
         }
         speechManager.stop()
+        stopCustomAudio()
         speechManager.isSimulatorMode = false
         aiVoiceRelayManager.release()
         stopLocalAudioMonitor()
@@ -822,6 +945,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (on) {
+                    proximityManager.release()
                     val speaker = audioManager.availableCommunicationDevices.firstOrNull {
                         it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
                     }
@@ -836,9 +960,12 @@ class CallSessionManager private constructor(private val appContext: Context) {
                         it.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES
                     }
                     if (btDevice != null) {
+                        proximityManager.release()
                         Log.i(TAG, "Routing audio to connected Bluetooth/Headset device: ${btDevice.productName}")
                         audioManager.setCommunicationDevice(btDevice)
                     } else {
+                        // Handset earpiece route: activate in-call proximity sensor
+                        proximityManager.acquire()
                         val earpiece = audioManager.availableCommunicationDevices.firstOrNull {
                             it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE
                         }
@@ -852,11 +979,16 @@ class CallSessionManager private constructor(private val appContext: Context) {
             } else {
                 @Suppress("DEPRECATION")
                 audioManager.isSpeakerphoneOn = on
-                if (!on) {
+                if (on) {
+                    proximityManager.release()
+                } else {
                     @Suppress("DEPRECATION")
                     if (audioManager.isBluetoothScoAvailableOffCall) {
+                        proximityManager.release()
                         audioManager.startBluetoothSco()
                         audioManager.isBluetoothScoOn = true
+                    } else {
+                        proximityManager.acquire()
                     }
                 }
             }
@@ -871,7 +1003,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
     fun toggleSpeechJammer() {
         if (speechJammerEngine.isJammerActive.value) {
             speechJammerEngine.stopJammer()
-            if (_sessionState.value.audioCallMode == AudioCallMode.AI_TYPE_SPEAK) {
+            if (_sessionState.value.audioCallMode == AudioCallMode.AI_TYPE_SPEAK && !speechJammerEngine.isEchoUserVoiceEnabled) {
                 CallScreeningInCallService.isolateMicForAiRelay(true)
             }
         } else {
@@ -879,12 +1011,49 @@ class CallSessionManager private constructor(private val appContext: Context) {
             audioManager.isMicrophoneMute = false
             CallScreeningInCallService.setCallMute(false)
             CallScreeningInCallService.isolateMicForAiRelay(false)
+            if (speechJammerEngine.isEchoUserVoiceEnabled) {
+                _sessionState.update { it.copy(isMuted = false) }
+            }
             speechJammerEngine.startJammer(forTestLab = false)
+        }
+    }
+
+    /**
+     * Toggles whether the user's microphone audio is also fed into the Echo Chamber.
+     * When enabled, automatically unmasks and enables the microphone (even during screening calls)
+     * and streams user speech as echo reflections to the caller.
+     */
+    fun toggleEchoUserVoice() {
+        val newState = !speechJammerEngine.isEchoUserVoiceEnabled
+        setEchoUserVoice(newState)
+    }
+
+    fun setEchoUserVoice(enabled: Boolean) {
+        speechJammerEngine.setEchoUserVoice(enabled)
+        _sessionState.update { it.copy(isEchoUserVoiceEnabled = enabled) }
+        if (enabled) {
+            // Automatically enable mic so user voice is captured and echoed to caller
+            audioManager.isMicrophoneMute = false
+            CallScreeningInCallService.setCallMute(false)
+            CallScreeningInCallService.isolateMicForAiRelay(false)
+            _sessionState.update { it.copy(isMuted = false) }
+
+            // If Speech Jammer is not active yet, start it so the echo chamber is live
+            if (!speechJammerEngine.isJammerActive.value) {
+                audioManager.mode = AudioManager.MODE_IN_CALL
+                speechJammerEngine.startJammer(forTestLab = false)
+            }
+        } else {
+            // If in AI screening mode, restore mic isolation
+            if (_sessionState.value.audioCallMode == AudioCallMode.AI_TYPE_SPEAK) {
+                CallScreeningInCallService.isolateMicForAiRelay(true)
+            }
         }
     }
 
     private fun resetAudioMode() {
         try {
+            proximityManager.release()
             if (speechJammerEngine.isJammerActive.value) {
                 speechJammerEngine.stopJammer()
             }

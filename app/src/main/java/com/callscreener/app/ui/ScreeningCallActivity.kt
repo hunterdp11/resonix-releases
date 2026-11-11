@@ -62,6 +62,9 @@ class ScreeningCallActivity : ComponentActivity() {
                     state = state,
                     presets = presets,
                     onPlayPreset = { preset -> sessionManager.playAudioPreset(preset) },
+                    onPauseCustomAudio = { sessionManager.pauseCustomAudio() },
+                    onResumeCustomAudio = { sessionManager.resumeCustomAudio() },
+                    onStopCustomAudio = { sessionManager.stopCustomAudio() },
                     onStartScreening = { sessionManager.startScreening() },
                     onAnswerDirectly = { sessionManager.answerCallDirectly() },
                     onSendReply = { replyText -> sessionManager.sendUserReply(replyText) },
@@ -81,6 +84,7 @@ class ScreeningCallActivity : ComponentActivity() {
                     onToggleRecording = { sessionManager.toggleRecording() },
                     onToggleHold = { sessionManager.toggleHold() },
                     onToggleSpeechJammer = { sessionManager.toggleSpeechJammer() },
+                    onToggleEchoUserVoice = { sessionManager.toggleEchoUserVoice() },
                     onDtmfDigit = { digit -> sessionManager.playDtmf(digit) },
                     presetManager = sessionManager.presetManager,
                     quickReplyManager = sessionManager.quickReplyManager
@@ -107,8 +111,7 @@ class ScreeningCallActivity : ComponentActivity() {
             @Suppress("DEPRECATION")
             window.addFlags(
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                        WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-                        WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                        WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
             )
         }
     }

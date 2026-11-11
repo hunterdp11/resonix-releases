@@ -40,5 +40,10 @@ data class CallSessionState(
     val quickReplies: List<QuickReply> = QuickReply.DEFAULT_REPLIES,
     val isSpeechJammerActive: Boolean = false,
     val isSpeechJammerEnabled: Boolean = true,
+    val isEchoUserVoiceEnabled: Boolean = false,
+    val playingAudioPresetId: String? = null,
+    val playingAudioPresetTitle: String? = null,
+    val isAudioPresetPlaying: Boolean = false,
+    val isAudioPresetPaused: Boolean = false,
     val isSimulated: Boolean = false
 )

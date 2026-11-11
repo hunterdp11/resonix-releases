@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ContentProviderOperation
+import android.content.ContentUris
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -166,6 +168,23 @@ object DialerRepository {
             file.writeText(jsonArray.toString())
         } catch (e: Exception) {
             Log.e(TAG, "Error saving contacts to cache", e)
+        }
+    }
+
+    /**
+     * Instantly updates the in-memory and disk cache when a custom contact photo is set or removed.
+     */
+    fun updateCachedContactPhoto(context: Context, number: String, photoPath: String?) {
+        val clean = DIGITS_ONLY_REGEX.replace(number, "")
+        val tail7 = if (clean.length >= 7) clean.takeLast(7) else clean
+        val updated = inMemoryContactsCache?.map { contact ->
+            val cClean = DIGITS_ONLY_REGEX.replace(contact.number, "")
+            val match = (cClean.isNotEmpty() && cClean == clean) ||
+                    (tail7.length >= 7 && cClean.length >= 7 && cClean.takeLast(7) == tail7)
+            if (match) contact.copy(photoUri = photoPath) else contact
+        }
+        if (updated != null) {
+            saveContactsToCache(context, updated)
         }
     }
 
@@ -699,6 +718,86 @@ object DialerRepository {
             Log.e(TAG, "saveNewContact: Error writing to contacts provider", e)
             false
         }
+    }
+
+    /**
+     * Programmatically toggle or set the STARRED / Favorite flag for a contact.
+     * Updates ContactsContract.Contacts directly if WRITE_CONTACTS permission is available,
+     * and always updates inMemoryContactsCache + cached_contacts.json for instant UI reactivity.
+     */
+    suspend fun setContactStarred(context: Context, contactId: Long, phoneNumber: String, starred: Boolean): Boolean = withContext(Dispatchers.IO) {
+        val appContext = context.applicationContext ?: context
+        var providerSuccess = false
+
+        if (ContextCompat.checkSelfPermission(appContext, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+            try {
+                val values = ContentValues().apply {
+                    put(ContactsContract.Contacts.STARRED, if (starred) 1 else 0)
+                }
+
+                // Try 1: By contact ID
+                if (contactId > 0) {
+                    val contactUri = ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, contactId)
+                    val rows = appContext.contentResolver.update(contactUri, values, null, null)
+                    if (rows > 0) {
+                        providerSuccess = true
+                        Log.i(TAG, "setContactStarred: Updated contact $contactId to starred=$starred via ID")
+                    }
+                }
+
+                // Try 2: By phone lookup if ID update didn't affect rows
+                if (!providerSuccess && phoneNumber.isNotBlank()) {
+                    val clean = phoneNumber.trim()
+                    val lookupUri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(clean))
+                    val lookupCursor = appContext.contentResolver.query(
+                        lookupUri,
+                        arrayOf(ContactsContract.PhoneLookup._ID),
+                        null,
+                        null,
+                        null
+                    )
+                    var foundId: Long? = null
+                    lookupCursor?.use { c ->
+                        if (c.moveToFirst()) {
+                            foundId = c.getLong(0)
+                        }
+                    }
+                    if (foundId != null && foundId!! > 0) {
+                        val contactUri = ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, foundId!!)
+                        val rows = appContext.contentResolver.update(contactUri, values, null, null)
+                        if (rows > 0) {
+                            providerSuccess = true
+                            Log.i(TAG, "setContactStarred: Updated contact $foundId to starred=$starred via PhoneLookup")
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "setContactStarred: Error updating contacts provider", e)
+            }
+        } else {
+            Log.w(TAG, "setContactStarred: WRITE_CONTACTS permission not granted, updating local cache only")
+        }
+
+        // Always update in-memory cache and persisted cached_contacts.json for instant zero-lag UI reaction
+        try {
+            val normTarget = PHONE_CLEAN_REGEX.replace(phoneNumber, "")
+            val currentList = inMemoryContactsCache ?: getCachedContacts(appContext)
+            val updatedList = currentList.map { item ->
+                val normItem = PHONE_CLEAN_REGEX.replace(item.number, "")
+                val isMatch = (contactId > 0 && item.id == contactId) ||
+                        (normTarget.isNotEmpty() && (normItem == normTarget || (normTarget.length >= 7 && normItem.endsWith(normTarget.takeLast(7)))))
+                if (isMatch) {
+                    item.copy(isStarred = starred)
+                } else {
+                    item
+                }
+            }
+            saveContactsToCache(appContext, updatedList)
+        } catch (cacheEx: Exception) {
+            Log.e(TAG, "setContactStarred: Error updating memory/disk cache", cacheEx)
+        }
+
+        true
     }
 }
 

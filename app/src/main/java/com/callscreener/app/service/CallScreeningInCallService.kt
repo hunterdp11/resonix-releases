@@ -109,6 +109,7 @@ class CallScreeningInCallService : InCallService() {
                         Log.i(TAG, "Call is now ACTIVE")
                         wasCallAnswered = true
                         RingtonePlayer.stop(applicationContext)
+                        com.callscreener.app.telephony.CallVibrator.vibrateCallConnected(applicationContext)
                         DynamicCallCapsuleManager.dismissCapsule()
                         currentCallerNumber?.let {
                             NotificationHelper.cancelMissedCallNotification(applicationContext, it)
@@ -124,6 +125,7 @@ class CallScreeningInCallService : InCallService() {
                     Call.STATE_DISCONNECTED -> {
                         Log.i(TAG, "Call DISCONNECTED")
                         RingtonePlayer.stop(applicationContext)
+                        com.callscreener.app.telephony.CallVibrator.vibrateCallEnded(applicationContext)
                         DynamicCallCapsuleManager.dismissCapsule()
                         NotificationHelper.cancelCallNotification(applicationContext)
                         if (isCurrentCallIncoming && !wasCallAnswered && !isCurrentCallBlocked) {

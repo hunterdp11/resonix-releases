@@ -139,8 +139,21 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
         get() = prefs.getBoolean("jammer_auto_unknown", false)
         set(value) { prefs.edit().putBoolean("jammer_auto_unknown", value).apply() }
 
+    // Option: Echo user's voice into the call (two-way echo chamber)
+    var isEchoUserVoiceEnabled: Boolean
+        get() = prefs.getBoolean("jammer_echo_user_voice", false)
+        set(value) {
+            prefs.edit().putBoolean("jammer_echo_user_voice", value).apply()
+            _isEchoUserVoiceFlow.value = value
+            Log.i(TAG, "Speech Jammer Echo User Voice set to: $value")
+        }
+
+    private val _isEchoUserVoiceFlow = MutableStateFlow(isEchoUserVoiceEnabled)
+    val isEchoUserVoiceFlow: StateFlow<Boolean> = _isEchoUserVoiceFlow.asStateFlow()
+
     // Audio Pipeline State
     private var audioRecord: AudioRecord? = null
+    private var userMicRecord: AudioRecord? = null
     private var telephonyUplinkTrack: AudioTrack? = null
     private var mediaMixerTrack: AudioTrack? = null
     private var monitorAudioTrack: AudioTrack? = null
@@ -172,6 +185,30 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
     private fun updateDelaySamples(ms: Int) {
         delaySamples = (ms * DSP_SAMPLE_RATE) / 1000
         Log.i(TAG, "Speech Jammer delay calibrated: ${ms}ms ($delaySamples samples @ ${DSP_SAMPLE_RATE}Hz)")
+    }
+
+    /**
+     * Dynamically update Echo User Voice mode (starts/stops mic recording if active).
+     */
+    fun setEchoUserVoice(enabled: Boolean) {
+        isEchoUserVoiceEnabled = enabled
+        if (isRunning && !isTestMode) {
+            if (enabled && userMicRecord == null) {
+                val recordBufSize = max(
+                    AudioRecord.getMinBufferSize(DSP_SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT) * 4,
+                    8192
+                )
+                userMicRecord = createUserMicAudioRecord(recordBufSize)
+                Log.i(TAG, "Dynamically started User Mic capture for Speech Jammer")
+            } else if (!enabled && userMicRecord != null) {
+                try {
+                    userMicRecord?.stop()
+                    userMicRecord?.release()
+                } catch (_: Exception) {}
+                userMicRecord = null
+                Log.i(TAG, "Dynamically stopped User Mic capture for Speech Jammer")
+            }
+        }
     }
 
     /**
@@ -224,6 +261,14 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
             return false
         }
         audioRecord = record
+
+        // Initialize dedicated microphone capture if "Echo My Voice" is active during live call
+        if (!forTestLab && isEchoUserVoiceEnabled) {
+            userMicRecord = createUserMicAudioRecord(recordBufSize)
+            Log.i(TAG, "Initialized User Mic AudioRecord for two-way echo chamber (userMicRecord != null: ${userMicRecord != null})")
+        } else {
+            userMicRecord = null
+        }
 
         // Explicitly disable AcousticEchoCanceler:
         // AEC actively detects 180-240ms delayed auditory feedback & echo reflections
@@ -448,6 +493,14 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
         audioRecord = null
 
         try {
+            userMicRecord?.apply {
+                stop()
+                release()
+            }
+        } catch (_: Exception) {}
+        userMicRecord = null
+
+        try {
             telephonyUplinkTrack?.apply {
                 stop()
                 release()
@@ -505,6 +558,7 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
     private fun runDafDspLoop(record: AudioRecord) {
         val chunkSize = 256 // 16ms chunk size @ 16kHz
         val inShorts = ShortArray(chunkSize)
+        val micShorts = ShortArray(chunkSize)
         val outShorts = ShortArray(chunkSize)
         val inFloats = FloatArray(chunkSize)
         val outFloats = FloatArray(chunkSize)
@@ -535,6 +589,14 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
                 continue
             }
 
+            // Capture local user microphone in parallel if "Echo My Voice" is active
+            val micRec = userMicRecord
+            val micReadCount = if (isEchoUserVoiceEnabled && micRec != null && micRec.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                try {
+                    micRec.read(micShorts, 0, readCount, AudioRecord.READ_NON_BLOCKING)
+                } catch (_: Exception) { 0 }
+            } else 0
+
             val currentMode = mode
             val gain = intensityGain
             val currentDelay = delaySamples
@@ -547,11 +609,13 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
             var chunkMaxAbs = 0.0f
 
             for (i in 0 until readCount) {
-                val rawSample = inShorts[i].toFloat() / 32768.0f
+                val callerSample = inShorts[i].toFloat() / 32768.0f
+                val micSample = if (i < micReadCount) (micShorts[i].toFloat() / 32768.0f) * 1.35f else 0.0f
+                val combined = (callerSample + micSample).coerceIn(-1.0f, 1.0f)
 
                 // 1st-order High-Pass Filter @ ~80 Hz
-                val hpfOut = hpfAlpha * (hpfPrevOut + rawSample - hpfPrevIn)
-                hpfPrevIn = rawSample
+                val hpfOut = hpfAlpha * (hpfPrevOut + combined - hpfPrevIn)
+                hpfPrevIn = combined
                 hpfPrevOut = hpfOut
 
                 // 1st-order Low-Pass Filter @ ~4200 Hz
@@ -740,6 +804,48 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
         return null
     }
 
+    /**
+     * Initializes AudioRecord specifically for the local physical microphone when "Echo My Voice" is enabled.
+     */
+    private fun createUserMicAudioRecord(bufferSize: Int): AudioRecord? {
+        val channelIn = AudioFormat.CHANNEL_IN_MONO
+        val encoding = AudioFormat.ENCODING_PCM_16BIT
+        val micSources = intArrayOf(
+            MediaRecorder.AudioSource.MIC,
+            MediaRecorder.AudioSource.VOICE_COMMUNICATION,
+            MediaRecorder.AudioSource.DEFAULT
+        )
+
+        for (src in micSources) {
+            try {
+                @SuppressLint("MissingPermission")
+                val record = AudioRecord(
+                    src,
+                    DSP_SAMPLE_RATE,
+                    channelIn,
+                    encoding,
+                    bufferSize
+                )
+                if (record.state == AudioRecord.STATE_INITIALIZED) {
+                    try {
+                        if (record.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
+                            record.startRecording()
+                        }
+                        Log.i(TAG, "User Mic AudioRecord initialized & started with source=$src")
+                        return record
+                    } catch (e: Exception) {
+                        Log.w(TAG, "User Mic AudioRecord start failed on source=$src: ${e.message}")
+                    }
+                }
+                record.release()
+            } catch (e: Exception) {
+                Log.w(TAG, "User Mic AudioRecord source=$src failed: ${e.message}")
+            }
+        }
+        Log.w(TAG, "Could not initialize User Mic AudioRecord on any candidate source")
+        return null
+    }
+
     private fun unmaskInCallHardwareMixersSync() {
         try {
             val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
@@ -758,6 +864,10 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
             runBlocking(Dispatchers.IO) {
                 RootPrivilegeManager.executeSuCommand("""
                     # 1. System permissions via root
+                    pm grant com.resonix.app android.permission.CAPTURE_AUDIO_OUTPUT 2>/dev/null || true
+                    pm grant com.resonix.app android.permission.MODIFY_AUDIO_ROUTING 2>/dev/null || true
+                    appops set com.resonix.app RECORD_AUDIO allow 2>/dev/null || true
+                    appops set com.resonix.app CAPTURE_AUDIO_OUTPUT allow 2>/dev/null || true
                     pm grant com.callscreener.app android.permission.CAPTURE_AUDIO_OUTPUT 2>/dev/null || true
                     pm grant com.callscreener.app android.permission.MODIFY_AUDIO_ROUTING 2>/dev/null || true
                     appops set com.callscreener.app RECORD_AUDIO allow 2>/dev/null || true

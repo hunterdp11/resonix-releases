@@ -119,6 +119,7 @@ import androidx.compose.material.icons.rounded.RecordVoiceOver
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material.icons.rounded.Tune
@@ -207,6 +208,9 @@ fun ScreeningCallScreen(
     state: CallSessionState,
     presets: List<AudioPreset> = AudioPreset.DEFAULT_PRESETS,
     onPlayPreset: (AudioPreset) -> Unit = {},
+    onPauseCustomAudio: () -> Unit = {},
+    onResumeCustomAudio: () -> Unit = {},
+    onStopCustomAudio: () -> Unit = {},
     onStartScreening: () -> Unit,
     onAnswerDirectly: () -> Unit = onStartScreening,
     onSendReply: (String) -> Unit,
@@ -223,6 +227,7 @@ fun ScreeningCallScreen(
     onToggleRecording: () -> Unit = {},
     onToggleHold: () -> Unit = {},
     onToggleSpeechJammer: () -> Unit = {},
+    onToggleEchoUserVoice: () -> Unit = {},
     onDtmfDigit: (Char) -> Unit = {},
     presetManager: AudioPresetManager? = null,
     quickReplyManager: QuickReplyManager? = null
@@ -354,6 +359,8 @@ fun ScreeningCallScreen(
                         onToggleHold = onToggleHold,
                         isSpeechJammerActive = state.isSpeechJammerActive,
                         onToggleSpeechJammer = onToggleSpeechJammer,
+                        isEchoUserVoice = state.isEchoUserVoiceEnabled,
+                        onToggleEchoUserVoice = onToggleEchoUserVoice,
                         onScreenWithAi = onStartScreening,
                         onDtmfDigit = onDtmfDigit,
                         onHangUp = onHangUp,
@@ -397,11 +404,16 @@ fun ScreeningCallScreen(
                         onToggleSpeaker = onToggleSpeaker,
                         onToggleRecording = onToggleRecording,
                         onToggleSpeechJammer = onToggleSpeechJammer,
+                        isEchoUserVoice = state.isEchoUserVoiceEnabled,
+                        onToggleEchoUserVoice = onToggleEchoUserVoice,
                         onToggleAiVoiceListening = onToggleAiVoiceListening,
                         onSwitchToAiTypeMode = onSwitchToAiTypeMode,
                         onSwitchToDirectMicMode = onSwitchToDirectMicMode,
                         presets = presets,
                         onPlayPreset = onPlayPreset,
+                        onPauseCustomAudio = onPauseCustomAudio,
+                        onResumeCustomAudio = onResumeCustomAudio,
+                        onStopCustomAudio = onStopCustomAudio,
                         currentPersona = state.currentPersona,
                         onSelectPersona = onSelectPersona,
                         onOpenPresetManager = { isPresetManagerOpen = true },
@@ -436,9 +448,14 @@ fun ScreeningCallScreen(
             onSelectPersona = onSelectPersona,
             presets = presets,
             onPlayPreset = onPlayPreset,
+            playingAudioPresetId = state.playingAudioPresetId,
+            isAudioPresetPlaying = state.isAudioPresetPlaying,
+            isAudioPresetPaused = state.isAudioPresetPaused,
             onOpenPresetManager = { isPresetManagerOpen = true },
             isSpeechJammerActive = state.isSpeechJammerActive,
             onToggleSpeechJammer = onToggleSpeechJammer,
+            isEchoUserVoice = state.isEchoUserVoiceEnabled,
+            onToggleEchoUserVoice = onToggleEchoUserVoice,
             isRecording = state.isRecording,
             recordingDurationSeconds = state.recordingDurationSeconds,
             onToggleRecording = onToggleRecording,
@@ -450,6 +467,7 @@ fun ScreeningCallScreen(
         PresetManagementScreen(
             presetManager = presetManager,
             quickReplyManager = quickReplyManager,
+            monetColors = monetColors,
             onDismiss = { isPresetManagerOpen = false }
         )
     }
@@ -784,11 +802,16 @@ fun MaterialYouAssistantScreeningScreen(
     onToggleSpeaker: () -> Unit,
     onToggleRecording: () -> Unit,
     onToggleSpeechJammer: () -> Unit,
+    isEchoUserVoice: Boolean = false,
+    onToggleEchoUserVoice: () -> Unit = {},
     onToggleAiVoiceListening: () -> Unit,
     onSwitchToAiTypeMode: () -> Unit,
     onSwitchToDirectMicMode: () -> Unit,
     presets: List<AudioPreset>,
     onPlayPreset: (AudioPreset) -> Unit,
+    onPauseCustomAudio: () -> Unit = {},
+    onResumeCustomAudio: () -> Unit = {},
+    onStopCustomAudio: () -> Unit = {},
     currentPersona: VoicePersona,
     onSelectPersona: (VoicePersona) -> Unit,
     onOpenPresetManager: () -> Unit,
@@ -803,41 +826,6 @@ fun MaterialYouAssistantScreeningScreen(
             .fillMaxSize()
             .background(monetColors.surface)
     ) {
-        // Subtle Monet ambient light dispersion
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val width = size.width
-            val height = size.height
-
-            // Top-center gentle primary bloom
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        monetColors.primaryContainer.copy(alpha = 0.22f),
-                        monetColors.primary.copy(alpha = 0.06f),
-                        Color.Transparent
-                    ),
-                    center = Offset(width * 0.5f, height * 0.15f),
-                    radius = width * 0.65f
-                ),
-                radius = width * 0.65f,
-                center = Offset(width * 0.5f, height * 0.15f)
-            )
-
-            // Bottom-center secondary bloom
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        monetColors.tertiaryContainer.copy(alpha = 0.14f),
-                        Color.Transparent
-                    ),
-                    center = Offset(width * 0.5f, height * 0.85f),
-                    radius = width * 0.70f
-                ),
-                radius = width * 0.70f,
-                center = Offset(width * 0.5f, height * 0.85f)
-            )
-        }
-
         // Main Screening Column
         Column(
             modifier = Modifier
@@ -884,6 +872,13 @@ fun MaterialYouAssistantScreeningScreen(
                 onReplySelected = onQuickReplySelected,
                 presets = presets,
                 onPlayPreset = onPlayPreset,
+                playingAudioPresetId = state.playingAudioPresetId,
+                playingAudioPresetTitle = state.playingAudioPresetTitle,
+                isAudioPresetPlaying = state.isAudioPresetPlaying,
+                isAudioPresetPaused = state.isAudioPresetPaused,
+                onPauseCustomAudio = onPauseCustomAudio,
+                onResumeCustomAudio = onResumeCustomAudio,
+                onStopCustomAudio = onStopCustomAudio,
                 onOpenPresetManager = onOpenPresetManager,
                 monetColors = monetColors
             )
@@ -906,6 +901,8 @@ fun MaterialYouAssistantScreeningScreen(
             SmartJammerControl(
                 isActive = state.isSpeechJammerActive,
                 onToggle = onToggleSpeechJammer,
+                isEchoUserVoice = isEchoUserVoice,
+                onToggleEchoUserVoice = onToggleEchoUserVoice,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 2.dp),
@@ -1516,6 +1513,13 @@ private fun ScreeningResponsesAndAudioSection(
     onReplySelected: (QuickReply) -> Unit,
     presets: List<AudioPreset>,
     onPlayPreset: (AudioPreset) -> Unit,
+    playingAudioPresetId: String? = null,
+    playingAudioPresetTitle: String? = null,
+    isAudioPresetPlaying: Boolean = false,
+    isAudioPresetPaused: Boolean = false,
+    onPauseCustomAudio: () -> Unit = {},
+    onResumeCustomAudio: () -> Unit = {},
+    onStopCustomAudio: () -> Unit = {},
     onOpenPresetManager: () -> Unit,
     monetColors: ColorScheme
 ) {
@@ -1642,6 +1646,137 @@ private fun ScreeningResponsesAndAudioSection(
             }
         }
 
+        // Dedicated Now Playing / Paused Custom Audio Capsule
+        AnimatedVisibility(
+            visible = isAudioPresetPlaying || isAudioPresetPaused,
+            enter = fadeIn(tween(180)) + expandVertically(tween(200)),
+            exit = fadeOut(tween(140)) + shrinkVertically(tween(160)),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(
+                        if (isAudioPresetPaused) AppleAmber.copy(alpha = 0.18f)
+                        else monetColors.primaryContainer.copy(alpha = 0.40f)
+                    )
+                    .border(
+                        0.8.dp,
+                        if (isAudioPresetPaused) AppleAmber.copy(alpha = 0.55f)
+                        else monetColors.primary.copy(alpha = 0.45f),
+                        RoundedCornerShape(16.dp)
+                    )
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        if (!isAudioPresetPaused) {
+                            JumpingAudioWaveform(color = monetColors.primary, isPlaying = true)
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .clip(CircleShape)
+                                    .background(AppleAmber.copy(alpha = 0.25f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Pause,
+                                    contentDescription = null,
+                                    tint = AppleAmber,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                            }
+                        }
+                        Column {
+                            Text(
+                                text = if (isAudioPresetPaused) "PAUSED" else "PLAYING CUSTOM AUDIO",
+                                color = if (isAudioPresetPaused) AppleAmber else monetColors.primary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                letterSpacing = 0.5.sp
+                            )
+                            Text(
+                                text = playingAudioPresetTitle ?: "Audio Preset",
+                                color = monetColors.onSurface,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        // Pause / Resume Button
+                        Box(
+                            modifier = Modifier
+                                .height(28.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(if (isAudioPresetPaused) AppleAmber else monetColors.primary)
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    if (isAudioPresetPaused) onResumeCustomAudio() else onPauseCustomAudio()
+                                }
+                                .padding(horizontal = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isAudioPresetPaused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
+                                    contentDescription = if (isAudioPresetPaused) "Resume" else "Pause",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Text(
+                                    text = if (isAudioPresetPaused) "Resume" else "Pause",
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        // Stop Button
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(monetColors.surfaceContainerHighest)
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onStopCustomAudio()
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = "Stop",
+                                tint = monetColors.onSurfaceVariant,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         // Horizontal List of Action Chips
         LazyRow(
             modifier = Modifier
@@ -1687,11 +1822,25 @@ private fun ScreeningResponsesAndAudioSection(
             } else {
                 // Custom Audio Presets
                 itemsIndexed(presets, key = { index, preset -> "preset_${preset.id}_$index" }) { _, preset ->
+                    val isCurrent = playingAudioPresetId == preset.id
+                    val isPlayingThis = isCurrent && isAudioPresetPlaying && !isAudioPresetPaused
+                    val isPausedThis = isCurrent && isAudioPresetPaused
+
                     Box(
                         modifier = Modifier
                             .clip(CircleShape)
-                            .background(monetColors.surfaceContainerHigh)
-                            .border(1.dp, monetColors.primary.copy(alpha = 0.35f), CircleShape)
+                            .background(
+                                if (isPlayingThis) monetColors.primaryContainer
+                                else if (isPausedThis) AppleAmber.copy(alpha = 0.20f)
+                                else monetColors.surfaceContainerHigh
+                            )
+                            .border(
+                                width = if (isPlayingThis || isPausedThis) 1.2.dp else 1.dp,
+                                color = if (isPlayingThis) monetColors.primary
+                                else if (isPausedThis) AppleAmber
+                                else monetColors.primary.copy(alpha = 0.35f),
+                                shape = CircleShape
+                            )
                             .clickable {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 onPlayPreset(preset)
@@ -1707,21 +1856,25 @@ private fun ScreeningResponsesAndAudioSection(
                                 modifier = Modifier
                                     .size(18.dp)
                                     .clip(CircleShape)
-                                    .background(monetColors.primaryContainer),
+                                    .background(
+                                        if (isPlayingThis) monetColors.primary
+                                        else if (isPausedThis) AppleAmber
+                                        else monetColors.primaryContainer
+                                    ),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.Rounded.PlayArrow,
-                                    contentDescription = "Play preset",
-                                    tint = monetColors.onPrimaryContainer,
+                                    imageVector = if (isPlayingThis) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                                    contentDescription = if (isPlayingThis) "Pause preset" else "Play preset",
+                                    tint = if (isPlayingThis || isPausedThis) Color.White else monetColors.onPrimaryContainer,
                                     modifier = Modifier.size(12.dp)
                                 )
                             }
                             Text(
-                                text = preset.title,
-                                color = monetColors.onSurface,
+                                text = if (isPausedThis) "${preset.title} (Paused)" else preset.title,
+                                color = if (isPausedThis) AppleAmber else monetColors.onSurface,
                                 fontSize = 12.5.sp,
-                                fontWeight = FontWeight.Medium,
+                                fontWeight = if (isPlayingThis || isPausedThis) FontWeight.Bold else FontWeight.Medium,
                                 letterSpacing = (-0.1).sp
                             )
                         }
@@ -2295,9 +2448,14 @@ private fun ScreeningToolsBottomSheet(
     onSelectPersona: (VoicePersona) -> Unit,
     presets: List<AudioPreset>,
     onPlayPreset: (AudioPreset) -> Unit,
+    playingAudioPresetId: String? = null,
+    isAudioPresetPlaying: Boolean = false,
+    isAudioPresetPaused: Boolean = false,
     onOpenPresetManager: () -> Unit,
     isSpeechJammerActive: Boolean,
     onToggleSpeechJammer: () -> Unit,
+    isEchoUserVoice: Boolean = false,
+    onToggleEchoUserVoice: () -> Unit = {},
     isRecording: Boolean,
     recordingDurationSeconds: Long,
     onToggleRecording: () -> Unit,
@@ -2552,11 +2710,25 @@ private fun ScreeningToolsBottomSheet(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             itemsIndexed(presets, key = { index, preset -> "preset_${preset.id}_$index" }) { _, preset ->
+                                val isCurrent = playingAudioPresetId == preset.id
+                                val isPlayingThis = isCurrent && isAudioPresetPlaying && !isAudioPresetPaused
+                                val isPausedThis = isCurrent && isAudioPresetPaused
+
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(monetColors.surfaceContainer)
-                                        .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                        .background(
+                                            if (isPlayingThis) monetColors.primaryContainer
+                                            else if (isPausedThis) AppleAmber.copy(alpha = 0.20f)
+                                            else monetColors.surfaceContainer
+                                        )
+                                        .border(
+                                            width = if (isPlayingThis || isPausedThis) 1.2.dp else 0.8.dp,
+                                            color = if (isPlayingThis) monetColors.primary
+                                            else if (isPausedThis) AppleAmber
+                                            else monetColors.outlineVariant.copy(alpha = 0.3f),
+                                            shape = RoundedCornerShape(12.dp)
+                                        )
                                         .clickable {
                                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             onPlayPreset(preset)
@@ -2568,16 +2740,22 @@ private fun ScreeningToolsBottomSheet(
                                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
                                         Icon(
-                                            imageVector = if (preset.isAudioFile) Icons.Rounded.GraphicEq else Icons.AutoMirrored.Filled.VolumeUp,
+                                            imageVector = if (isPlayingThis) Icons.Rounded.Pause
+                                            else if (isPausedThis) Icons.Rounded.PlayArrow
+                                            else if (preset.isAudioFile) Icons.Rounded.GraphicEq
+                                            else Icons.AutoMirrored.Filled.VolumeUp,
                                             contentDescription = null,
-                                            tint = if (preset.isAudioFile) AppleAmber else monetColors.primary,
+                                            tint = if (isPlayingThis) monetColors.primary
+                                            else if (isPausedThis) AppleAmber
+                                            else if (preset.isAudioFile) AppleAmber
+                                            else monetColors.primary,
                                             modifier = Modifier.size(14.dp)
                                         )
                                         Text(
-                                            text = preset.title,
-                                            color = monetColors.onSurface,
+                                            text = if (isPausedThis) "${preset.title} (Paused)" else preset.title,
+                                            color = if (isPausedThis) AppleAmber else monetColors.onSurface,
                                             fontSize = 12.sp,
-                                            fontWeight = FontWeight.Medium
+                                            fontWeight = if (isPlayingThis || isPausedThis) FontWeight.Bold else FontWeight.Medium
                                         )
                                     }
                                 }
@@ -2596,6 +2774,8 @@ private fun ScreeningToolsBottomSheet(
                             SmartJammerControl(
                                 isActive = isSpeechJammerActive,
                                 onToggle = onToggleSpeechJammer,
+                                isEchoUserVoice = isEchoUserVoice,
+                                onToggleEchoUserVoice = onToggleEchoUserVoice,
                                 modifier = Modifier.fillMaxWidth(),
                                 monetColors = monetColors
                             )
@@ -2652,6 +2832,8 @@ private fun ScreeningToolsBottomSheet(
 fun SmartJammerControl(
     isActive: Boolean,
     onToggle: () -> Unit,
+    isEchoUserVoice: Boolean = false,
+    onToggleEchoUserVoice: () -> Unit = {},
     modifier: Modifier = Modifier,
     monetColors: ColorScheme = getPixelMonetDarkColorScheme()
 ) {
@@ -2662,6 +2844,8 @@ fun SmartJammerControl(
 
     val activeMode by jammerEngine.activeModeFlow.collectAsState()
     val isEcho = activeMode == JammerMode.INFINITE_ECHO
+    val engineEchoUserVoice by jammerEngine.isEchoUserVoiceFlow.collectAsState()
+    val userVoiceEchoActive = isEchoUserVoice || engineEchoUserVoice
 
     val accentColor = if (isEcho) Color(0xFF6366F1) else Color(0xFFFF2D55)
     val activeBorder = if (isEcho) Color(0xFFA5B4FC) else Color(0xFFFDA4AF)
@@ -2669,98 +2853,133 @@ fun SmartJammerControl(
 
     Row(
         modifier = modifier
-            .height(44.dp)
+            .height(46.dp)
             .clip(CircleShape)
-            .background(if (isActive) activeBg else monetColors.surfaceContainerHigh)
+            .background(if (isActive) activeBg else monetColors.surfaceContainerHigh.copy(alpha = 0.90f))
             .border(
                 width = if (isActive) 1.2.dp else 0.8.dp,
-                color = if (isActive) activeBorder else monetColors.outlineVariant.copy(alpha = 0.40f),
+                color = if (isActive) activeBorder else monetColors.outlineVariant.copy(alpha = 0.35f),
                 shape = CircleShape
             )
-            .padding(start = 10.dp, end = 8.dp),
+            .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Mode Icon Disc
+        // Mode Icon Disc (Tap to cycle mode)
         Box(
             modifier = Modifier
-                .size(28.dp)
+                .size(32.dp)
                 .clip(CircleShape)
-                .background(if (isActive) accentColor else monetColors.surfaceContainerHighest),
+                .background(if (isActive) accentColor else monetColors.surfaceContainerHighest)
+                .clickable {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    val nextMode = if (activeMode == JammerMode.DAF_JAMMER) JammerMode.INFINITE_ECHO else JammerMode.DAF_JAMMER
+                    jammerEngine.mode = nextMode
+                },
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = if (isEcho) Icons.Rounded.GraphicEq else Icons.Rounded.Psychology,
                 contentDescription = null,
                 tint = if (isActive) Color.White else monetColors.onSurfaceVariant,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(17.dp)
             )
         }
 
         Spacer(modifier = Modifier.width(10.dp))
 
-        // Title and live status dot (Single perfectly centered row)
-        Row(
-            modifier = Modifier.weight(1f),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text(
-                text = if (isEcho) "Echo Chamber" else "Speech Jammer",
-                color = if (isActive) Color.White else monetColors.onSurface,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (isActive) {
-                Box(
-                    modifier = Modifier
-                        .size(6.5.dp)
-                        .clip(CircleShape)
-                        .background(accentColor)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        // Mode Switcher Pill (ECHO vs DAF - Clean, no emojis)
-        Box(
+        // Center: Interactive Mode Title & Subtitle (Tap to switch mode)
+        Column(
             modifier = Modifier
-                .height(28.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(monetColors.surfaceContainerHighest)
-                .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
-                .clickable {
+                .weight(1f)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     val nextMode = if (activeMode == JammerMode.DAF_JAMMER) JammerMode.INFINITE_ECHO else JammerMode.DAF_JAMMER
                     jammerEngine.mode = nextMode
-                }
-                .padding(horizontal = 10.dp),
-            contentAlignment = Alignment.Center
+                },
+            verticalArrangement = Arrangement.Center
         ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Text(
+                    text = if (isEcho) "Echo Chamber" else "Speech Jammer",
+                    color = if (isActive) Color.White else monetColors.onSurface,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = GoogleSans,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (isActive) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(accentColor)
+                    )
+                }
+            }
             Text(
-                text = if (isEcho) "ECHO" else "DAF",
-                color = if (isEcho) Color(0xFF818CF8) else Color(0xFFFF6482),
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.3.sp
+                text = if (isEcho) {
+                    if (userVoiceEchoActive) "Echo • Both voices" else "Echo • Caller voice"
+                } else {
+                    "DAF • Delayed playback"
+                },
+                color = if (isActive) Color.White.copy(alpha = 0.80f) else monetColors.onSurfaceVariant,
+                fontSize = 10.5.sp,
+                fontFamily = GoogleSans,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
 
         Spacer(modifier = Modifier.width(6.dp))
 
-        // Action Status Pill (ACTIVE vs ENGAGE - Clean, no emojis)
+        // User Voice Mic Pill
         Box(
             modifier = Modifier
-                .height(28.dp)
-                .clip(RoundedCornerShape(14.dp))
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(
+                    if (userVoiceEchoActive) Color(0xFF2EAA55).copy(alpha = 0.20f)
+                    else monetColors.surfaceContainerHighest
+                )
+                .border(
+                    width = 0.8.dp,
+                    color = if (userVoiceEchoActive) Color(0xFF2EAA55).copy(alpha = 0.65f)
+                    else monetColors.outlineVariant.copy(alpha = 0.35f),
+                    shape = CircleShape
+                )
+                .clickable {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onToggleEchoUserVoice()
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = if (userVoiceEchoActive) Icons.Filled.Mic else Icons.Filled.MicOff,
+                contentDescription = "My Voice Echo",
+                tint = if (userVoiceEchoActive) Color(0xFF2EAA55) else monetColors.onSurfaceVariant.copy(alpha = 0.65f),
+                modifier = Modifier.size(15.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(6.dp))
+
+        // Minimal Pixel Action Pill (Active / Engage)
+        Box(
+            modifier = Modifier
+                .height(32.dp)
+                .clip(CircleShape)
                 .background(if (isActive) accentColor else monetColors.primary.copy(alpha = 0.16f))
                 .border(
                     width = 0.8.dp,
-                    color = if (isActive) Color.Transparent else monetColors.primary.copy(alpha = 0.40f),
-                    shape = RoundedCornerShape(14.dp)
+                    color = if (isActive) Color.Transparent else monetColors.primary.copy(alpha = 0.35f),
+                    shape = CircleShape
                 )
                 .clickable {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -3237,44 +3456,6 @@ fun OemIncomingCallScreen(
             .fillMaxSize()
             .background(monetColors.surface)
     ) {
-        // Atmospheric Android Monet Ambient Aura Canvas
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val width = size.width
-            val height = size.height
-
-            // Upper-Center Monet Primary Bloom
-            val orb1Radius = width * 0.70f * orbBreath
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        monetColors.primaryContainer.copy(alpha = 0.35f),
-                        monetColors.primary.copy(alpha = 0.12f),
-                        Color.Transparent
-                    ),
-                    center = Offset(width * 0.50f, height * 0.28f),
-                    radius = orb1Radius
-                ),
-                radius = orb1Radius,
-                center = Offset(width * 0.50f, height * 0.28f)
-            )
-
-            // Lower-Center Monet Tertiary / Secondary Bloom
-            val orb2Radius = width * 0.75f * (2.0f - orbBreath)
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        monetColors.tertiaryContainer.copy(alpha = 0.22f),
-                        monetColors.secondaryContainer.copy(alpha = 0.10f),
-                        Color.Transparent
-                    ),
-                    center = Offset(width * 0.50f, height * 0.76f),
-                    radius = orb2Radius
-                ),
-                radius = orb2Radius,
-                center = Offset(width * 0.50f, height * 0.76f)
-            )
-        }
-
         // Full Screen Content Column (Google Dialer Expressive Incoming Call Screen)
         Column(
             modifier = Modifier
@@ -3987,6 +4168,8 @@ fun StandardInCallScreen(
     onToggleHold: () -> Unit,
     isSpeechJammerActive: Boolean = false,
     onToggleSpeechJammer: () -> Unit = {},
+    isEchoUserVoice: Boolean = false,
+    onToggleEchoUserVoice: () -> Unit = {},
     onScreenWithAi: () -> Unit,
     onDtmfDigit: (Char) -> Unit,
     onHangUp: () -> Unit,
@@ -4069,56 +4252,6 @@ fun StandardInCallScreen(
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
-        // Atmospheric Material You Monet Ambient Depth Canvas (Pixel Organic Living Blooms)
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val width = size.width
-            val height = size.height
-
-            // Top Monet Primary Dispersion (Living Aura behind Avatar)
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        monetColors.primaryContainer.copy(alpha = pulseAlpha),
-                        monetColors.primary.copy(alpha = 0.14f),
-                        Color.Transparent
-                    ),
-                    center = Offset(width * 0.50f, height * 0.20f),
-                    radius = width * 0.78f * pulseScale
-                ),
-                radius = width * 0.78f * pulseScale,
-                center = Offset(width * 0.50f, height * 0.20f)
-            )
-
-            // Middle Secondary Accent Glow
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        monetColors.secondaryContainer.copy(alpha = 0.16f),
-                        Color.Transparent
-                    ),
-                    center = Offset(width * 0.85f, height * 0.45f),
-                    radius = width * 0.55f
-                ),
-                radius = width * 0.55f,
-                center = Offset(width * 0.85f, height * 0.45f)
-            )
-
-            // Bottom Monet Tertiary Bloom (Rich Atmospheric Depth under the Large Action Buttons)
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        monetColors.tertiaryContainer.copy(alpha = 0.26f),
-                        monetColors.surfaceContainerHigh.copy(alpha = 0.10f),
-                        Color.Transparent
-                    ),
-                    center = Offset(width * 0.50f, height * 0.78f),
-                    radius = width * 0.72f * pulseScale
-                ),
-                radius = width * 0.72f * pulseScale,
-                center = Offset(width * 0.50f, height * 0.78f)
-            )
-        }
-
         // Full Screen Content Column
         Column(
             modifier = Modifier
@@ -4256,26 +4389,31 @@ fun StandardInCallScreen(
                 }
             }
 
-            val morphSpec = spring<Dp>(dampingRatio = 0.85f, stiffness = Spring.StiffnessMedium)
+            val inCallTransitionSpec = tween<Dp>(durationMillis = 260, easing = FastOutSlowInEasing)
             val animatedAvatarSize by animateDpAsState(
-                targetValue = if (showKeypad) 46.dp else 100.dp,
-                animationSpec = morphSpec,
+                targetValue = if (showKeypad) 48.dp else 96.dp,
+                animationSpec = inCallTransitionSpec,
                 label = "avatarMorphSize"
             )
             val animatedAvatarCorner by animateDpAsState(
-                targetValue = if (showKeypad) 23.dp else 34.dp,
-                animationSpec = morphSpec,
+                targetValue = if (showKeypad) 24.dp else 32.dp,
+                animationSpec = inCallTransitionSpec,
                 label = "avatarMorphCorner"
             )
             val animatedAvatarSpacer by animateDpAsState(
-                targetValue = if (showKeypad) 8.dp else 18.dp,
-                animationSpec = morphSpec,
+                targetValue = if (showKeypad) 6.dp else 16.dp,
+                animationSpec = inCallTransitionSpec,
                 label = "avatarMorphSpacer"
             )
             val animatedTitleSpacer by animateDpAsState(
-                targetValue = if (showKeypad) 4.dp else 12.dp,
-                animationSpec = morphSpec,
+                targetValue = if (showKeypad) 4.dp else 10.dp,
+                animationSpec = inCallTransitionSpec,
                 label = "titleMorphSpacer"
+            )
+            val animatedTitleFontSize by animateFloatAsState(
+                targetValue = if (showKeypad) 19f else 25f,
+                animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
+                label = "titleFontSize"
             )
 
             Spacer(modifier = Modifier.height(animatedAvatarSpacer))
@@ -4366,65 +4504,76 @@ fun StandardInCallScreen(
             Text(
                 text = displayCallerTitle,
                 color = monetColors.onSurface,
-                fontSize = if (showKeypad) 19.sp else 26.sp,
+                fontSize = animatedTitleFontSize.sp,
                 fontWeight = FontWeight.SemiBold,
                 fontFamily = GoogleSans,
-                letterSpacing = (-0.4).sp,
+                letterSpacing = (-0.3).sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center
             )
 
-            // 4. Caller Phone Number (Visible when keypad is closed)
-            if (!showKeypad && callerNumber.isNotBlank() && callerName != callerNumber && !isNumberHidden) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = displayCallerNumber,
-                    color = monetColors.onSurfaceVariant,
-                    fontSize = 14.5.sp,
-                    fontFamily = GoogleSans,
-                    fontWeight = FontWeight.Normal,
-                    letterSpacing = 0.25.sp
-                )
-            }
-
-            // Quick Save Contact pill if caller is an unsaved number
-            if (!showKeypad && !isNumberHidden && callerNumber.isNotBlank() &&
-                (callerName.isNullOrBlank() || callerName == callerNumber || callerName.equals("Unknown Caller", ignoreCase = true))
+            // 4. Caller Phone Number & Quick Save (Fluidly animated container with zero layout jitter)
+            AnimatedVisibility(
+                visible = !showKeypad,
+                enter = fadeIn(tween(180, delayMillis = 40)) + expandVertically(tween(240, easing = FastOutSlowInEasing)),
+                exit = fadeOut(tween(120)) + shrinkVertically(tween(200, easing = FastOutLinearInEasing))
             ) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Box(
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .background(monetColors.surfaceContainerHigh.copy(alpha = 0.85f))
-                        .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.40f), CircleShape)
-                        .clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            com.callscreener.app.data.DialerRepository.openSystemSaveContact(context, callerNumber)
-                        }
-                        .padding(horizontal = 12.dp, vertical = 5.dp)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.PersonAdd,
-                            contentDescription = "Save Contact",
-                            tint = monetColors.primary,
-                            modifier = Modifier.size(14.dp)
-                        )
+                    if (callerNumber.isNotBlank() && callerName != callerNumber && !isNumberHidden) {
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Save Contact",
-                            color = monetColors.onSurface,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
+                            text = displayCallerNumber,
+                            color = monetColors.onSurfaceVariant,
+                            fontSize = 14.5.sp,
+                            fontFamily = GoogleSans,
+                            fontWeight = FontWeight.Normal,
+                            letterSpacing = 0.25.sp
                         )
+                    }
+
+                    // Quick Save Contact pill if caller is an unsaved number
+                    if (!isNumberHidden && callerNumber.isNotBlank() &&
+                        (callerName.isNullOrBlank() || callerName == callerNumber || callerName.equals("Unknown Caller", ignoreCase = true))
+                    ) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(monetColors.surfaceContainerHigh.copy(alpha = 0.85f))
+                                .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.40f), CircleShape)
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    com.callscreener.app.data.DialerRepository.openSystemSaveContact(context, callerNumber)
+                                }
+                                .padding(horizontal = 12.dp, vertical = 5.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.PersonAdd,
+                                    contentDescription = "Save Contact",
+                                    tint = monetColors.primary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Text(
+                                    text = "Save Contact",
+                                    color = monetColors.onSurface,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
                     }
                 }
             }
 
-            // 5. Middle Section: Dynamic Keypad in Stable Flexible Spacer (Zero Jitter Fluid Spring Transition)
+            // 5. Middle Section: Dynamic Keypad in Stable Flexible Spacer (Fluid slide & fade from dialer)
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -4433,10 +4582,14 @@ fun StandardInCallScreen(
             ) {
                 androidx.compose.animation.AnimatedVisibility(
                     visible = showKeypad,
-                    enter = fadeIn(animationSpec = tween(200, delayMillis = 40, easing = LinearOutSlowInEasing)) +
-                            scaleIn(initialScale = 0.90f, animationSpec = spring(dampingRatio = 0.80f, stiffness = Spring.StiffnessMediumLow)),
-                    exit = fadeOut(animationSpec = tween(120, easing = FastOutLinearInEasing)) +
-                            scaleOut(targetScale = 0.94f, animationSpec = tween(120, easing = FastOutLinearInEasing))
+                    enter = slideInVertically(
+                        initialOffsetY = { it / 4 },
+                        animationSpec = tween(260, easing = FastOutSlowInEasing)
+                    ) + fadeIn(animationSpec = tween(220, delayMillis = 30, easing = LinearOutSlowInEasing)),
+                    exit = slideOutVertically(
+                        targetOffsetY = { it / 4 },
+                        animationSpec = tween(180, easing = FastOutLinearInEasing)
+                    ) + fadeOut(animationSpec = tween(150, easing = FastOutLinearInEasing))
                 ) {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
@@ -4531,13 +4684,15 @@ fun StandardInCallScreen(
             // 6. Echo Chamber & Speech Jammer Capsule (Ergonomically aligned directly above in-call action buttons)
             AnimatedVisibility(
                 visible = !showKeypad && status != CallStatus.ENDED,
-                enter = fadeIn(tween(160)) + expandVertically(tween(180)),
-                exit = fadeOut(tween(110)) + shrinkVertically(tween(120))
+                enter = fadeIn(tween(200, delayMillis = 40)) + expandVertically(tween(240, easing = FastOutSlowInEasing)),
+                exit = fadeOut(tween(130)) + shrinkVertically(tween(180, easing = FastOutLinearInEasing))
             ) {
                 Column {
                     SmartJammerControl(
                         isActive = isSpeechJammerActive,
                         onToggle = onToggleSpeechJammer,
+                        isEchoUserVoice = isEchoUserVoice,
+                        onToggleEchoUserVoice = onToggleEchoUserVoice,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 8.dp),
@@ -4606,8 +4761,8 @@ fun StandardInCallScreen(
                 // Row 2: Record | Hold | Screen with AI (Only when Keypad is closed)
                 AnimatedVisibility(
                     visible = !showKeypad,
-                    enter = fadeIn(tween(220)) + expandVertically(tween(220)),
-                    exit = fadeOut(tween(160)) + shrinkVertically(tween(160))
+                    enter = fadeIn(tween(200, delayMillis = 40)) + expandVertically(tween(240, easing = FastOutSlowInEasing)),
+                    exit = fadeOut(tween(130)) + shrinkVertically(tween(180, easing = FastOutLinearInEasing))
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -4644,7 +4799,7 @@ fun StandardInCallScreen(
 
                         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                             InCallActionButton(
-                                icon = Icons.Rounded.AutoAwesome,
+                                icon = Icons.Rounded.RecordVoiceOver,
                                 label = "Screen Call",
                                 isActive = false,
                                 isAssistantSpecial = true,
@@ -4996,46 +5151,41 @@ fun InCallDtmfKey(
     val isPressed by interactionSource.collectIsPressedAsState()
 
     val keyScale by animateFloatAsState(
-        targetValue = if (isPressed) 0.90f else 1.0f,
-        animationSpec = spring(dampingRatio = 0.60f, stiffness = Spring.StiffnessMediumLow),
+        targetValue = if (isPressed) 0.92f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.70f, stiffness = Spring.StiffnessMediumLow),
         label = "dtmfKeyScale"
-    )
-    val keyCorner by animateDpAsState(
-        targetValue = if (isPressed) 16.dp else 22.dp,
-        animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
-        label = "dtmfKeyCorner"
     )
     val keyBg by animateColorAsState(
         targetValue = if (isPressed) monetColors.primaryContainer.copy(alpha = 0.90f) else monetColors.surfaceContainerHigh.copy(alpha = 0.85f),
-        animationSpec = tween(durationMillis = 110),
+        animationSpec = tween(durationMillis = 100),
         label = "dtmfKeyBg"
     )
     val keyBorder by animateColorAsState(
         targetValue = if (isPressed) monetColors.primary.copy(alpha = 0.65f) else monetColors.outlineVariant.copy(alpha = 0.35f),
-        animationSpec = tween(durationMillis = 110),
+        animationSpec = tween(durationMillis = 100),
         label = "dtmfKeyBorder"
     )
 
     Box(
         modifier = Modifier
-            .size(64.dp)
+            .size(66.dp)
             .scale(keyScale)
             .shadow(
-                elevation = if (isPressed) 2.dp else 5.dp,
-                shape = RoundedCornerShape(keyCorner),
-                spotColor = monetColors.primary.copy(alpha = 0.22f)
+                elevation = if (isPressed) 2.dp else 4.dp,
+                shape = CircleShape,
+                spotColor = monetColors.primary.copy(alpha = 0.18f)
             )
-            .clip(RoundedCornerShape(keyCorner))
+            .clip(CircleShape)
             .background(keyBg)
             .border(
                 width = 1.dp,
                 brush = Brush.linearGradient(
                     listOf(
-                        Color.White.copy(alpha = 0.35f),
+                        Color.White.copy(alpha = 0.28f),
                         keyBorder
                     )
                 ),
-                shape = RoundedCornerShape(keyCorner)
+                shape = CircleShape
             )
             .clickable(
                 interactionSource = interactionSource,
@@ -5050,9 +5200,10 @@ fun InCallDtmfKey(
             Text(
                 text = digit.toString(),
                 color = if (isPressed) monetColors.onPrimaryContainer else monetColors.onSurface,
-                fontSize = 22.sp,
+                fontSize = 24.sp,
                 fontWeight = FontWeight.SemiBold,
-                lineHeight = 24.sp
+                fontFamily = GoogleSans,
+                lineHeight = 26.sp
             )
             if (letters.isNotBlank()) {
                 Text(
@@ -5060,6 +5211,7 @@ fun InCallDtmfKey(
                     color = if (isPressed) monetColors.onPrimaryContainer.copy(alpha = 0.85f) else monetColors.onSurfaceVariant.copy(alpha = 0.75f),
                     fontSize = 9.5.sp,
                     fontWeight = FontWeight.Bold,
+                    fontFamily = GoogleSans,
                     letterSpacing = 0.8.sp,
                     lineHeight = 11.sp
                 )

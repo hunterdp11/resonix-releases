@@ -28,6 +28,47 @@ class RootCallAudioInjector(private val context: Context) {
     private var audioTrack: AudioTrack? = null
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
+    @Volatile private var isPaused: Boolean = false
+    @Volatile private var isStopped: Boolean = false
+    private val pauseLock = Any()
+
+    fun pauseInjection() {
+        Log.i(TAG, "pauseInjection called")
+        isPaused = true
+        try {
+            audioTrack?.pause()
+        } catch (e: Exception) {
+            Log.w(TAG, "AudioTrack pause failed", e)
+        }
+    }
+
+    fun resumeInjection() {
+        Log.i(TAG, "resumeInjection called")
+        synchronized(pauseLock) {
+            isPaused = false
+            try {
+                audioTrack?.play()
+            } catch (e: Exception) {
+                Log.w(TAG, "AudioTrack resume play failed", e)
+            }
+            (pauseLock as java.lang.Object).notifyAll()
+        }
+    }
+
+    fun stopInjection() {
+        Log.i(TAG, "stopInjection called")
+        synchronized(pauseLock) {
+            isStopped = true
+            isPaused = false
+            (pauseLock as java.lang.Object).notifyAll()
+        }
+        try {
+            audioTrack?.pause()
+            audioTrack?.flush()
+            audioTrack?.stop()
+        } catch (_: Exception) {}
+    }
+
     data class WavInfo(
         val sampleRate: Int,
         val channels: Int,
@@ -295,6 +336,14 @@ class RootCallAudioInjector(private val context: Context) {
             return@withContext
         }
 
+        // Cleanly stop any existing injection before starting the new one (instant switch / no collision)
+        stopInjection()
+        kotlinx.coroutines.delay(20L)
+        synchronized(pauseLock) {
+            isStopped = false
+            isPaused = false
+        }
+
         var success = false
         try {
             // Enable hardware ALSA in-call uplink mixer routing (unmuting Voice Tx so audio reaches caller)
@@ -367,18 +416,39 @@ class RootCallAudioInjector(private val context: Context) {
 
                 val chunkSize = 4096
                 var offset = 0
-                while (offset < pcmBytes.size) {
+                while (offset < pcmBytes.size && !isStopped) {
+                    // Check if paused and wait until resumed or stopped
+                    synchronized(pauseLock) {
+                        while (isPaused && !isStopped) {
+                            try {
+                                (pauseLock as java.lang.Object).wait()
+                            } catch (_: InterruptedException) {
+                                break
+                            }
+                        }
+                    }
+                    if (isStopped) break
+
                     val toWrite = minOf(chunkSize, pcmBytes.size - offset)
-                    track.write(pcmBytes, offset, toWrite)
-                    offset += toWrite
+                    val written = track.write(pcmBytes, offset, toWrite)
+                    if (written > 0) {
+                        offset += written
+                    } else if (written < 0) {
+                        Log.w(TAG, "AudioTrack write error: $written")
+                        break
+                    }
                 }
 
-                kotlinx.coroutines.delay(160L)
-                track.stop()
-                track.release()
+                if (!isStopped) {
+                    kotlinx.coroutines.delay(160L)
+                    success = true
+                }
+                try {
+                    track.stop()
+                    track.release()
+                } catch (_: Exception) {}
                 audioTrack = null
-                success = true
-                Log.i(TAG, "Audio file preset successfully injected into call uplink with pristine 48kHz HD quality: ${file.name}")
+                Log.i(TAG, "Audio file preset injection completed (stopped=$isStopped, success=$success): ${file.name}")
             }
         } catch (e: Exception) {
             Log.e(TAG, "injectAudioFile failed", e)
@@ -458,6 +528,7 @@ class RootCallAudioInjector(private val context: Context) {
     }
 
     fun release() {
+        stopInjection()
         try {
             audioTrack?.stop()
             audioTrack?.release()

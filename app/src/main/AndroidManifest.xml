@@ -10,6 +10,7 @@
     <!-- Standard Permissions required for Default Dialer, Call Screening, and AI LLM Engine -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
@@ -31,12 +32,13 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
-        android:name=".CallScreenerApp"
+        android:name="com.callscreener.app.CallScreenerApp"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
-        android:label="Call Screener AI"
+        android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.CallScreener"
@@ -45,7 +47,7 @@
 
         <!-- Main Launcher & Dialer Activity -->
         <activity
-            android:name=".ui.MainActivity"
+            android:name="com.callscreener.app.ui.MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize">

@@ -63,8 +63,9 @@ object NotificationHelper {
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "Notifications for incoming calls"
-                setSound(null, null) // InCallService / RingtonePlayer manages ringtone & vibration directly
-                enableVibration(false)
+                setSound(null, null) // InCallService / RingtonePlayer manages ringtone directly
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 1000, 1000)
                 setShowBadge(true)
                 lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
             }
@@ -303,6 +304,7 @@ object NotificationHelper {
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setVibrate(longArrayOf(0, 1000, 1000))
             .setColor(0xFF1A73E8.toInt()) // Google Blue
             .addAction(
                 R.drawable.ic_notification_screen_ai,

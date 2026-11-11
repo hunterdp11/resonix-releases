@@ -1,13 +1,22 @@
 package com.callscreener.app.ui
 
 import android.net.Uri
+import android.os.Build
 import android.provider.OpenableColumns
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -21,7 +30,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -38,34 +46,31 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.rounded.DragIndicator
-import androidx.compose.material.icons.rounded.GraphicEq
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.KeyboardArrowUp
-import androidx.compose.material.icons.rounded.KeyboardDoubleArrowUp
-import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.FileUpload
+import androidx.compose.material.icons.rounded.RecordVoiceOver
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -88,13 +93,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import com.callscreener.app.engine.AudioPresetManager
 import com.callscreener.app.engine.QuickReplyManager
 import com.callscreener.app.model.AudioPreset
 import com.callscreener.app.model.QuickReply
+import com.callscreener.app.ui.theme.GoogleSans
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 enum class PresetManagerTab {
@@ -148,20 +153,12 @@ class LazyListDragDropState(
         // Auto-scroll when dragging near viewport top/bottom edges
         val viewportStart = listState.layoutInfo.viewportStartOffset
         val viewportEnd = listState.layoutInfo.viewportEndOffset
-        val topThreshold = viewportStart + 130f
-        val bottomThreshold = viewportEnd - 130f
+        val threshold = 90
 
-        val itemTop = currentItemInfo.offset + dragOffset
-        val itemBottom = itemTop + currentItemInfo.size
-
-        if (itemTop < topThreshold) {
-            val scrollDelta = ((itemTop - topThreshold) * 0.22f).coerceIn(-30f, -4f)
-            val consumed = listState.dispatchRawDelta(scrollDelta)
-            dragOffset -= consumed
-        } else if (itemBottom > bottomThreshold) {
-            val scrollDelta = ((itemBottom - bottomThreshold) * 0.22f).coerceIn(4f, 30f)
-            val consumed = listState.dispatchRawDelta(scrollDelta)
-            dragOffset -= consumed
+        if (currentItemCenter < viewportStart + threshold) {
+            // Dragged near top edge
+        } else if (currentItemCenter > viewportEnd - threshold) {
+            // Dragged near bottom edge
         }
     }
 
@@ -177,24 +174,38 @@ class LazyListDragDropState(
 }
 
 /**
- * Dedicated Full-Screen Frosted Glass Management Page:
- * Allows user to Reorder / Align, Edit, Delete, Import Audio, and Add Custom Quick Replies.
- * Changes immediately reflect in both the soundboard and in-call screening ribbons!
+ * Pixel Expressive / Material 3 Presets & Responses Full-Screen Page.
+ * Dedicated edge-to-edge subpage with seamless fluid animations, clean back navigation,
+ * tactile drag-and-drop reordering, quick replies, and audio preset management.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PresetManagementScreen(
     presetManager: AudioPresetManager,
     quickReplyManager: QuickReplyManager,
+    monetColors: ColorScheme? = null,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
 
+    val colors: ColorScheme = monetColors ?: remember(context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                dynamicDarkColorScheme(context)
+            } catch (_: Exception) {
+                getPixelMonetDarkColorScheme()
+            }
+        } else {
+            getPixelMonetDarkColorScheme()
+        }
+    }
+
     val presets by presetManager.presets.collectAsState()
     val quickReplies by quickReplyManager.quickReplies.collectAsState()
     val playingId by presetManager.currentlyPlayingId.collectAsState()
+    val isPresetPaused by presetManager.isPaused.collectAsState()
 
     var activeTab by remember { mutableStateOf(PresetManagerTab.SOUNDBOARD_AUDIO) }
 
@@ -238,473 +249,482 @@ fun PresetManagementScreen(
         }
     }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
-        )
+    var isVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        isVisible = true
+    }
+
+    fun animateDismiss() {
+        if (!isVisible) return
+        scope.launch {
+            isVisible = false
+            delay(180)
+            onDismiss()
+        }
+    }
+
+    BackHandler(enabled = isVisible) {
+        animateDismiss()
+    }
+
+    AnimatedVisibility(
+        visible = isVisible,
+        enter = slideInHorizontally(
+            initialOffsetX = { fullWidth -> fullWidth },
+            animationSpec = spring(
+                dampingRatio = 0.85f,
+                stiffness = Spring.StiffnessMediumLow
+            )
+        ) + fadeIn(animationSpec = tween(200)),
+        exit = slideOutHorizontally(
+            targetOffsetX = { fullWidth -> fullWidth },
+            animationSpec = tween(180, easing = FastOutLinearInEasing)
+        ) + fadeOut(animationSpec = tween(140))
     ) {
-        Surface(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF090B10)),
-            color = Color(0xFF090B10)
+                .background(colors.background)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) {}
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                // Background Ambient Glow
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+            ) {
+                // Pixel Expressive Header Bar: Left Arrow Back, Title, Subtitle (No Cross Icon)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    IconButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            animateDismiss()
+                        },
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(colors.surfaceContainerHigh.copy(alpha = 0.8f))
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = "Back",
+                            tint = colors.onSurface,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Presets & Responses",
+                            color = colors.onSurface,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = GoogleSans,
+                            letterSpacing = (-0.3).sp
+                        )
+                        Text(
+                            text = "Soundboard & in-call responses",
+                            color = colors.onSurfaceVariant,
+                            fontSize = 12.sp,
+                            fontFamily = GoogleSans
+                        )
+                    }
+                }
+
+                // Minimal Pixel Segmented Tab Switcher
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color(0xFF141926),
-                                    Color(0xFF0B0E14),
-                                    Color(0xFF06080C)
-                                )
-                            )
-                        )
-                )
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .statusBarsPadding()
-                        .navigationBarsPadding()
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(colors.surfaceContainerHigh.copy(alpha = 0.5f))
+                        .border(0.8.dp, colors.outlineVariant.copy(alpha = 0.25f), RoundedCornerShape(20.dp))
+                        .padding(4.dp)
                 ) {
-                    // Header Bar
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        // Tab 1: Soundboard
+                        val isSoundboard = activeTab == PresetManagerTab.SOUNDBOARD_AUDIO
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(38.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(if (isSoundboard) colors.surfaceContainerHighest else Color.Transparent)
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    activeTab = PresetManagerTab.SOUNDBOARD_AUDIO
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Soundboard (${presets.size})",
+                                color = if (isSoundboard) colors.onSurface else colors.onSurfaceVariant,
+                                fontSize = 12.5.sp,
+                                fontWeight = if (isSoundboard) FontWeight.Bold else FontWeight.Medium,
+                                fontFamily = GoogleSans
+                            )
+                        }
+
+                        // Tab 2: Quick Replies
+                        val isReplies = activeTab == PresetManagerTab.QUICK_REPLIES
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(38.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(if (isReplies) colors.surfaceContainerHighest else Color.Transparent)
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    activeTab = PresetManagerTab.QUICK_REPLIES
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Quick Replies (${quickReplies.size})",
+                                color = if (isReplies) colors.onSurface else colors.onSurfaceVariant,
+                                fontSize = 12.5.sp,
+                                fontWeight = if (isReplies) FontWeight.Bold else FontWeight.Medium,
+                                fontFamily = GoogleSans
+                            )
+                        }
+                    }
+                }
+
+                // Content Section based on Tab
+                if (activeTab == PresetManagerTab.SOUNDBOARD_AUDIO) {
+                    // Action Bar: Import Audio & Add Speech
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        // Button 1: Import Audio File
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(42.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(colors.primaryContainer.copy(alpha = 0.5f))
+                                .border(0.8.dp, colors.primary.copy(alpha = 0.25f), RoundedCornerShape(16.dp))
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    audioPickerLauncher.launch("audio/*")
+                                },
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0x18FFFFFF))
-                                    .border(0.8.dp, Color(0x30FFFFFF), RoundedCornerShape(12.dp)),
-                                contentAlignment = Alignment.Center
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Rounded.Tune,
+                                    imageVector = Icons.Rounded.FileUpload,
                                     contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                            Column {
-                                Text(
-                                    text = "Presets & Responses",
-                                    color = Color.White,
-                                    fontSize = 19.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = (-0.4).sp
+                                    tint = colors.onPrimaryContainer,
+                                    modifier = Modifier.size(16.dp)
                                 )
                                 Text(
-                                    text = "Align, reorder, edit and manage in-call speech",
-                                    color = Color(0x99FFFFFF),
-                                    fontSize = 11.5.sp
+                                    text = "Import Audio",
+                                    color = colors.onPrimaryContainer,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontFamily = GoogleSans
                                 )
                             }
                         }
 
-                        IconButton(
-                            onClick = onDismiss,
+                        // Button 2: Add Speech Preset
+                        Box(
                             modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Color(0x18FFFFFF))
+                                .weight(1f)
+                                .height(42.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(colors.surfaceContainerHigh.copy(alpha = 0.6f))
+                                .border(0.8.dp, colors.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    isAddingTextPreset = true
+                                },
+                            contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.Close,
-                                contentDescription = "Close",
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.RecordVoiceOver,
+                                    contentDescription = null,
+                                    tint = colors.onSurface,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "Add Speech",
+                                    color = colors.onSurface,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    fontFamily = GoogleSans
+                                )
+                            }
                         }
                     }
 
-                    // Frosted Segmented Tab Switcher
-                    Box(
+                    // Subtle Drag Hint
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 6.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color(0x18FFFFFF))
-                            .border(0.8.dp, Color(0x25FFFFFF), RoundedCornerShape(16.dp))
-                            .padding(3.dp)
+                            .padding(horizontal = 20.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            // Tab 1: Soundboard
-                            val isSoundboard = activeTab == PresetManagerTab.SOUNDBOARD_AUDIO
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(38.dp)
-                                    .clip(RoundedCornerShape(13.dp))
-                                    .background(if (isSoundboard) Color(0x35FFFFFF) else Color.Transparent)
-                                    .clickable {
+                        Icon(
+                            imageVector = Icons.Rounded.DragIndicator,
+                            contentDescription = null,
+                            tint = colors.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = "Hold & drag ⠿ to reorder presets",
+                            color = colors.onSurfaceVariant.copy(alpha = 0.6f),
+                            fontSize = 11.5.sp,
+                            fontFamily = GoogleSans
+                        )
+                    }
+
+                    // Presets List with Hold & Drag Reordering, Instant Move-to-Top & Up/Down Controls
+                    LazyColumn(
+                        state = soundboardListState,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        itemsIndexed(presets, key = { _, item -> item.id }) { index, preset ->
+                            val isDragging = soundboardDragDropState.draggedIndex == index
+                            SoundboardPresetItemRow(
+                                preset = preset,
+                                index = index,
+                                totalCount = presets.size,
+                                isPlaying = playingId == preset.id && !isPresetPaused,
+                                isPaused = playingId == preset.id && isPresetPaused,
+                                isDragging = isDragging,
+                                dragOffset = if (isDragging) soundboardDragDropState.dragOffset else 0f,
+                                colors = colors,
+                                onDragStart = {
+                                    val currIdx = presets.indexOfFirst { it.id == preset.id }
+                                    if (currIdx >= 0) soundboardDragDropState.onDragStart(currIdx)
+                                },
+                                onDrag = { deltaY ->
+                                    soundboardDragDropState.onDrag(deltaY, presets.size) {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        activeTab = PresetManagerTab.SOUNDBOARD_AUDIO
-                                    },
-                                contentAlignment = Alignment.Center
+                                    }
+                                },
+                                onDragEnd = { soundboardDragDropState.onDragEnd() },
+                                onDragCancel = { soundboardDragDropState.onDragCancel() },
+                                onMoveToTop = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    scope.launch {
+                                        presetManager.movePresetToTop(preset.id)
+                                        soundboardListState.animateScrollToItem(0)
+                                    }
+                                },
+                                onMoveUp = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    presetManager.movePresetUp(preset.id)
+                                },
+                                onMoveDown = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    presetManager.movePresetDown(preset.id)
+                                },
+                                onPlayPreview = {
+                                    if (playingId == preset.id) {
+                                        if (!isPresetPaused) {
+                                            presetManager.pausePreview()
+                                        } else {
+                                            presetManager.resumePreview()
+                                        }
+                                    } else {
+                                        presetManager.previewPreset(preset)
+                                    }
+                                },
+                                onEdit = { editingPreset = preset },
+                                onDelete = {
+                                    deleteConfirmationItem = preset.id to preset.title
+                                },
+                                modifier = Modifier.animateItemPlacement()
+                            )
+                        }
+
+                        item {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            TextButton(
+                                onClick = { isResetConfirmOpen = true },
+                                modifier = Modifier.fillMaxWidth()
                             ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Refresh,
+                                    contentDescription = null,
+                                    tint = colors.onSurfaceVariant.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "Soundboard (${presets.size})",
-                                    color = if (isSoundboard) Color.White else Color(0x80FFFFFF),
-                                    fontSize = 12.5.sp,
-                                    fontWeight = if (isSoundboard) FontWeight.Bold else FontWeight.Medium
+                                    text = "Reset Soundboard to Default Presets",
+                                    color = colors.onSurfaceVariant.copy(alpha = 0.7f),
+                                    fontSize = 12.sp,
+                                    fontFamily = GoogleSans
                                 )
                             }
-
-                            // Tab 2: Quick Replies
-                            val isReplies = activeTab == PresetManagerTab.QUICK_REPLIES
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(38.dp)
-                                    .clip(RoundedCornerShape(13.dp))
-                                    .background(if (isReplies) Color(0x35FFFFFF) else Color.Transparent)
-                                    .clickable {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        activeTab = PresetManagerTab.QUICK_REPLIES
-                                    },
-                                contentAlignment = Alignment.Center
+                            Spacer(modifier = Modifier.height(20.dp))
+                        }
+                    }
+                } else {
+                    // Quick Replies Tab Action Bar
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(42.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(colors.primaryContainer.copy(alpha = 0.5f))
+                                .border(0.8.dp, colors.primary.copy(alpha = 0.25f), RoundedCornerShape(16.dp))
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                isAddingQuickReply = true
+                            },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Add,
+                                    contentDescription = null,
+                                    tint = colors.onPrimaryContainer,
+                                    modifier = Modifier.size(16.dp)
+                                )
                                 Text(
-                                    text = "Quick Replies (${quickReplies.size})",
-                                    color = if (isReplies) Color.White else Color(0x80FFFFFF),
+                                    text = "Add Custom Quick Reply",
+                                    color = colors.onPrimaryContainer,
                                     fontSize = 12.5.sp,
-                                    fontWeight = if (isReplies) FontWeight.Bold else FontWeight.Medium
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontFamily = GoogleSans
                                 )
                             }
                         }
                     }
 
-                    // Content Section based on Tab
-                    if (activeTab == PresetManagerTab.SOUNDBOARD_AUDIO) {
-                        // Action Bar: Import Audio & Add Speech
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Button 1: Import Audio File
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(40.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0x18FFFFFF))
-                                    .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(12.dp))
-                                    .clickable {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        audioPickerLauncher.launch("audio/*")
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Add,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Text(
-                                        text = "Import Audio",
-                                        color = Color.White,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-                            }
+                    // Subtle Drag Hint
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.DragIndicator,
+                            contentDescription = null,
+                            tint = colors.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = "Hold & drag ⠿ to reorder presets",
+                            color = colors.onSurfaceVariant.copy(alpha = 0.6f),
+                            fontSize = 11.5.sp,
+                            fontFamily = GoogleSans
+                        )
+                    }
 
-                            // Button 2: Add Speech Preset
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(40.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0x10FFFFFF))
-                                    .border(0.8.dp, Color(0x1EFFFFFF), RoundedCornerShape(12.dp))
-                                    .clickable {
+                    // Quick Replies List with Hold & Drag Reordering, Instant Move-to-Top & Up/Down Controls
+                    LazyColumn(
+                        state = quickRepliesListState,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        itemsIndexed(quickReplies, key = { _, item -> item.id }) { index, reply ->
+                            val isDragging = quickRepliesDragDropState.draggedIndex == index
+                            QuickReplyItemRow(
+                                reply = reply,
+                                index = index,
+                                totalCount = quickReplies.size,
+                                isDragging = isDragging,
+                                dragOffset = if (isDragging) quickRepliesDragDropState.dragOffset else 0f,
+                                colors = colors,
+                                onDragStart = {
+                                    val currIdx = quickReplies.indexOfFirst { it.id == reply.id }
+                                    if (currIdx >= 0) quickRepliesDragDropState.onDragStart(currIdx)
+                                },
+                                onDrag = { deltaY ->
+                                    quickRepliesDragDropState.onDrag(deltaY, quickReplies.size) {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        isAddingTextPreset = true
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Add,
-                                        contentDescription = null,
-                                        tint = Color(0xB0FFFFFF),
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Text(
-                                        text = "Add Speech",
-                                        color = Color(0xE0FFFFFF),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                            }
-                        }
-
-                        // Subtle Drag Hint
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 22.dp, vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.DragIndicator,
-                                contentDescription = null,
-                                tint = Color(0x60FFFFFF),
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Text(
-                                text = "Drag ⠿ to reorder presets",
-                                color = Color(0x60FFFFFF),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Normal
+                                    }
+                                },
+                                onDragEnd = { quickRepliesDragDropState.onDragEnd() },
+                                onDragCancel = { quickRepliesDragDropState.onDragCancel() },
+                                onMoveToTop = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    scope.launch {
+                                        quickReplyManager.moveToTop(reply.id)
+                                        quickRepliesListState.animateScrollToItem(0)
+                                    }
+                                },
+                                onMoveUp = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    quickReplyManager.moveUp(reply.id)
+                                },
+                                onMoveDown = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    quickReplyManager.moveDown(reply.id)
+                                },
+                                onEdit = { editingQuickReply = reply },
+                                onDelete = {
+                                    deleteConfirmationItem = reply.id to reply.title
+                                },
+                                modifier = Modifier.animateItemPlacement()
                             )
                         }
 
-                        // Presets List with Hold & Drag Reordering, Instant Move-to-Top & Up/Down Controls
-                        LazyColumn(
-                            state = soundboardListState,
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth(),
-                            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            itemsIndexed(presets, key = { _, item -> item.id }) { index, preset ->
-                                val isDragging = soundboardDragDropState.draggedIndex == index
-                                SoundboardPresetItemRow(
-                                    preset = preset,
-                                    index = index,
-                                    totalCount = presets.size,
-                                    isPlaying = playingId == preset.id,
-                                    isDragging = isDragging,
-                                    dragOffset = if (isDragging) soundboardDragDropState.dragOffset else 0f,
-                                    onDragStart = {
-                                        val currIdx = presets.indexOfFirst { it.id == preset.id }
-                                        if (currIdx >= 0) soundboardDragDropState.onDragStart(currIdx)
-                                    },
-                                    onDrag = { deltaY ->
-                                        soundboardDragDropState.onDrag(deltaY, presets.size) {
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        }
-                                    },
-                                    onDragEnd = { soundboardDragDropState.onDragEnd() },
-                                    onDragCancel = { soundboardDragDropState.onDragCancel() },
-                                    onMoveToTop = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        scope.launch {
-                                            presetManager.movePresetToTop(preset.id)
-                                            soundboardListState.animateScrollToItem(0)
-                                        }
-                                    },
-                                    onMoveUp = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        presetManager.movePresetUp(preset.id)
-                                    },
-                                    onMoveDown = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        presetManager.movePresetDown(preset.id)
-                                    },
-                                    onPlayPreview = {
-                                        if (playingId == preset.id) {
-                                            presetManager.stopPreview()
-                                        } else {
-                                            presetManager.previewPreset(preset)
-                                        }
-                                    },
-                                    onEdit = { editingPreset = preset },
-                                    onDelete = {
-                                        deleteConfirmationItem = preset.id to preset.title
-                                    },
-                                    modifier = Modifier.animateItemPlacement()
+                        item {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            TextButton(
+                                onClick = { isResetConfirmOpen = true },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Refresh,
+                                    contentDescription = null,
+                                    tint = colors.onSurfaceVariant.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Reset Quick Replies to Default",
+                                    color = colors.onSurfaceVariant.copy(alpha = 0.7f),
+                                    fontSize = 12.sp,
+                                    fontFamily = GoogleSans
                                 )
                             }
-
-                            item {
-                                Spacer(modifier = Modifier.height(12.dp))
-                                TextButton(
-                                    onClick = { isResetConfirmOpen = true },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Refresh,
-                                        contentDescription = null,
-                                        tint = Color(0x80FFFFFF),
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Reset Soundboard to Default Presets",
-                                        color = Color(0x80FFFFFF),
-                                        fontSize = 12.sp
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(20.dp))
-                            }
-                        }
-                    } else {
-                        // Quick Replies Tab Action Bar
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(40.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0x18FFFFFF))
-                                    .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(12.dp))
-                                    .clickable {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        isAddingQuickReply = true
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Add,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Text(
-                                        text = "Add Custom Quick Reply",
-                                        color = Color.White,
-                                        fontSize = 12.5.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-                            }
-                        }
-
-                        // Subtle Drag Hint
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 22.dp, vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.DragIndicator,
-                                contentDescription = null,
-                                tint = Color(0x60FFFFFF),
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Text(
-                                text = "Drag ⠿ to reorder presets",
-                                color = Color(0x60FFFFFF),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Normal
-                            )
-                        }
-
-                        // Quick Replies List with Hold & Drag Reordering, Instant Move-to-Top & Up/Down Controls
-                        LazyColumn(
-                            state = quickRepliesListState,
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth(),
-                            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            itemsIndexed(quickReplies, key = { _, item -> item.id }) { index, reply ->
-                                val isDragging = quickRepliesDragDropState.draggedIndex == index
-                                QuickReplyItemRow(
-                                    reply = reply,
-                                    index = index,
-                                    totalCount = quickReplies.size,
-                                    isDragging = isDragging,
-                                    dragOffset = if (isDragging) quickRepliesDragDropState.dragOffset else 0f,
-                                    onDragStart = {
-                                        val currIdx = quickReplies.indexOfFirst { it.id == reply.id }
-                                        if (currIdx >= 0) quickRepliesDragDropState.onDragStart(currIdx)
-                                    },
-                                    onDrag = { deltaY ->
-                                        quickRepliesDragDropState.onDrag(deltaY, quickReplies.size) {
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        }
-                                    },
-                                    onDragEnd = { quickRepliesDragDropState.onDragEnd() },
-                                    onDragCancel = { quickRepliesDragDropState.onDragCancel() },
-                                    onMoveToTop = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        scope.launch {
-                                            quickReplyManager.moveToTop(reply.id)
-                                            quickRepliesListState.animateScrollToItem(0)
-                                        }
-                                    },
-                                    onMoveUp = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        quickReplyManager.moveUp(reply.id)
-                                    },
-                                    onMoveDown = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        quickReplyManager.moveDown(reply.id)
-                                    },
-                                    onEdit = { editingQuickReply = reply },
-                                    onDelete = {
-                                        deleteConfirmationItem = reply.id to reply.title
-                                    },
-                                    modifier = Modifier.animateItemPlacement()
-                                )
-                            }
-
-                            item {
-                                Spacer(modifier = Modifier.height(12.dp))
-                                TextButton(
-                                    onClick = { isResetConfirmOpen = true },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Refresh,
-                                        contentDescription = null,
-                                        tint = Color(0x80FFFFFF),
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Reset Quick Replies to Default",
-                                        color = Color(0x80FFFFFF),
-                                        fontSize = 12.sp
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(20.dp))
-                            }
+                            Spacer(modifier = Modifier.height(20.dp))
                         }
                     }
                 }
@@ -713,7 +733,7 @@ fun PresetManagementScreen(
     }
 
     // ==========================================
-    // DIALOGS: IMPORT AUDIO, EDIT, ADD & DELETE
+    // PIXEL EXPRESSIVE DIALOGS
     // ==========================================
 
     // 1. Import Audio File Dialog
@@ -726,26 +746,39 @@ fun PresetManagementScreen(
 
         AlertDialog(
             onDismissRequest = { pendingImportUri = null },
-            title = { Text(text = "Import Audio Preset", color = Color.White, fontWeight = FontWeight.Bold) },
+            shape = RoundedCornerShape(28.dp),
+            containerColor = colors.surfaceContainerHighest,
+            title = {
+                Text(
+                    text = "Import Audio Preset",
+                    color = colors.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = GoogleSans
+                )
+            },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
                         text = "Enter a display name for this custom audio track in the in-call soundboard:",
-                        color = Color(0xCCFFFFFF),
-                        fontSize = 13.sp
+                        color = colors.onSurfaceVariant,
+                        fontSize = 13.sp,
+                        fontFamily = GoogleSans
                     )
                     OutlinedTextField(
                         value = importTitle,
                         onValueChange = { importTitle = it },
                         label = { Text("Preset Title") },
                         singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF64B5F6),
-                            unfocusedBorderColor = Color(0x40FFFFFF),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        modifier = Modifier.fillMaxWidth()
+                            focusedBorderColor = colors.primary,
+                            unfocusedBorderColor = colors.outlineVariant,
+                            focusedTextColor = colors.onSurface,
+                            unfocusedTextColor = colors.onSurface,
+                            focusedLabelColor = colors.primary,
+                            unfocusedLabelColor = colors.onSurfaceVariant
+                        )
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -754,12 +787,14 @@ fun PresetManagementScreen(
                         Checkbox(
                             checked = placeAtTop,
                             onCheckedChange = { placeAtTop = it },
-                            colors = CheckboxDefaults.colors(checkedColor = Color(0xFF3872E0))
+                            colors = CheckboxDefaults.colors(checkedColor = colors.primary)
                         )
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Place at Top of Soundboard (Instant Access)",
-                            color = Color.White,
-                            fontSize = 12.5.sp
+                            text = "Place at Top of Soundboard",
+                            color = colors.onSurface,
+                            fontSize = 12.5.sp,
+                            fontFamily = GoogleSans
                         )
                     }
                 }
@@ -767,30 +802,26 @@ fun PresetManagementScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        scope.launch {
-                            val res = presetManager.importAudioFile(
-                                title = importTitle.ifBlank { "Custom Audio" },
-                                sourceUri = uri,
-                                insertAtTop = placeAtTop
-                            )
-                            if (res.isSuccess) {
-                                Toast.makeText(context, "Audio preset added!", Toast.LENGTH_SHORT).show()
-                            } else {
-                                Toast.makeText(context, "Failed to import audio", Toast.LENGTH_SHORT).show()
+                        if (importTitle.isNotBlank()) {
+                            scope.launch {
+                                presetManager.importAudioFile(
+                                    title = importTitle,
+                                    sourceUri = uri,
+                                    insertAtTop = placeAtTop
+                                )
                             }
                             pendingImportUri = null
                         }
                     }
                 ) {
-                    Text("Import", color = Color(0xFF64B5F6), fontWeight = FontWeight.Bold)
+                    Text("Import", color = colors.primary, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { pendingImportUri = null }) {
-                    Text("Cancel", color = Color(0x80FFFFFF))
+                    Text("Cancel", color = colors.onSurfaceVariant, fontFamily = GoogleSans)
                 }
-            },
-            containerColor = Color(0xFF181C26)
+            }
         )
     }
 
@@ -802,21 +833,33 @@ fun PresetManagementScreen(
 
         AlertDialog(
             onDismissRequest = { isAddingTextPreset = false },
-            title = { Text(text = "Add Speech Preset", color = Color.White, fontWeight = FontWeight.Bold) },
+            shape = RoundedCornerShape(28.dp),
+            containerColor = colors.surfaceContainerHighest,
+            title = {
+                Text(
+                    text = "Add Speech Preset",
+                    color = colors.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = GoogleSans
+                )
+            },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
                         value = newTitle,
                         onValueChange = { newTitle = it },
                         label = { Text("Display Title") },
                         placeholder = { Text("e.g. Call Later") },
                         singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF64B5F6),
-                            unfocusedBorderColor = Color(0x40FFFFFF),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
+                            focusedBorderColor = colors.primary,
+                            unfocusedBorderColor = colors.outlineVariant,
+                            focusedTextColor = colors.onSurface,
+                            unfocusedTextColor = colors.onSurface,
+                            focusedLabelColor = colors.primary,
+                            unfocusedLabelColor = colors.onSurfaceVariant
                         )
                     )
                     OutlinedTextField(
@@ -825,12 +868,15 @@ fun PresetManagementScreen(
                         label = { Text("Spoken Text (Synthesized to Caller)") },
                         placeholder = { Text("e.g. I am busy, I will call you later.") },
                         minLines = 2,
+                        shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF64B5F6),
-                            unfocusedBorderColor = Color(0x40FFFFFF),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
+                            focusedBorderColor = colors.primary,
+                            unfocusedBorderColor = colors.outlineVariant,
+                            focusedTextColor = colors.onSurface,
+                            unfocusedTextColor = colors.onSurface,
+                            focusedLabelColor = colors.primary,
+                            unfocusedLabelColor = colors.onSurfaceVariant
                         )
                     )
                     Row(
@@ -840,12 +886,14 @@ fun PresetManagementScreen(
                         Checkbox(
                             checked = placeAtTop,
                             onCheckedChange = { placeAtTop = it },
-                            colors = CheckboxDefaults.colors(checkedColor = Color(0xFF3872E0))
+                            colors = CheckboxDefaults.colors(checkedColor = colors.primary)
                         )
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "Place at Top of Soundboard",
-                            color = Color.White,
-                            fontSize = 12.5.sp
+                            color = colors.onSurface,
+                            fontSize = 12.5.sp,
+                            fontFamily = GoogleSans
                         )
                     }
                 }
@@ -863,15 +911,14 @@ fun PresetManagementScreen(
                         }
                     }
                 ) {
-                    Text("Add", color = Color(0xFF64B5F6), fontWeight = FontWeight.Bold)
+                    Text("Add", color = colors.primary, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { isAddingTextPreset = false }) {
-                    Text("Cancel", color = Color(0x80FFFFFF))
+                    Text("Cancel", color = colors.onSurfaceVariant, fontFamily = GoogleSans)
                 }
-            },
-            containerColor = Color(0xFF181C26)
+            }
         )
     }
 
@@ -882,20 +929,32 @@ fun PresetManagementScreen(
 
         AlertDialog(
             onDismissRequest = { editingPreset = null },
-            title = { Text(text = "Edit Preset", color = Color.White, fontWeight = FontWeight.Bold) },
+            shape = RoundedCornerShape(28.dp),
+            containerColor = colors.surfaceContainerHighest,
+            title = {
+                Text(
+                    text = "Edit Preset",
+                    color = colors.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = GoogleSans
+                )
+            },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
                         value = editTitle,
                         onValueChange = { editTitle = it },
                         label = { Text("Title") },
                         singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF64B5F6),
-                            unfocusedBorderColor = Color(0x40FFFFFF),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
+                            focusedBorderColor = colors.primary,
+                            unfocusedBorderColor = colors.outlineVariant,
+                            focusedTextColor = colors.onSurface,
+                            unfocusedTextColor = colors.onSurface,
+                            focusedLabelColor = colors.primary,
+                            unfocusedLabelColor = colors.onSurfaceVariant
                         )
                     )
                     if (!preset.isAudioFile) {
@@ -904,19 +963,22 @@ fun PresetManagementScreen(
                             onValueChange = { editText = it },
                             label = { Text("Spoken Text") },
                             minLines = 2,
+                            shape = RoundedCornerShape(14.dp),
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color(0xFF64B5F6),
-                                unfocusedBorderColor = Color(0x40FFFFFF),
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White
+                                focusedBorderColor = colors.primary,
+                                unfocusedBorderColor = colors.outlineVariant,
+                                focusedTextColor = colors.onSurface,
+                                unfocusedTextColor = colors.onSurface,
+                                focusedLabelColor = colors.primary,
+                                unfocusedLabelColor = colors.onSurfaceVariant
                             )
                         )
                     } else {
                         Text(
                             text = "Audio file: ${preset.textOrPath.substringAfterLast("/")}",
-                            color = Color(0x80FFFFFF),
-                            fontSize = 11.sp,
+                            color = colors.onSurfaceVariant,
+                            fontSize = 11.5.sp,
                             fontFamily = FontFamily.Monospace
                         )
                     }
@@ -933,15 +995,14 @@ fun PresetManagementScreen(
                         editingPreset = null
                     }
                 ) {
-                    Text("Save", color = Color(0xFF64B5F6), fontWeight = FontWeight.Bold)
+                    Text("Save", color = colors.primary, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { editingPreset = null }) {
-                    Text("Cancel", color = Color(0x80FFFFFF))
+                    Text("Cancel", color = colors.onSurfaceVariant, fontFamily = GoogleSans)
                 }
-            },
-            containerColor = Color(0xFF181C26)
+            }
         )
     }
 
@@ -954,21 +1015,33 @@ fun PresetManagementScreen(
 
         AlertDialog(
             onDismissRequest = { isAddingQuickReply = false },
-            title = { Text(text = "Add Quick Reply", color = Color.White, fontWeight = FontWeight.Bold) },
+            shape = RoundedCornerShape(28.dp),
+            containerColor = colors.surfaceContainerHighest,
+            title = {
+                Text(
+                    text = "Add Quick Reply",
+                    color = colors.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = GoogleSans
+                )
+            },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
                         value = replyTitle,
                         onValueChange = { replyTitle = it },
                         label = { Text("Button Title") },
                         placeholder = { Text("e.g. Call back at 5pm") },
                         singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF81C784),
-                            unfocusedBorderColor = Color(0x40FFFFFF),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
+                            focusedBorderColor = colors.primary,
+                            unfocusedBorderColor = colors.outlineVariant,
+                            focusedTextColor = colors.onSurface,
+                            unfocusedTextColor = colors.onSurface,
+                            focusedLabelColor = colors.primary,
+                            unfocusedLabelColor = colors.onSurfaceVariant
                         )
                     )
                     OutlinedTextField(
@@ -977,12 +1050,15 @@ fun PresetManagementScreen(
                         label = { Text("Spoken Voice Message to Caller") },
                         placeholder = { Text("e.g. Please call me back at 5pm, thank you.") },
                         minLines = 2,
+                        shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF81C784),
-                            unfocusedBorderColor = Color(0x40FFFFFF),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
+                            focusedBorderColor = colors.primary,
+                            unfocusedBorderColor = colors.outlineVariant,
+                            focusedTextColor = colors.onSurface,
+                            unfocusedTextColor = colors.onSurface,
+                            focusedLabelColor = colors.primary,
+                            unfocusedLabelColor = colors.onSurfaceVariant
                         )
                     )
                     Row(
@@ -990,11 +1066,19 @@ fun PresetManagementScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "Hindi / Hinglish Mode", color = Color.White, fontSize = 13.sp)
+                        Text(
+                            text = "Hindi / Hinglish Mode",
+                            color = colors.onSurface,
+                            fontSize = 13.sp,
+                            fontFamily = GoogleSans
+                        )
                         Switch(
                             checked = isHindi,
                             onCheckedChange = { isHindi = it },
-                            colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFF4CAF50))
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = colors.onPrimary,
+                                checkedTrackColor = colors.primary
+                            )
                         )
                     }
                     Row(
@@ -1004,12 +1088,14 @@ fun PresetManagementScreen(
                         Checkbox(
                             checked = placeAtTop,
                             onCheckedChange = { placeAtTop = it },
-                            colors = CheckboxDefaults.colors(checkedColor = Color(0xFF4CAF50))
+                            colors = CheckboxDefaults.colors(checkedColor = colors.primary)
                         )
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "Place at Front of Ribbon (First in Call Screen)",
-                            color = Color.White,
-                            fontSize = 12.sp
+                            color = colors.onSurface,
+                            fontSize = 12.sp,
+                            fontFamily = GoogleSans
                         )
                     }
                 }
@@ -1028,15 +1114,14 @@ fun PresetManagementScreen(
                         }
                     }
                 ) {
-                    Text("Add", color = Color(0xFF81C784), fontWeight = FontWeight.Bold)
+                    Text("Add", color = colors.primary, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { isAddingQuickReply = false }) {
-                    Text("Cancel", color = Color(0x80FFFFFF))
+                    Text("Cancel", color = colors.onSurfaceVariant, fontFamily = GoogleSans)
                 }
-            },
-            containerColor = Color(0xFF181C26)
+            }
         )
     }
 
@@ -1048,20 +1133,32 @@ fun PresetManagementScreen(
 
         AlertDialog(
             onDismissRequest = { editingQuickReply = null },
-            title = { Text(text = "Edit Quick Reply", color = Color.White, fontWeight = FontWeight.Bold) },
+            shape = RoundedCornerShape(28.dp),
+            containerColor = colors.surfaceContainerHighest,
+            title = {
+                Text(
+                    text = "Edit Quick Reply",
+                    color = colors.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = GoogleSans
+                )
+            },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
                         value = editTitle,
                         onValueChange = { editTitle = it },
                         label = { Text("Button Title") },
                         singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF81C784),
-                            unfocusedBorderColor = Color(0x40FFFFFF),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
+                            focusedBorderColor = colors.primary,
+                            unfocusedBorderColor = colors.outlineVariant,
+                            focusedTextColor = colors.onSurface,
+                            unfocusedTextColor = colors.onSurface,
+                            focusedLabelColor = colors.primary,
+                            unfocusedLabelColor = colors.onSurfaceVariant
                         )
                     )
                     OutlinedTextField(
@@ -1069,12 +1166,15 @@ fun PresetManagementScreen(
                         onValueChange = { editSpoken = it },
                         label = { Text("Spoken Message") },
                         minLines = 2,
+                        shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF81C784),
-                            unfocusedBorderColor = Color(0x40FFFFFF),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
+                            focusedBorderColor = colors.primary,
+                            unfocusedBorderColor = colors.outlineVariant,
+                            focusedTextColor = colors.onSurface,
+                            unfocusedTextColor = colors.onSurface,
+                            focusedLabelColor = colors.primary,
+                            unfocusedLabelColor = colors.onSurfaceVariant
                         )
                     )
                     Row(
@@ -1082,11 +1182,19 @@ fun PresetManagementScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "Hindi Mode", color = Color.White, fontSize = 13.sp)
+                        Text(
+                            text = "Hindi Mode",
+                            color = colors.onSurface,
+                            fontSize = 13.sp,
+                            fontFamily = GoogleSans
+                        )
                         Switch(
                             checked = isHindi,
                             onCheckedChange = { isHindi = it },
-                            colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFF4CAF50))
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = colors.onPrimary,
+                                checkedTrackColor = colors.primary
+                            )
                         )
                     }
                 }
@@ -1103,15 +1211,14 @@ fun PresetManagementScreen(
                         editingQuickReply = null
                     }
                 ) {
-                    Text("Save", color = Color(0xFF81C784), fontWeight = FontWeight.Bold)
+                    Text("Save", color = colors.primary, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { editingQuickReply = null }) {
-                    Text("Cancel", color = Color(0x80FFFFFF))
+                    Text("Cancel", color = colors.onSurfaceVariant, fontFamily = GoogleSans)
                 }
-            },
-            containerColor = Color(0xFF181C26)
+            }
         )
     }
 
@@ -1119,12 +1226,22 @@ fun PresetManagementScreen(
     deleteConfirmationItem?.let { (id, title) ->
         AlertDialog(
             onDismissRequest = { deleteConfirmationItem = null },
-            title = { Text(text = "Delete Preset?", color = Color.White, fontWeight = FontWeight.Bold) },
+            shape = RoundedCornerShape(28.dp),
+            containerColor = colors.surfaceContainerHighest,
+            title = {
+                Text(
+                    text = "Delete Preset?",
+                    color = colors.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = GoogleSans
+                )
+            },
             text = {
                 Text(
                     text = "Are you sure you want to remove \"$title\"? It will no longer appear in the in-call ribbon.",
-                    color = Color(0xCCFFFFFF),
-                    fontSize = 13.5.sp
+                    color = colors.onSurfaceVariant,
+                    fontSize = 13.5.sp,
+                    fontFamily = GoogleSans
                 )
             },
             confirmButton = {
@@ -1138,15 +1255,14 @@ fun PresetManagementScreen(
                         deleteConfirmationItem = null
                     }
                 ) {
-                    Text("Delete", color = Color(0xFFFF453A), fontWeight = FontWeight.Bold)
+                    Text("Delete", color = colors.error, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { deleteConfirmationItem = null }) {
-                    Text("Cancel", color = Color(0x80FFFFFF))
+                    Text("Cancel", color = colors.onSurfaceVariant, fontFamily = GoogleSans)
                 }
-            },
-            containerColor = Color(0xFF181C26)
+            }
         )
     }
 
@@ -1154,15 +1270,25 @@ fun PresetManagementScreen(
     if (isResetConfirmOpen) {
         AlertDialog(
             onDismissRequest = { isResetConfirmOpen = false },
-            title = { Text(text = "Reset to Default?", color = Color.White, fontWeight = FontWeight.Bold) },
+            shape = RoundedCornerShape(28.dp),
+            containerColor = colors.surfaceContainerHighest,
+            title = {
+                Text(
+                    text = "Reset to Default?",
+                    color = colors.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = GoogleSans
+                )
+            },
             text = {
                 Text(
                     text = if (activeTab == PresetManagerTab.SOUNDBOARD_AUDIO)
                         "This will restore all default audio soundboard presets while preserving your imported custom audio tracks."
                     else
                         "This will reset all Quick Replies to factory defaults.",
-                    color = Color(0xCCFFFFFF),
-                    fontSize = 13.5.sp
+                    color = colors.onSurfaceVariant,
+                    fontSize = 13.5.sp,
+                    fontFamily = GoogleSans
                 )
             },
             confirmButton = {
@@ -1176,21 +1302,20 @@ fun PresetManagementScreen(
                         isResetConfirmOpen = false
                     }
                 ) {
-                    Text("Reset", color = Color(0xFFFF9500), fontWeight = FontWeight.Bold)
+                    Text("Reset", color = colors.primary, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { isResetConfirmOpen = false }) {
-                    Text("Cancel", color = Color(0x80FFFFFF))
+                    Text("Cancel", color = colors.onSurfaceVariant, fontFamily = GoogleSans)
                 }
-            },
-            containerColor = Color(0xFF181C26)
+            }
         )
     }
 }
 
 /**
- * Soundboard Preset Row: Sleek Minimal Obsidian Glass Design with Tactile Drag Handle, Category Badges & Clean Actions
+ * Soundboard Preset Row: Pixel Expressive Minimalist Card with Tactile Drag Handle, Category Badges & Clean Actions
  */
 @Composable
 fun SoundboardPresetItemRow(
@@ -1198,8 +1323,10 @@ fun SoundboardPresetItemRow(
     index: Int,
     totalCount: Int,
     isPlaying: Boolean,
+    isPaused: Boolean = false,
     isDragging: Boolean = false,
     dragOffset: Float = 0f,
+    colors: ColorScheme,
     onDragStart: () -> Unit,
     onDrag: (Float) -> Unit,
     onDragEnd: () -> Unit,
@@ -1224,16 +1351,15 @@ fun SoundboardPresetItemRow(
             }
             .fillMaxWidth()
             .shadow(
-                elevation = if (isDragging) 12.dp else 0.dp,
-                shape = RoundedCornerShape(16.dp),
-                spotColor = Color(0x80FFFFFF)
+                elevation = if (isDragging) 10.dp else 0.dp,
+                shape = RoundedCornerShape(18.dp)
             )
-            .clip(RoundedCornerShape(16.dp))
-            .background(if (isDragging) Color(0x30FFFFFF) else Color(0x12FFFFFF))
+            .clip(RoundedCornerShape(18.dp))
+            .background(if (isDragging) colors.surfaceContainerHighest else colors.surfaceContainer.copy(alpha = 0.65f))
             .border(
                 width = 0.8.dp,
-                color = if (isDragging) Color(0x80FFFFFF) else Color(0x1CFFFFFF),
-                shape = RoundedCornerShape(16.dp)
+                color = if (isDragging) colors.primary.copy(alpha = 0.5f) else colors.outlineVariant.copy(alpha = 0.25f),
+                shape = RoundedCornerShape(18.dp)
             )
             .pointerInput(preset.id) {
                 detectDragGesturesAfterLongPress(
@@ -1249,7 +1375,7 @@ fun SoundboardPresetItemRow(
                     onDragCancel = onDragCancel
                 )
             }
-            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .padding(horizontal = 12.dp, vertical = 11.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1259,12 +1385,12 @@ fun SoundboardPresetItemRow(
             Box(
                 modifier = Modifier
                     .size(36.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (isDragging) Color(0x35FFFFFF) else Color(0x10FFFFFF))
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isDragging) colors.primary.copy(alpha = 0.2f) else colors.surfaceContainerHigh.copy(alpha = 0.8f))
                     .border(
                         0.8.dp,
-                        if (isDragging) Color(0x60FFFFFF) else Color(0x18FFFFFF),
-                        RoundedCornerShape(10.dp)
+                        if (isDragging) colors.primary.copy(alpha = 0.4f) else colors.outlineVariant.copy(alpha = 0.2f),
+                        RoundedCornerShape(12.dp)
                     )
                     .pointerInput(preset.id) {
                         detectDragGestures(
@@ -1285,8 +1411,8 @@ fun SoundboardPresetItemRow(
                 Icon(
                     imageVector = Icons.Rounded.DragIndicator,
                     contentDescription = "Hold and drag to reorder",
-                    tint = if (isDragging) Color.White else Color(0x90FFFFFF),
-                    modifier = Modifier.size(19.dp)
+                    tint = if (isDragging) colors.primary else colors.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
                 )
             }
 
@@ -1297,13 +1423,13 @@ fun SoundboardPresetItemRow(
                 modifier = Modifier
                     .widthIn(min = 22.dp)
                     .height(22.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0x0EFFFFFF)),
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(colors.surfaceContainerHighest.copy(alpha = 0.6f)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "${index + 1}",
-                    color = Color(0x75FFFFFF),
+                    color = colors.onSurfaceVariant.copy(alpha = 0.8f),
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.SemiBold,
@@ -1322,16 +1448,16 @@ fun SoundboardPresetItemRow(
                     // Type Badge
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
+                            .clip(RoundedCornerShape(6.dp))
                             .background(
-                                if (preset.isAudioFile) Color(0x28FFA726)
-                                else Color(0x2229B6F6)
+                                if (preset.isAudioFile) colors.tertiaryContainer.copy(alpha = 0.7f)
+                                else colors.secondaryContainer.copy(alpha = 0.7f)
                             )
                             .padding(horizontal = 5.dp, vertical = 2.dp)
                     ) {
                         Text(
                             text = if (preset.isAudioFile) "AUDIO" else "SPEECH",
-                            color = if (preset.isAudioFile) Color(0xFFFFB74D) else Color(0xFF81D4FA),
+                            color = if (preset.isAudioFile) colors.onTertiaryContainer else colors.onSecondaryContainer,
                             fontSize = 8.5.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
@@ -1342,8 +1468,9 @@ fun SoundboardPresetItemRow(
                     if (preset.category.isNotBlank() && preset.category != "Custom") {
                         Text(
                             text = preset.category,
-                            color = Color(0x50FFFFFF),
-                            fontSize = 10.sp,
+                            color = colors.onSurfaceVariant.copy(alpha = 0.6f),
+                            fontSize = 10.5.sp,
+                            fontFamily = GoogleSans,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -1353,9 +1480,10 @@ fun SoundboardPresetItemRow(
 
                 Text(
                     text = preset.title,
-                    color = Color.White,
+                    color = colors.onSurface,
                     fontSize = 13.5.sp,
                     fontWeight = FontWeight.SemiBold,
+                    fontFamily = GoogleSans,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1364,8 +1492,9 @@ fun SoundboardPresetItemRow(
                     Spacer(modifier = Modifier.height(1.dp))
                     Text(
                         text = preset.textOrPath,
-                        color = Color(0x70FFFFFF),
-                        fontSize = 11.sp,
+                        color = colors.onSurfaceVariant,
+                        fontSize = 11.5.sp,
+                        fontFamily = GoogleSans,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -1382,9 +1511,13 @@ fun SoundboardPresetItemRow(
                 if (preset.isAudioFile) {
                     Box(
                         modifier = Modifier
-                            .size(32.dp)
+                            .size(34.dp)
                             .clip(CircleShape)
-                            .background(if (isPlaying) Color(0xFFFF9500) else Color(0x18FFFFFF))
+                            .background(
+                                if (isPlaying) colors.primary
+                                else if (isPaused) colors.primaryContainer
+                                else colors.surfaceContainerHigh.copy(alpha = 0.8f)
+                            )
                             .clickable {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 onPlayPreview()
@@ -1392,9 +1525,9 @@ fun SoundboardPresetItemRow(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = if (isPlaying) Icons.Filled.Stop else Icons.Filled.PlayArrow,
-                            contentDescription = if (isPlaying) "Stop" else "Play",
-                            tint = if (isPlaying) Color.Black else Color.White,
+                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (isPlaying) "Pause" else if (isPaused) "Resume" else "Play",
+                            tint = if (isPlaying) colors.onPrimary else if (isPaused) colors.onPrimaryContainer else colors.onSurface,
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -1402,9 +1535,9 @@ fun SoundboardPresetItemRow(
 
                 Box(
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(34.dp)
                         .clip(CircleShape)
-                        .background(Color(0x12FFFFFF))
+                        .background(colors.surfaceContainerHigh.copy(alpha = 0.8f))
                         .clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onEdit()
@@ -1414,16 +1547,16 @@ fun SoundboardPresetItemRow(
                     Icon(
                         imageVector = Icons.Filled.Edit,
                         contentDescription = "Edit",
-                        tint = Color(0xB5FFFFFF),
+                        tint = colors.onSurfaceVariant,
                         modifier = Modifier.size(15.dp)
                     )
                 }
 
                 Box(
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(34.dp)
                         .clip(CircleShape)
-                        .background(Color(0x14FF453A))
+                        .background(colors.errorContainer.copy(alpha = 0.25f))
                         .clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             onDelete()
@@ -1433,7 +1566,7 @@ fun SoundboardPresetItemRow(
                     Icon(
                         imageVector = Icons.Filled.Delete,
                         contentDescription = "Delete",
-                        tint = Color(0xFFFF5252),
+                        tint = colors.error,
                         modifier = Modifier.size(15.dp)
                     )
                 }
@@ -1443,7 +1576,7 @@ fun SoundboardPresetItemRow(
 }
 
 /**
- * Quick Reply Row: Sleek Minimal Obsidian Glass Design with Tactile Drag Handle, Language Badges & Clean Actions
+ * Quick Reply Row: Pixel Expressive Minimalist Card with Tactile Drag Handle, Language Badges & Clean Actions
  */
 @Composable
 fun QuickReplyItemRow(
@@ -1452,6 +1585,7 @@ fun QuickReplyItemRow(
     totalCount: Int,
     isDragging: Boolean = false,
     dragOffset: Float = 0f,
+    colors: ColorScheme,
     onDragStart: () -> Unit,
     onDrag: (Float) -> Unit,
     onDragEnd: () -> Unit,
@@ -1475,16 +1609,15 @@ fun QuickReplyItemRow(
             }
             .fillMaxWidth()
             .shadow(
-                elevation = if (isDragging) 12.dp else 0.dp,
-                shape = RoundedCornerShape(16.dp),
-                spotColor = Color(0x80FFFFFF)
+                elevation = if (isDragging) 10.dp else 0.dp,
+                shape = RoundedCornerShape(18.dp)
             )
-            .clip(RoundedCornerShape(16.dp))
-            .background(if (isDragging) Color(0x30FFFFFF) else Color(0x12FFFFFF))
+            .clip(RoundedCornerShape(18.dp))
+            .background(if (isDragging) colors.surfaceContainerHighest else colors.surfaceContainer.copy(alpha = 0.65f))
             .border(
                 width = 0.8.dp,
-                color = if (isDragging) Color(0x80FFFFFF) else Color(0x1CFFFFFF),
-                shape = RoundedCornerShape(16.dp)
+                color = if (isDragging) colors.primary.copy(alpha = 0.5f) else colors.outlineVariant.copy(alpha = 0.25f),
+                shape = RoundedCornerShape(18.dp)
             )
             .pointerInput(reply.id) {
                 detectDragGesturesAfterLongPress(
@@ -1500,7 +1633,7 @@ fun QuickReplyItemRow(
                     onDragCancel = onDragCancel
                 )
             }
-            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .padding(horizontal = 12.dp, vertical = 11.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1510,12 +1643,12 @@ fun QuickReplyItemRow(
             Box(
                 modifier = Modifier
                     .size(36.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (isDragging) Color(0x35FFFFFF) else Color(0x10FFFFFF))
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isDragging) colors.primary.copy(alpha = 0.2f) else colors.surfaceContainerHigh.copy(alpha = 0.8f))
                     .border(
                         0.8.dp,
-                        if (isDragging) Color(0x60FFFFFF) else Color(0x18FFFFFF),
-                        RoundedCornerShape(10.dp)
+                        if (isDragging) colors.primary.copy(alpha = 0.4f) else colors.outlineVariant.copy(alpha = 0.2f),
+                        RoundedCornerShape(12.dp)
                     )
                     .pointerInput(reply.id) {
                         detectDragGestures(
@@ -1536,8 +1669,8 @@ fun QuickReplyItemRow(
                 Icon(
                     imageVector = Icons.Rounded.DragIndicator,
                     contentDescription = "Hold and drag to reorder",
-                    tint = if (isDragging) Color.White else Color(0x90FFFFFF),
-                    modifier = Modifier.size(19.dp)
+                    tint = if (isDragging) colors.primary else colors.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
                 )
             }
 
@@ -1548,13 +1681,13 @@ fun QuickReplyItemRow(
                 modifier = Modifier
                     .widthIn(min = 22.dp)
                     .height(22.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0x0EFFFFFF)),
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(colors.surfaceContainerHighest.copy(alpha = 0.6f)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "${index + 1}",
-                    color = Color(0x75FFFFFF),
+                    color = colors.onSurfaceVariant.copy(alpha = 0.8f),
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.SemiBold,
@@ -1572,16 +1705,16 @@ fun QuickReplyItemRow(
                 ) {
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
+                            .clip(RoundedCornerShape(6.dp))
                             .background(
-                                if (reply.isHindi) Color(0x2566BB6A)
-                                else Color(0x2229B6F6)
+                                if (reply.isHindi) colors.tertiaryContainer.copy(alpha = 0.7f)
+                                else colors.secondaryContainer.copy(alpha = 0.7f)
                             )
                             .padding(horizontal = 5.dp, vertical = 2.dp)
                     ) {
                         Text(
                             text = if (reply.isHindi) "HINDI" else "ENGLISH",
-                            color = if (reply.isHindi) Color(0xFF81C784) else Color(0xFF81D4FA),
+                            color = if (reply.isHindi) colors.onTertiaryContainer else colors.onSecondaryContainer,
                             fontSize = 8.5.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
@@ -1594,9 +1727,10 @@ fun QuickReplyItemRow(
 
                 Text(
                     text = reply.title,
-                    color = Color.White,
+                    color = colors.onSurface,
                     fontSize = 13.5.sp,
                     fontWeight = FontWeight.SemiBold,
+                    fontFamily = GoogleSans,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1605,8 +1739,9 @@ fun QuickReplyItemRow(
                     Spacer(modifier = Modifier.height(1.dp))
                     Text(
                         text = reply.spokenText,
-                        color = Color(0x70FFFFFF),
-                        fontSize = 11.sp,
+                        color = colors.onSurfaceVariant,
+                        fontSize = 11.5.sp,
+                        fontFamily = GoogleSans,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -1622,9 +1757,9 @@ fun QuickReplyItemRow(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(34.dp)
                         .clip(CircleShape)
-                        .background(Color(0x12FFFFFF))
+                        .background(colors.surfaceContainerHigh.copy(alpha = 0.8f))
                         .clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onEdit()
@@ -1634,16 +1769,16 @@ fun QuickReplyItemRow(
                     Icon(
                         imageVector = Icons.Filled.Edit,
                         contentDescription = "Edit",
-                        tint = Color(0xB5FFFFFF),
+                        tint = colors.onSurfaceVariant,
                         modifier = Modifier.size(15.dp)
                     )
                 }
 
                 Box(
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(34.dp)
                         .clip(CircleShape)
-                        .background(Color(0x14FF453A))
+                        .background(colors.errorContainer.copy(alpha = 0.25f))
                         .clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             onDelete()
@@ -1653,7 +1788,7 @@ fun QuickReplyItemRow(
                     Icon(
                         imageVector = Icons.Filled.Delete,
                         contentDescription = "Delete",
-                        tint = Color(0xFFFF5252),
+                        tint = colors.error,
                         modifier = Modifier.size(15.dp)
                     )
                 }
@@ -1678,4 +1813,3 @@ private fun getFileName(context: android.content.Context, uri: Uri): String {
     }
     return result
 }
-

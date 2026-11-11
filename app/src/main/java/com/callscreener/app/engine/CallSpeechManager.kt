@@ -85,18 +85,9 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
         tts.setSpeechRate(persona.speed)
 
         try {
-            val hasDevanagari = text.any { it in '\u0900'..'\u097F' }
             val hasBengaliAssamese = text.any { it in '\u0980'..'\u09FF' }
 
-            if (hasDevanagari) {
-                tts.setLanguage(Locale("hi", "IN"))
-                val available = tts.voices
-                val hindiVoice = available?.filter { it.locale.language.equals("hi", ignoreCase = true) }
-                    ?.firstOrNull { isFemaleVoiceName(it.name.lowercase()) }
-                    ?: available?.firstOrNull { it.locale.language.equals("hi", ignoreCase = true) }
-                if (hindiVoice != null) tts.voice = hindiVoice
-                return
-            } else if (hasBengaliAssamese) {
+            if (hasBengaliAssamese) {
                 var res = tts.setLanguage(Locale("as", "IN"))
                 if (res == TextToSpeech.LANG_MISSING_DATA || res == TextToSpeech.LANG_NOT_SUPPORTED) {
                     res = tts.setLanguage(Locale("bn", "IN"))
@@ -109,7 +100,7 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
                 }
             }
 
-            // Default to configured persona
+            // Always configure persona-specific voice (gender, language, pitch, speed)
             applyVoiceForPersona(persona)
         } catch (e: Exception) {
             Log.w(TAG, "Error in applyVoiceForText", e)
@@ -188,21 +179,42 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
                         ?: candidateVoices.firstOrNull { voice ->
                             isFemaleVoiceName(voice.name.lowercase())
                         }
+                        ?: candidateVoices.firstOrNull { !isMaleVoiceName(it.name.lowercase()) }
                         ?: candidateVoices.firstOrNull()
                     }
                     VoiceGender.MALE -> {
+                        // 1. Keyword match in candidate voices with neural quality
                         candidateVoices.firstOrNull { voice ->
                             val vName = voice.name.lowercase()
                             val matchesKw = persona.voiceKeywords.any { kw -> vName.contains(kw) }
-                            isMaleVoiceName(vName) && matchesKw
+                            isMaleVoiceName(vName) && matchesKw && isNeuralQuality(voice)
                         }
+                        // 2. Keyword match in candidate voices
+                        ?: candidateVoices.firstOrNull { voice ->
+                            val vName = voice.name.lowercase()
+                            val matchesKw = persona.voiceKeywords.any { kw -> vName.contains(kw) }
+                            isMaleVoiceName(vName) && matchesKw && !isNotInstalled(voice)
+                        }
+                        // 3. Any installed male voice in target language/candidates
                         ?: candidateVoices.firstOrNull { voice ->
                             val vName = voice.name.lowercase()
                             isMaleVoiceName(vName) && !isNotInstalled(voice)
                         }
+                        // 4. Any male voice in candidates
                         ?: candidateVoices.firstOrNull { voice ->
                             isMaleVoiceName(voice.name.lowercase())
                         }
+                        // 5. Expand search to all available voices on the device for an installed male voice
+                        ?: availableVoices.firstOrNull { voice ->
+                            val vName = voice.name.lowercase()
+                            isMaleVoiceName(vName) && !isNotInstalled(voice)
+                        }
+                        // 6. Any male voice installed anywhere
+                        ?: availableVoices.firstOrNull { voice ->
+                            isMaleVoiceName(voice.name.lowercase())
+                        }
+                        // 7. Last resort: candidate voice (will apply deep masculine pitch shift below)
+                        ?: candidateVoices.firstOrNull()
                     }
                     VoiceGender.NEUTRAL -> candidateVoices.firstOrNull()
                 }
@@ -212,14 +224,24 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
                     Log.i(TAG, "Assigned natural voice: ${matchingVoice.name} (quality=${matchingVoice.quality}, locale=${matchingVoice.locale}) for persona: ${persona.name}")
                 }
 
-                // Dynamic Pitch Calibration for Authentic Masculine Register
+                // Dynamic Pitch Calibration for Authentic Masculine / Feminine Register
                 var targetPitch = persona.pitch
                 if (persona.gender == VoiceGender.MALE) {
                     val isConfirmedMale = matchingVoice != null && isMaleVoiceName(matchingVoice.name.lowercase())
                     if (!isConfirmedMale) {
-                        // If user device only has female Hindi voice model, lower pitch to masculine vocal tract register
-                        targetPitch = minOf(targetPitch, 0.72f)
-                        Log.w(TAG, "No confirmed male Hindi voice on device; shifted pitch to masculine register: $targetPitch")
+                        // If user device only has female voice model, lower pitch to deep masculine vocal tract register
+                        targetPitch = minOf(targetPitch, 0.62f)
+                        Log.w(TAG, "No confirmed male voice on device; shifted pitch to deep masculine register: $targetPitch")
+                    } else {
+                        // Confirmed male voice: ensure natural masculine depth
+                        targetPitch = minOf(targetPitch, 0.85f)
+                    }
+                } else if (persona.gender == VoiceGender.FEMALE) {
+                    val isConfirmedFemale = matchingVoice != null && isFemaleVoiceName(matchingVoice.name.lowercase())
+                    if (!isConfirmedFemale) {
+                        // If fallback landed on a non-female voice, elevate pitch to natural feminine register
+                        targetPitch = maxOf(targetPitch, 1.15f)
+                        Log.w(TAG, "No confirmed female voice on device; shifted pitch to feminine register: $targetPitch")
                     }
                 }
                 tts.setPitch(targetPitch)
@@ -237,13 +259,15 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
                 name.contains("-f-") || name.contains("-fem-") || name.contains("f00") ||
                 name.contains("sfg") || name.contains("iob") || name.contains("tpf") ||
                 name.contains("cfl") || name.contains("rjs") ||
-                name.contains("hia") || name.contains("hie") || name.contains("hic")
+                name.contains("hia") || name.contains("hie") || name.contains("hic") ||
+                name.contains("woman") || name.contains("girl")
     }
 
     private fun isMaleVoiceName(name: String): Boolean {
         if (isFemaleVoiceName(name)) return false
         return name.contains("male") || name.contains("#male") || name.contains("-m-") ||
                 name.contains("m00") || name.contains("hid") || name.contains("hib") ||
+                name.contains("iom") || name.contains("iol") || name.contains("tpc") ||
                 name.contains("-d-") || name.contains("-b-") || name.contains("hnd") ||
                 name.contains("_male") || name.contains("man") || name.contains("boy")
     }

@@ -10,6 +10,7 @@ import android.util.LruCache
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -60,44 +61,44 @@ object ContactPhotoCache {
 /**
  * Composable helper with zero-jank in-memory caching to asynchronously load and cache contact bitmaps.
  * Supports both local cached file paths and Android content:// provider URIs.
+ * Reactively updates when any caller photo changes via [CallerProfileManager.photoVersionState].
  */
 @Composable
-fun rememberContactPhotoBitmap(photoPath: String?): ImageBitmap? {
+fun rememberContactPhotoBitmap(photoPath: String?, reloadKey: Any? = null): ImageBitmap? {
+    val photoVersion = CallerProfileManager.photoVersionState.intValue
     if (photoPath.isNullOrBlank()) return null
     val context = androidx.compose.ui.platform.LocalContext.current
-    var bitmap by remember(photoPath) {
+    var bitmap by remember(photoPath, reloadKey, photoVersion) {
         val cached = ContactPhotoCache.get(photoPath)
         mutableStateOf(cached?.asImageBitmap())
     }
-    LaunchedEffect(photoPath) {
-        if (bitmap == null) {
-            val loaded = withContext(Dispatchers.IO) {
-                try {
-                    if (photoPath.startsWith("content://")) {
-                        context.contentResolver.openInputStream(Uri.parse(photoPath))?.use { input ->
-                            val decoded = BitmapFactory.decodeStream(input)
-                            if (decoded != null) {
-                                ContactPhotoCache.put(photoPath, decoded)
-                                decoded.asImageBitmap()
-                            } else null
-                        }
-                    } else {
-                        val file = File(photoPath)
-                        if (file.exists() && file.length() > 0) {
-                            val decoded = BitmapFactory.decodeFile(file.absolutePath)
-                            if (decoded != null) {
-                                ContactPhotoCache.put(photoPath, decoded)
-                                decoded.asImageBitmap()
-                            } else null
+    LaunchedEffect(photoPath, reloadKey, photoVersion) {
+        val loaded = withContext(Dispatchers.IO) {
+            try {
+                if (photoPath.startsWith("content://")) {
+                    context.contentResolver.openInputStream(Uri.parse(photoPath))?.use { input ->
+                        val decoded = BitmapFactory.decodeStream(input)
+                        if (decoded != null) {
+                            ContactPhotoCache.put(photoPath, decoded)
+                            decoded.asImageBitmap()
                         } else null
                     }
-                } catch (_: Exception) {
-                    null
+                } else {
+                    val file = File(photoPath)
+                    if (file.exists() && file.length() > 0) {
+                        val decoded = BitmapFactory.decodeFile(file.absolutePath)
+                        if (decoded != null) {
+                            ContactPhotoCache.put(photoPath, decoded)
+                            decoded.asImageBitmap()
+                        } else null
+                    } else null
                 }
+            } catch (_: Exception) {
+                null
             }
-            if (loaded != null) {
-                bitmap = loaded
-            }
+        }
+        if (loaded != null) {
+            bitmap = loaded
         }
     }
     return bitmap
@@ -110,6 +111,16 @@ object CallerProfileManager {
     private const val TAG = "CallerProfileManager"
     private const val PREFS_NAME = "call_screener_caller_profiles"
 
+    /**
+     * Observable version state that increments whenever a custom contact photo is updated or removed.
+     * UI components observing this will instantly and reactively recompose.
+     */
+    val photoVersionState = mutableIntStateOf(0)
+
+    fun notifyPhotoChanged() {
+        photoVersionState.intValue++
+    }
+
     private fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
@@ -119,10 +130,7 @@ object CallerProfileManager {
         return if (clean.length >= 10) clean.takeLast(10) else clean
     }
 
-    fun getProfile(context: Context, number: String): CallerProfile? {
-        val key = normalizeNumber(number)
-        if (key.isBlank()) return null
-        val raw = getPrefs(context).getString(key, null) ?: return null
+    private fun parseProfileJson(raw: String): CallerProfile? {
         return try {
             val json = JSONObject(raw)
             CallerProfile(
@@ -137,6 +145,34 @@ object CallerProfileManager {
         } catch (_: Exception) {
             null
         }
+    }
+
+    fun getProfile(context: Context, number: String): CallerProfile? {
+        val key = normalizeNumber(number)
+        if (key.isBlank()) return null
+        val prefs = getPrefs(context)
+        val raw = prefs.getString(key, null)
+        if (raw != null) {
+            return parseProfileJson(raw)
+        }
+        // Fallback 1: exact digits
+        val digits = number.filter { it.isDigit() }
+        if (digits.isNotBlank() && digits != key) {
+            val rawDigits = prefs.getString(digits, null)
+            if (rawDigits != null) return parseProfileJson(rawDigits)
+        }
+        // Fallback 2: tail 7 match across stored keys
+        if (digits.length >= 7) {
+            val tail7 = digits.takeLast(7)
+            for (entryKey in prefs.all.keys) {
+                val entryDigits = entryKey.filter { it.isDigit() }
+                if (entryDigits.length >= 7 && (entryDigits.takeLast(7) == tail7 || entryDigits == digits)) {
+                    val entryRaw = prefs.getString(entryKey, null) ?: continue
+                    return parseProfileJson(entryRaw)
+                }
+            }
+        }
+        return null
     }
 
     fun saveProfile(context: Context, number: String, profile: CallerProfile) {
@@ -181,15 +217,44 @@ object CallerProfileManager {
     }
 
     fun getCustomPhotoPath(context: Context, number: String): String? {
+        if (number.isBlank()) return null
         val key = normalizeNumber(number)
-        if (key.isBlank()) return null
         val profile = getProfile(context, number)
         if (!profile?.customPhotoPath.isNullOrBlank()) {
             val file = File(profile!!.customPhotoPath!!)
             if (file.exists() && file.length() > 0) return file.absolutePath
         }
-        val defaultFile = getContactPhotoFile(context, number)
-        return if (defaultFile.exists() && defaultFile.length() > 0) defaultFile.absolutePath else null
+        // Check default file under normalized key
+        if (key.isNotBlank()) {
+            val defaultFile = getContactPhotoFile(context, number)
+            if (defaultFile.exists() && defaultFile.length() > 0) return defaultFile.absolutePath
+        }
+        // Check default file under full digits
+        val digits = number.filter { it.isDigit() }
+        if (digits.isNotBlank() && digits != key) {
+            val dir = File(context.filesDir, "contact_photos")
+            val digitsFile = File(dir, "avatar_${digits}.jpg")
+            if (digitsFile.exists() && digitsFile.length() > 0) return digitsFile.absolutePath
+        }
+        // Check tail 7 across contact_photos folder
+        if (digits.length >= 7) {
+            val tail7 = digits.takeLast(7)
+            val dir = File(context.filesDir, "contact_photos")
+            if (dir.exists()) {
+                val files = dir.listFiles()
+                if (files != null) {
+                    for (f in files) {
+                        if (f.name.startsWith("avatar_") && f.name.endsWith(".jpg") && f.length() > 0) {
+                            val fileNum = f.name.removePrefix("avatar_").removeSuffix(".jpg").filter { it.isDigit() }
+                            if (fileNum.length >= 7 && (fileNum.takeLast(7) == tail7 || fileNum == digits)) {
+                                return f.absolutePath
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return null
     }
 
     suspend fun saveCustomPhotoFromUri(context: Context, number: String, imageUri: Uri): String? = withContext(Dispatchers.IO) {
@@ -240,6 +305,10 @@ object CallerProfileManager {
                     val path = targetFile.absolutePath
                     val current = getProfile(context, number) ?: CallerProfile()
                     saveProfile(context, number, current.copy(customPhotoPath = path))
+                    DialerRepository.updateCachedContactPhoto(context, number, path)
+                    withContext(Dispatchers.Main) {
+                        notifyPhotoChanged()
+                    }
                     Log.i(TAG, "Saved custom photo for $number to $path")
                     return@withContext path
                 }
@@ -261,6 +330,8 @@ object CallerProfileManager {
             if (current != null) {
                 saveProfile(context, number, current.copy(customPhotoPath = null))
             }
+            DialerRepository.updateCachedContactPhoto(context, number, null)
+            notifyPhotoChanged()
             Log.i(TAG, "Removed custom photo for $number")
         } catch (e: Exception) {
             Log.e(TAG, "Failed removing custom photo for $number", e)

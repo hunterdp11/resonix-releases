@@ -141,7 +141,7 @@ object RootPrivilegeManager {
      */
     fun hasModuleFilesOnDisk(): Boolean {
         return try {
-            val script = "test -d /data/adb/modules/call_screener && test -f /data/adb/modules/call_screener/module.prop && test -f /data/adb/modules/call_screener/system/priv-app/CallScreener/CallScreener.apk && ! test -f /data/adb/modules/call_screener/disable && ! test -f /data/adb/modules/call_screener/remove && echo 'yes' || echo 'no'"
+            val script = "((test -d /data/adb/modules/resonix && test -f /data/adb/modules/resonix/module.prop && ! test -f /data/adb/modules/resonix/disable && ! test -f /data/adb/modules/resonix/remove) || (test -d /data/adb/modules/call_screener && test -f /data/adb/modules/call_screener/module.prop && ! test -f /data/adb/modules/call_screener/disable && ! test -f /data/adb/modules/call_screener/remove)) && echo 'yes' || echo 'no'"
             val process = Runtime.getRuntime().exec(arrayOf("su", "-c", script))
             val reader = BufferedReader(InputStreamReader(process.inputStream))
             val line = reader.readLine()
@@ -221,7 +221,7 @@ object RootPrivilegeManager {
     }
 
     /**
-     * Creates a seamless Magisk / KernelSU / APatch module that mounts Call Screener into
+     * Creates a seamless Magisk / KernelSU / APatch module that mounts Resonix into
      * /system/priv-app with full system audio routing and capture permissions!
      */
     suspend fun installSystemModule(context: Context): Pair<Boolean, String> = withContext(Dispatchers.IO) {
@@ -229,17 +229,17 @@ object RootPrivilegeManager {
         val packageName = context.packageName
 
         val script = """
-            MODULE_DIR="/data/adb/modules/call_screener"
-            mkdir -p "${'$'}MODULE_DIR/system/priv-app/CallScreener"
+            MODULE_DIR="/data/adb/modules/resonix"
+            mkdir -p "${'$'}MODULE_DIR/system/priv-app/Resonix"
             mkdir -p "${'$'}MODULE_DIR/system/etc/permissions"
             
             # 1. Copy active APK into system priv-app
-            cp "$apkPath" "${'$'}MODULE_DIR/system/priv-app/CallScreener/CallScreener.apk"
+            cp "$apkPath" "${'$'}MODULE_DIR/system/priv-app/Resonix/Resonix.apk"
             chmod 755 "${'$'}MODULE_DIR"
             chmod 755 "${'$'}MODULE_DIR/system"
             chmod 755 "${'$'}MODULE_DIR/system/priv-app"
-            chmod 755 "${'$'}MODULE_DIR/system/priv-app/CallScreener"
-            chmod 644 "${'$'}MODULE_DIR/system/priv-app/CallScreener/CallScreener.apk"
+            chmod 755 "${'$'}MODULE_DIR/system/priv-app/Resonix"
+            chmod 644 "${'$'}MODULE_DIR/system/priv-app/Resonix/Resonix.apk"
             
             # 2. Write privapp-permissions whitelist for Android system_server
             cat << 'EOF' > "${'$'}MODULE_DIR/system/etc/permissions/privapp-permissions-$packageName.xml"
@@ -259,12 +259,12 @@ EOF
             
             # 3. Create standard Magisk/KernelSU module metadata
             cat << 'EOF' > "${'$'}MODULE_DIR/module.prop"
-id=call_screener
-name=Call Screener AI Priv-App
-version=1.0.1
-versionCode=2
+id=resonix
+name=Resonix Audio & Telephony Priv-App
+version=1.0.0
+versionCode=1
 author=DpXarma
-description=Systemless mount of Call Screener AI into /system/priv-app with direct audio routing privileges by DpXarma.
+description=Systemless mount of Resonix into /system/priv-app with direct native audio routing & HAL capture privileges by DpXarma.
 EOF
             chmod 644 "${'$'}MODULE_DIR/module.prop"
             rm -f "${'$'}MODULE_DIR/disable"
@@ -293,7 +293,7 @@ EOF
     }
 
     suspend fun uninstallSystemModule(context: Context? = null): Pair<Boolean, String> = withContext(Dispatchers.IO) {
-        val script = "rm -rf /data/adb/modules/call_screener"
+        val script = "rm -rf /data/adb/modules/resonix /data/adb/modules/call_screener"
         val result = executeSuCommand(script)
         if (result.first) {
             context?.let { ctx ->

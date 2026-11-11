@@ -61,27 +61,7 @@ object RingtonePlayer {
             }
 
             // 2. Play Vibration if not SILENT
-            if (ringerMode != AudioManager.RINGER_MODE_SILENT) {
-                val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-                    vm?.defaultVibrator
-                } else {
-                    @Suppress("DEPRECATION")
-                    context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-                }
-
-                if (vibrator != null && vibrator.hasVibrator()) {
-                    val pattern = longArrayOf(0, 1000, 1000)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        vibrator.vibrate(VibrationEffect.createWaveform(pattern, 0))
-                    } else {
-                        @Suppress("DEPRECATION")
-                        vibrator.vibrate(pattern, 0)
-                    }
-                    activeVibrator = vibrator
-                    Log.i(TAG, "Incoming call vibration pattern started")
-                }
-            }
+            CallVibrator.startRingingVibration(context)
 
             isPlaying = true
         } catch (e: Exception) {
@@ -91,15 +71,16 @@ object RingtonePlayer {
 
     @Synchronized
     fun stop(context: Context) {
-        if (!isPlaying && activeRingtone == null && activeVibrator == null) return
+        try {
+            CallVibrator.stopRingingVibration()
+        } catch (_: Exception) {}
+
+        if (!isPlaying && activeRingtone == null) return
 
         try {
             Log.i(TAG, "Stopping ringtone and cancelling vibration")
             activeRingtone?.stop()
             activeRingtone = null
-
-            activeVibrator?.cancel()
-            activeVibrator = null
 
             isPlaying = false
         } catch (e: Exception) {
