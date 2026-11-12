@@ -9789,7 +9789,7 @@ fun SavedRecordingsDialog(
                                         ) {
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                                             ) {
                                                 Box(
                                                     modifier = Modifier
@@ -9826,106 +9826,115 @@ fun SavedRecordingsDialog(
 
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                                             ) {
-                                                IconButton(
-                                                    onClick = {
-                                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                        if (isPlaying) {
-                                                            try {
-                                                                mediaPlayer?.pause()
-                                                                playingId = null
-                                                            } catch (_: Exception) {}
-                                                        } else {
-                                                            try {
-                                                                mediaPlayer?.release()
-                                                                mediaPlayer = MediaPlayer().apply {
-                                                                    setDataSource(item.file.absolutePath)
-                                                                    prepare()
-                                                                    start()
-                                                                    setOnCompletionListener {
-                                                                        playingId = null
-                                                                    }
-                                                                }
-                                                                playingId = item.id
-                                                            } catch (e: Exception) {
-                                                                Toast.makeText(context, "Cannot play recording", Toast.LENGTH_SHORT).show()
-                                                            }
-                                                        }
-                                                    },
+                                                Box(
                                                     modifier = Modifier
-                                                        .size(38.dp)
+                                                        .size(36.dp)
                                                         .clip(CircleShape)
                                                         .background(
                                                             if (isPlaying) monetColors.primary
                                                             else monetColors.surfaceContainerHighest
                                                         )
+                                                        .border(
+                                                            0.8.dp,
+                                                            if (isPlaying) monetColors.primary.copy(alpha = 0.5f)
+                                                            else monetColors.outlineVariant.copy(alpha = 0.35f),
+                                                            CircleShape
+                                                        )
+                                                        .clickable {
+                                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                            if (isPlaying) {
+                                                                try {
+                                                                    mediaPlayer?.pause()
+                                                                    playingId = null
+                                                                } catch (_: Exception) {}
+                                                            } else {
+                                                                try {
+                                                                    mediaPlayer?.release()
+                                                                    mediaPlayer = MediaPlayer().apply {
+                                                                        setDataSource(item.file.absolutePath)
+                                                                        prepare()
+                                                                        start()
+                                                                        setOnCompletionListener {
+                                                                            playingId = null
+                                                                        }
+                                                                    }
+                                                                    playingId = item.id
+                                                                } catch (e: Exception) {
+                                                                    Toast.makeText(context, "Cannot play recording", Toast.LENGTH_SHORT).show()
+                                                                }
+                                                            }
+                                                        },
+                                                    contentAlignment = Alignment.Center
                                                 ) {
                                                     Icon(
                                                         imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                                                         contentDescription = if (isPlaying) "Pause" else "Play",
                                                         tint = if (isPlaying) monetColors.onPrimary else monetColors.onSurface,
-                                                        modifier = Modifier.size(19.dp)
+                                                        modifier = Modifier.size(18.dp)
                                                     )
                                                 }
 
-                                                IconButton(
-                                                    onClick = {
-                                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                        try {
-                                                            val uri = FileProvider.getUriForFile(
-                                                                context,
-                                                                "${context.packageName}.fileprovider",
-                                                                item.file
-                                                            )
-                                                            val intent = Intent(Intent.ACTION_SEND).apply {
-                                                                type = "audio/wav"
-                                                                putExtra(Intent.EXTRA_STREAM, uri)
-                                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                            }
-                                                            context.startActivity(Intent.createChooser(intent, "Share Call Recording"))
-                                                        } catch (e: Exception) {
-                                                            Toast.makeText(context, "Error sharing recording: ${e.message}", Toast.LENGTH_SHORT).show()
-                                                        }
-                                                    },
+                                                Box(
                                                     modifier = Modifier
-                                                        .size(38.dp)
+                                                        .size(36.dp)
                                                         .clip(CircleShape)
                                                         .background(monetColors.surfaceContainerHighest)
                                                         .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.35f), CircleShape)
+                                                        .clickable {
+                                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                            try {
+                                                                val uri = FileProvider.getUriForFile(
+                                                                    context,
+                                                                    "${context.packageName}.fileprovider",
+                                                                    item.file
+                                                                )
+                                                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                                                    type = "audio/wav"
+                                                                    putExtra(Intent.EXTRA_STREAM, uri)
+                                                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                                }
+                                                                context.startActivity(Intent.createChooser(intent, "Share Call Recording"))
+                                                            } catch (e: Exception) {
+                                                                Toast.makeText(context, "Error sharing recording: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                            }
+                                                        },
+                                                    contentAlignment = Alignment.Center
                                                 ) {
                                                     Icon(
                                                         imageVector = Icons.Filled.Share,
                                                         contentDescription = "Share",
                                                         tint = monetColors.onSurfaceVariant,
-                                                        modifier = Modifier.size(16.dp)
+                                                        modifier = Modifier.size(15.dp)
                                                     )
                                                 }
 
-                                                IconButton(
-                                                    onClick = {
-                                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                        if (isPlaying) {
-                                                            try { mediaPlayer?.stop() } catch (_: Exception) {}
-                                                            playingId = null
-                                                        }
-                                                        scope.launch {
-                                                            sessionManager.recordingEngine.deleteRecording(item.file)
-                                                            recordings = sessionManager.recordingEngine.getSavedRecordings()
-                                                        }
-                                                    },
+                                                Box(
                                                     modifier = Modifier
-                                                        .size(38.dp)
+                                                        .size(36.dp)
                                                         .clip(CircleShape)
                                                         .background(Color(0xFFFF2D55).copy(alpha = 0.12f))
                                                         .border(0.8.dp, Color(0xFFFF2D55).copy(alpha = 0.35f), CircleShape)
+                                                        .clickable {
+                                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                            if (isPlaying) {
+                                                                try { mediaPlayer?.stop() } catch (_: Exception) {}
+                                                                playingId = null
+                                                            }
+                                                            scope.launch {
+                                                                sessionManager.recordingEngine.deleteRecording(item.file)
+                                                                recordings = sessionManager.recordingEngine.getSavedRecordings()
+                                                            }
+                                                        },
+                                                    contentAlignment = Alignment.Center
                                                 ) {
                                                     Icon(
                                                         imageVector = Icons.Filled.Delete,
                                                         contentDescription = "Delete",
                                                         tint = Color(0xFFFF2D55),
-                                                        modifier = Modifier.size(16.dp)
+                                                        modifier = Modifier.size(15.dp)
                                                     )
                                                 }
                                             }
