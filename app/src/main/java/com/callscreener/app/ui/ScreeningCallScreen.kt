@@ -4718,6 +4718,39 @@ fun StandardInCallScreen(
                 }
             }
 
+            // 3rd row: Screen Call (always visible when call is active, not in keypad mode)
+            AnimatedVisibility(
+                visible = !showKeypad && status != CallStatus.ENDED,
+                enter = fadeIn(tween(200, delayMillis = 60)) + expandVertically(tween(260, easing = FastOutSlowInEasing)),
+                exit = fadeOut(tween(130)) + shrinkVertically(tween(180, easing = FastOutLinearInEasing))
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        // Empty spacer slot for alignment
+                    }
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        InCallActionButton(
+                            icon = Icons.Rounded.RecordVoiceOver,
+                            label = "Screen call",
+                            isActive = false,
+                            activeColor = monetColors.primary,
+                            monetColors = monetColors,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onScreenWithAi()
+                            }
+                        )
+                    }
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        // Empty spacer slot for alignment
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
 
             val endCallInfiniteTransition = rememberInfiniteTransition(label = "endCallInfinite")
