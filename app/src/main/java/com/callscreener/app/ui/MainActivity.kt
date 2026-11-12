@@ -112,6 +112,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -3032,7 +3034,13 @@ fun ContactsScreen(
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    val coroutineScope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
     var searchQuery by remember { mutableStateOf("") }
+    val alphabetLetters = remember { ('A'..'Z').map { it.toString() } + "#" }
+    var activeScrubLetter by remember { mutableStateOf<String?>(null) }
+    var scrubIndicatorY by remember { mutableFloatStateOf(0f) }
+    var isScrubbing by remember { mutableStateOf(false) }
 
     val monetColors: ColorScheme = remember(context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -3124,6 +3132,16 @@ fun ContactsScreen(
         }
     }
 
+    val sectionIndices = remember(groupedContacts, frequentContacts, searchQuery) {
+        val map = mutableMapOf<String, Int>()
+        var currentIndex = if (searchQuery.isBlank() && frequentContacts.isNotEmpty()) 1 else 0
+        groupedContacts.forEach { (sectionKey, contactsInSection) ->
+            map[sectionKey] = currentIndex
+            currentIndex += 1 + contactsInSection.size
+        }
+        map
+    }
+
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -3212,8 +3230,9 @@ fun ContactsScreen(
             }
         } else {
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = statusBarTop + 124.dp, bottom = 120.dp, start = 18.dp, end = 18.dp),
+                contentPadding = PaddingValues(top = statusBarTop + 124.dp, bottom = 120.dp, start = 18.dp, end = 34.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 if (searchQuery.isBlank() && frequentContacts.isNotEmpty()) {
@@ -3608,6 +3627,43 @@ fun ContactsScreen(
             }
         }
 
+        if (filteredContacts.isNotEmpty()) {
+            ContactsAlphabetScroller(
+                alphabet = alphabetLetters,
+                activeLetters = groupedContacts.keys,
+                selectedLetter = activeScrubLetter,
+                indicatorY = scrubIndicatorY,
+                isScrubbing = isScrubbing,
+                monetColors = monetColors,
+                onScrubStart = { isScrubbing = true },
+                onScrubEnd = {
+                    isScrubbing = false
+                    activeScrubLetter = null
+                },
+                onLetterHover = { letter, yPx ->
+                    scrubIndicatorY = yPx
+                    if (letter != activeScrubLetter) {
+                        activeScrubLetter = letter
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        val targetIdx = sectionIndices[letter] ?: run {
+                            if (letter == "#") sectionIndices["#"] ?: (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                            else groupedContacts.keys.firstOrNull { it > letter && it != "#" }?.let { sectionIndices[it] }
+                                ?: sectionIndices["#"]
+                                ?: (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                        }
+                        if (targetIdx != null) {
+                            coroutineScope.launch {
+                                listState.scrollToItem(targetIdx)
+                            }
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(top = statusBarTop + 130.dp, bottom = 120.dp, end = 4.dp)
+            )
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -3771,6 +3827,114 @@ fun ContactsScreen(
                 onQueryChange = { searchQuery = it },
                 placeholder = "Search ${contacts.size} contacts or numbers..."
             )
+        }
+    }
+}
+
+@Composable
+fun ContactsAlphabetScroller(
+    alphabet: List<String>,
+    activeLetters: Set<String>,
+    selectedLetter: String?,
+    indicatorY: Float,
+    isScrubbing: Boolean,
+    monetColors: ColorScheme,
+    onScrubStart: () -> Unit,
+    onScrubEnd: () -> Unit,
+    onLetterHover: (String, Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val density = LocalDensity.current
+
+    Box(
+        modifier = modifier.fillMaxHeight(),
+        contentAlignment = Alignment.CenterEnd
+    ) {
+        if (isScrubbing && selectedLetter != null) {
+            val bubbleOffsetY = with(density) {
+                (indicatorY - 24.dp.toPx()).coerceAtLeast(0f).toDp()
+            }
+            Box(
+                modifier = Modifier
+                    .offset(x = (-38).dp, y = bubbleOffsetY)
+                    .size(46.dp)
+                    .shadow(elevation = 8.dp, shape = CircleShape, spotColor = Color(0x60000000))
+                    .clip(CircleShape)
+                    .background(monetColors.primary)
+                    .border(1.dp, monetColors.onPrimary.copy(alpha = 0.25f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = selectedLetter,
+                    color = monetColors.onPrimary,
+                    fontSize = 20.sp,
+                    fontFamily = AppFont,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(12.dp))
+                .background(monetColors.surfaceContainerHigh.copy(alpha = 0.55f))
+                .border(0.6.dp, monetColors.outlineVariant.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                .padding(vertical = 4.dp, horizontal = 2.dp)
+                .pointerInput(alphabet) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        onScrubStart()
+                        val totalH = size.height
+                        fun handlePosition(y: Float) {
+                            val fraction = (y / totalH).coerceIn(0f, 0.999f)
+                            val idx = (fraction * alphabet.size).toInt().coerceIn(0, alphabet.lastIndex)
+                            val letter = alphabet[idx]
+                            onLetterHover(letter, y)
+                        }
+                        handlePosition(down.position.y)
+                        try {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                if (change.pressed) {
+                                    change.consume()
+                                    handlePosition(change.position.y)
+                                } else {
+                                    break
+                                }
+                            }
+                        } finally {
+                            onScrubEnd()
+                        }
+                    }
+                }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                alphabet.forEach { letter ->
+                    val hasContacts = letter in activeLetters
+                    val isSelected = letter == selectedLetter
+                    Text(
+                        text = letter,
+                        color = when {
+                            isSelected -> monetColors.primary
+                            hasContacts -> monetColors.onSurface.copy(alpha = 0.85f)
+                            else -> monetColors.onSurfaceVariant.copy(alpha = 0.25f)
+                        },
+                        fontSize = 9.sp,
+                        fontFamily = AppFont,
+                        fontWeight = if (isSelected || hasContacts) FontWeight.Bold else FontWeight.Normal,
+                        lineHeight = 10.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
         }
     }
 }
