@@ -95,6 +95,46 @@ object OtaUpdateManager {
         _downloadStatus.value = DownloadStatus.Idle
     }
 
+    private fun isNewerVersion(remoteVersion: String, currentVersion: String): Boolean {
+        if (remoteVersion.isBlank()) return false
+        val cleanRemote = remoteVersion.trim().removePrefix("v").removePrefix("V")
+        val cleanCurrent = currentVersion.trim().removePrefix("v").removePrefix("V")
+        val remoteParts = cleanRemote.split(".").map { part ->
+            part.takeWhile { it.isDigit() }.toIntOrNull() ?: 0
+        }
+        val currentParts = cleanCurrent.split(".").map { part ->
+            part.takeWhile { it.isDigit() }.toIntOrNull() ?: 0
+        }
+        val maxLen = maxOf(remoteParts.size, currentParts.size)
+        for (i in 0 until maxLen) {
+            val r = remoteParts.getOrElse(i) { 0 }
+            val c = currentParts.getOrElse(i) { 0 }
+            if (r > c) return true
+            if (r < c) return false
+        }
+        return false
+    }
+
+    private fun isBelowMinVersion(currentVersion: String, minVersion: String): Boolean {
+        if (minVersion.isBlank()) return false
+        val cleanMin = minVersion.trim().removePrefix("v").removePrefix("V")
+        val cleanCurrent = currentVersion.trim().removePrefix("v").removePrefix("V")
+        val minParts = cleanMin.split(".").map { part ->
+            part.takeWhile { it.isDigit() }.toIntOrNull() ?: 0
+        }
+        val currentParts = cleanCurrent.split(".").map { part ->
+            part.takeWhile { it.isDigit() }.toIntOrNull() ?: 0
+        }
+        val maxLen = maxOf(minParts.size, currentParts.size)
+        for (i in 0 until maxLen) {
+            val m = minParts.getOrElse(i) { 0 }
+            val c = currentParts.getOrElse(i) { 0 }
+            if (c < m) return true
+            if (c > m) return false
+        }
+        return false
+    }
+
     suspend fun checkForUpdates(context: Context, customUrl: String? = null): UpdateCheckStatus = withContext(Dispatchers.IO) {
         _checkStatus.value = UpdateCheckStatus.Checking
         val feedUrl = customUrl?.takeIf { it.isNotBlank() } ?: getUpdateUrl(context)
@@ -105,30 +145,57 @@ object OtaUpdateManager {
             val jsonText = fetchUrlWithRedirects(feedUrl)
             val json = JSONObject(jsonText)
 
-            val remoteVersionCode = json.optLong("versionCode", 0L)
-            val remoteVersionName = json.optString("versionName", "")
-            val changelog = json.optString("changelog", "• General improvements and stability fixes.")
-            val downloadUrl = json.optString("downloadUrl", "")
-            val fileSize = json.optString("fileSize", "")
-            val releaseDate = json.optString("releaseDate", "")
-            val minSupportedVersion = json.optLong("minSupportedVersion", 1L)
-            val isMandatory = json.optBoolean("isMandatory", false) || (currentCode < minSupportedVersion)
+            val remoteVersionName = json.optString("latest_version")
+                .ifBlank { json.optString("versionName") }
+                .ifBlank { json.optString("version_name", "") }
+
+            val remoteVersionCode = if (json.has("version_code")) {
+                json.optLong("version_code", 0L)
+            } else {
+                json.optLong("versionCode", 0L)
+            }
+
+            val changelog = json.optString("release_notes")
+                .ifBlank { json.optString("changelog", "• General improvements and stability fixes.") }
+
+            val downloadUrl = json.optString("download_url")
+                .ifBlank { json.optString("downloadUrl", "") }
+
+            val fileSize = json.optString("file_size")
+                .ifBlank { json.optString("fileSize", "") }
+
+            val releaseDate = json.optString("release_date")
+                .ifBlank { json.optString("releaseDate", "") }
+
+            val minVersionStr = json.optString("min_version")
+                .ifBlank { json.optString("min_supported_version", "") }
+
+            val minSupportedVersionCode = json.optLong("minSupportedVersion", 0L)
+
+            val forceUpdateFlag = json.optBoolean("force_update", json.optBoolean("isMandatory", json.optBoolean("is_mandatory", false)))
 
             if (downloadUrl.isBlank()) {
-                val err = UpdateCheckStatus.Error("Invalid update feed: downloadUrl is missing")
+                val err = UpdateCheckStatus.Error("Invalid update feed: download_url is missing")
                 _checkStatus.value = err
                 return@withContext err
             }
 
-            if (remoteVersionCode > currentCode) {
+            val isAvailable = (remoteVersionCode > 0 && remoteVersionCode > currentCode) ||
+                    (remoteVersionName.isNotBlank() && isNewerVersion(remoteVersionName, currentName))
+
+            val isMandatory = forceUpdateFlag ||
+                    (minVersionStr.isNotBlank() && isBelowMinVersion(currentName, minVersionStr)) ||
+                    (minSupportedVersionCode > 0 && currentCode < minSupportedVersionCode)
+
+            if (isAvailable) {
                 val info = UpdateInfo(
                     versionCode = remoteVersionCode,
-                    versionName = remoteVersionName.ifBlank { "v$remoteVersionCode" },
+                    versionName = remoteVersionName.ifBlank { if (remoteVersionCode > 0) "v$remoteVersionCode" else "Update" },
                     changelog = changelog,
                     downloadUrl = downloadUrl,
                     fileSize = fileSize,
                     releaseDate = releaseDate,
-                    minSupportedVersion = minSupportedVersion,
+                    minSupportedVersion = minSupportedVersionCode,
                     isMandatory = isMandatory
                 )
                 val status = UpdateCheckStatus.UpdateAvailable(info)

@@ -1,10 +1,7 @@
 {
-  "versionCode": 2,
-  "versionName": "1.0.1",
-  "changelog": "• Alphabetical quick-scroller on Contacts screen\n• Fluid spring animation when toggling All and Missed calls\n• Cleaned UI and background performance optimizations",
-  "downloadUrl": "https://github.com/hunterdp11/resonix-releases/releases/download/v1.0.1/Resonix-v1.0.1-release.apk",
-  "fileSize": "2.53 MB",
-  "releaseDate": "November 2026",
-  "minSupportedVersion": 2,
-  "isMandatory": true
+  "latest_version": "1.0.1",
+  "min_version": "1.0.1",
+  "force_update": true,
+  "download_url": "https://github.com/hunterdp11/resonix-releases/releases/download/v1.0.1/Resonix-v1.0.1-release.apk",
+  "release_notes": "• Alphabetical quick-scroller on Contacts screen\n• Fluid spring animation when toggling All and Missed calls\n• Cleaned UI and background performance optimizations"
 }

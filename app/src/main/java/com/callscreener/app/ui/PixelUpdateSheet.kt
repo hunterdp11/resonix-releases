@@ -164,11 +164,13 @@ fun PixelExpressiveUpdateDialog(
                         if (updateInfo.releaseDate.isNotBlank()) {
                             UpdateMetaChip(text = updateInfo.releaseDate, monetColors = monetColors)
                         }
-                        UpdateMetaChip(
-                            text = "Build ${updateInfo.versionCode}",
-                            monetColors = monetColors,
-                            isAccent = true
-                        )
+                        if (updateInfo.versionCode > 0) {
+                            UpdateMetaChip(
+                                text = "Build ${updateInfo.versionCode}",
+                                monetColors = monetColors,
+                                isAccent = true
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(18.dp))
