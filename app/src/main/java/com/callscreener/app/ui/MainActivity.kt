@@ -557,6 +557,15 @@ fun MainDashboard(
         }
     }
 
+    val coroutineScope = rememberCoroutineScope()
+    val otaCheckStatus by OtaUpdateManager.checkStatus.collectAsState()
+    val otaDownloadStatus by OtaUpdateManager.downloadStatus.collectAsState()
+    var isOtaDismissed by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        OtaUpdateManager.checkForUpdates(context)
+    }
+
     var selectedContactForDetails by remember { mutableStateOf<ContactItem?>(null) }
     var isSettingsOpen by remember { mutableStateOf(false) }
     var isPresetManagerOpen by remember { mutableStateOf(false) }
@@ -773,6 +782,40 @@ fun MainDashboard(
                 quickReplyManager = sessionManager.quickReplyManager,
                 monetColors = monetColors,
                 onDismiss = { isPresetManagerOpen = false }
+            )
+        }
+
+        val activeUpdateInfo = (otaCheckStatus as? UpdateCheckStatus.UpdateAvailable)?.info
+        if (activeUpdateInfo != null && (activeUpdateInfo.isMandatory || !isOtaDismissed)) {
+            PixelExpressiveUpdateDialog(
+                updateInfo = activeUpdateInfo,
+                downloadStatus = otaDownloadStatus,
+                monetColors = monetColors,
+                onDismiss = { isOtaDismissed = true },
+                onStartDownload = {
+                    coroutineScope.launch {
+                        val res = OtaUpdateManager.downloadUpdate(context, activeUpdateInfo)
+                        if (res.isFailure) {
+                            Toast.makeText(context, "Download failed: ${res.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                },
+                onInstallStandard = { file ->
+                    val res = OtaUpdateManager.installUpdateStandard(context, file)
+                    if (res.isFailure) {
+                        Toast.makeText(context, res.exceptionOrNull()?.message ?: "Install failed", Toast.LENGTH_LONG).show()
+                    }
+                },
+                onInstallRoot = { file ->
+                    coroutineScope.launch {
+                        val res = OtaUpdateManager.installUpdateRoot(context, file)
+                        if (res.isSuccess) {
+                            Toast.makeText(context, res.getOrNull(), Toast.LENGTH_LONG).show()
+                        } else {
+                            Toast.makeText(context, res.exceptionOrNull()?.message ?: "Root install failed", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
             )
         }
     }

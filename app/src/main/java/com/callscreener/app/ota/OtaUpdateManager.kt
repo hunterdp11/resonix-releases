@@ -112,7 +112,7 @@ object OtaUpdateManager {
             val fileSize = json.optString("fileSize", "")
             val releaseDate = json.optString("releaseDate", "")
             val minSupportedVersion = json.optLong("minSupportedVersion", 1L)
-            val isMandatory = json.optBoolean("isMandatory", false)
+            val isMandatory = json.optBoolean("isMandatory", false) || (currentCode < minSupportedVersion)
 
             if (downloadUrl.isBlank()) {
                 val err = UpdateCheckStatus.Error("Invalid update feed: downloadUrl is missing")

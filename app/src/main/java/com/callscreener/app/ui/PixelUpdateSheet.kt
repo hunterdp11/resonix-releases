@@ -54,17 +54,18 @@ fun PixelExpressiveUpdateDialog(
 ) {
     val haptic = LocalHapticFeedback.current
     val isRootActive = remember { RootPrivilegeManager.isRootAvailable() }
+    val isMandatory = updateInfo.isMandatory
 
     Dialog(
         onDismissRequest = {
-            if (downloadStatus !is DownloadStatus.Downloading && downloadStatus !is DownloadStatus.Installing) {
+            if (!isMandatory && downloadStatus !is DownloadStatus.Downloading && downloadStatus !is DownloadStatus.Installing) {
                 onDismiss()
             }
         },
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
-            dismissOnBackPress = downloadStatus !is DownloadStatus.Downloading && downloadStatus !is DownloadStatus.Installing,
-            dismissOnClickOutside = downloadStatus !is DownloadStatus.Downloading && downloadStatus !is DownloadStatus.Installing
+            dismissOnBackPress = !isMandatory && downloadStatus !is DownloadStatus.Downloading && downloadStatus !is DownloadStatus.Installing,
+            dismissOnClickOutside = !isMandatory && downloadStatus !is DownloadStatus.Downloading && downloadStatus !is DownloadStatus.Installing
         )
     ) {
         Box(
@@ -87,29 +88,58 @@ fun PixelExpressiveUpdateDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(100.dp))
-                            .background(monetColors.primaryContainer.copy(alpha = 0.5f))
-                            .padding(horizontal = 14.dp, vertical = 6.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    if (isMandatory) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(100.dp))
+                                .background(Color(0xFFFF5252).copy(alpha = 0.18f))
+                                .border(0.8.dp, Color(0xFFFF5252).copy(alpha = 0.5f), RoundedCornerShape(100.dp))
+                                .padding(horizontal = 14.dp, vertical = 6.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Rounded.AutoAwesome,
-                                contentDescription = null,
-                                tint = monetColors.primary,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Text(
-                                text = "SYSTEM UPDATE",
-                                color = monetColors.primary,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.PriorityHigh,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFF5252),
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Text(
+                                    text = "CRITICAL UPDATE REQUIRED",
+                                    color = Color(0xFFFF5252),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.8.sp
+                                )
+                            }
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(100.dp))
+                                .background(monetColors.primaryContainer.copy(alpha = 0.5f))
+                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = monetColors.primary,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Text(
+                                    text = "SYSTEM UPDATE",
+                                    color = monetColors.primary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.sp
+                                )
+                            }
                         }
                     }
 
@@ -331,27 +361,14 @@ fun PixelExpressiveUpdateDialog(
                         }
 
                         DownloadStatus.Idle -> {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                TextButton(
-                                    onClick = onDismiss,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(48.dp),
-                                    shape = RoundedCornerShape(18.dp)
-                                ) {
-                                    Text("Later", color = monetColors.onSurfaceVariant, fontSize = 14.sp)
-                                }
-
+                            if (isMandatory) {
                                 Button(
                                     onClick = {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         onStartDownload()
                                     },
                                     modifier = Modifier
-                                        .weight(1.4f)
+                                        .fillMaxWidth()
                                         .height(48.dp),
                                     shape = RoundedCornerShape(18.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = monetColors.primary)
@@ -361,7 +378,42 @@ fun PixelExpressiveUpdateDialog(
                                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
                                         Icon(Icons.Rounded.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                                        Text("Update Now", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text("Update Now (Required)", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    }
+                                }
+                            } else {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    TextButton(
+                                        onClick = onDismiss,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(48.dp),
+                                        shape = RoundedCornerShape(18.dp)
+                                    ) {
+                                        Text("Later", color = monetColors.onSurfaceVariant, fontSize = 14.sp)
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            onStartDownload()
+                                        },
+                                        modifier = Modifier
+                                            .weight(1.4f)
+                                            .height(48.dp),
+                                        shape = RoundedCornerShape(18.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = monetColors.primary)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(Icons.Rounded.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                                            Text("Update Now", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        }
                                     }
                                 }
                             }
