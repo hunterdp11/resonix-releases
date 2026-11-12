@@ -212,7 +212,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.People
-import androidx.compose.material.icons.rounded.Voicemail
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 import androidx.compose.ui.Alignment
@@ -4086,14 +4085,7 @@ fun OemDialerKeyButton(
                 lineHeight = 30.sp
             )
             if (digit == "1") {
-                // Modern Google Pixel Dialer Voicemail icon
-                Icon(
-                    imageVector = Icons.Rounded.Voicemail,
-                    contentDescription = "Voicemail",
-                    tint = if (isPressed) monetColors.onPrimaryContainer.copy(alpha = 0.85f)
-                    else monetColors.onSurfaceVariant.copy(alpha = 0.8f),
-                    modifier = Modifier.size(13.dp)
-                )
+                Spacer(modifier = Modifier.height(11.dp))
             } else if (letters.isNotEmpty()) {
                 Text(
                     text = letters,
@@ -4306,12 +4298,12 @@ fun KeypadScreen(
             .padding(bottom = 86.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 1. Pinned Header: "Keypad" Title & Voicemail Shortcut
+        // 1. Pinned Header: "Keypad" Title
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 18.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -4322,35 +4314,6 @@ fun KeypadScreen(
                 fontWeight = FontWeight.Bold,
                 letterSpacing = (-0.5).sp
             )
-
-            // Voicemail / Speed Dial Capsule
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(monetColors.surfaceContainerHigh.copy(alpha = 0.7f))
-                    .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
-                    .clickable {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onCall("1")
-                    }
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Voicemail,
-                    contentDescription = "Voicemail",
-                    tint = monetColors.primary,
-                    modifier = Modifier.size(15.dp)
-                )
-                Text(
-                    text = "Voicemail",
-                    color = monetColors.onSurface,
-                    fontSize = 12.sp,
-                    fontFamily = GoogleSans,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
         }
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -4947,7 +4910,7 @@ fun KeypadScreen(
                                 modifier = Modifier.size(13.dp)
                             )
                             Text(
-                                text = "Hold 0 for + • Hold 1 for Voicemail",
+                                text = "Hold 0 for +",
                                 color = monetColors.onSurfaceVariant,
                                 fontSize = 11.sp,
                                 fontFamily = GoogleSans
@@ -5206,12 +5169,6 @@ fun KeypadScreen(
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     playTone(digit)
                                     typedNumber += "+"
-                                } else if (digit == "1") {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    playTone(digit)
-                                    if (typedNumber.isEmpty()) {
-                                        onCall("1")
-                                    }
                                 }
                             }
                         )
