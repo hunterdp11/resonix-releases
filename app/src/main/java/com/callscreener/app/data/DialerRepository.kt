@@ -69,15 +69,12 @@ object T9Helper {
         val cleanQuery = query.trim().replace(Regex("[^0-9*#+]"), "")
         if (cleanQuery.isBlank()) return false
 
-        // 1. Phone number match
         val cleanPhone = contact.number.replace(Regex("[^0-9+]"), "")
         if (cleanPhone.contains(cleanQuery)) return true
 
-        // 2. Full Name T9 match
         val nameT9 = nameToT9(contact.name)
         if (nameT9.contains(cleanQuery)) return true
 
-        // 3. Match beginning of any word (e.g. "D" in "John Doe")
         val words = contact.name.lowercase().split(Regex("[\\s-]+")).filter { it.isNotBlank() }
         for (word in words) {
             val wordT9 = nameToT9(word)
@@ -98,10 +95,6 @@ object DialerRepository {
     @Volatile
     private var inMemoryCallLogsCache: List<CallLogItem>? = null
 
-    /**
-     * Prewarms contacts and call logs into memory synchronously on application start (taking 2-5ms)
-     * so UI components can access them immediately on the first frame of cold start.
-     */
     fun prewarmCache(context: Context) {
         val appContext = context.applicationContext ?: context
         if (inMemoryContactsCache == null) {
@@ -112,9 +105,6 @@ object DialerRepository {
         }
     }
 
-    /**
-     * Instant synchronous read of cached contacts (RAM first, fallback to disk JSON cache).
-     */
     fun getCachedContacts(context: Context): List<ContactItem> {
         inMemoryContactsCache?.let { return it }
         val appContext = context.applicationContext ?: context
@@ -147,9 +137,6 @@ object DialerRepository {
         return emptyList()
     }
 
-    /**
-     * Persists fresh contacts to RAM and disk cache.
-     */
     fun saveContactsToCache(context: Context, contacts: List<ContactItem>) {
         inMemoryContactsCache = contacts
         val appContext = context.applicationContext ?: context
@@ -171,9 +158,6 @@ object DialerRepository {
         }
     }
 
-    /**
-     * Instantly updates the in-memory and disk cache when a custom contact photo is set or removed.
-     */
     fun updateCachedContactPhoto(context: Context, number: String, photoPath: String?) {
         val clean = DIGITS_ONLY_REGEX.replace(number, "")
         val tail7 = if (clean.length >= 7) clean.takeLast(7) else clean
@@ -188,9 +172,6 @@ object DialerRepository {
         }
     }
 
-    /**
-     * Instant synchronous read of cached call logs (RAM first, fallback to disk JSON cache).
-     */
     fun getCachedCallLogs(context: Context): List<CallLogItem> {
         inMemoryCallLogsCache?.let { return it }
         val appContext = context.applicationContext ?: context
@@ -224,9 +205,6 @@ object DialerRepository {
         return emptyList()
     }
 
-    /**
-     * Persists fresh call logs to RAM and disk cache.
-     */
     fun saveCallLogsToCache(context: Context, logs: List<CallLogItem>) {
         inMemoryCallLogsCache = logs
         val appContext = context.applicationContext ?: context
@@ -267,7 +245,6 @@ object DialerRepository {
                 ContactsContract.CommonDataKinds.Phone.STARRED
             )
 
-            // Try first with safe DISPLAY_NAME ASC; if query throws (some OEM ROMs restrict sort order), fall back to null
             var cursor: android.database.Cursor? = null
             try {
                 cursor = appContext.contentResolver.query(
@@ -328,7 +305,6 @@ object DialerRepository {
             Log.e(TAG, "Error loading contacts from CommonDataKinds.Phone", e)
         }
 
-        // Secondary fallback: if Phone.CONTENT_URI yielded 0 items, query ContactsContract.Contacts directly
         if (list.isEmpty()) {
             try {
                 Log.i(TAG, "Phone table empty or failed, trying fallback to ContactsContract.Contacts")
@@ -363,23 +339,17 @@ object DialerRepository {
             }
         }
 
-        // Sort in memory with localized case-insensitive collation
         list.sortWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
         Log.i(TAG, "loadContacts: loaded ${list.size} contacts successfully")
         saveContactsToCache(appContext, list)
         list
     }
 
-    /**
-     * Fast, indexed contact lookup by phone number using Android's native ContactsContract.PhoneLookup index.
-     * Returns the user's saved contact name from the device phonebook, or null if unsaved.
-     */
     fun lookupContactName(context: Context, rawNumber: String?): String? {
         if (rawNumber.isNullOrBlank()) return null
         val cleanNumber = rawNumber.trim()
         val appContext = context.applicationContext ?: context
 
-        // Check custom name in CallerProfile first (user explicit override)
         val customName = CallerProfileManager.getCustomName(appContext, cleanNumber)
         if (!customName.isNullOrBlank()) {
             return customName
@@ -415,7 +385,6 @@ object DialerRepository {
             return@withContext list
         }
 
-        // Fast O(1) indexed maps for contact resolution
         val exactContactsMap = HashMap<String, String>(contacts.size)
         val tail7ContactsMap = HashMap<String, String>(contacts.size)
 
@@ -464,7 +433,6 @@ object DialerRepository {
                     val date = if (dateIdx >= 0) it.getLong(dateIdx) else 0L
                     val duration = if (durIdx >= 0) it.getLong(durIdx) else 0L
 
-                    // Fast O(1) contact name lookup: exact norm match or last 7 digits match
                     val norm = DIGITS_ONLY_REGEX.replace(number, "")
                     val savedContactName = exactContactsMap[norm] ?: if (norm.length >= 7) {
                         tail7ContactsMap[norm.takeLast(7)]
@@ -500,7 +468,6 @@ object DialerRepository {
             Manifest.permission.CALL_PHONE
         ) == PackageManager.PERMISSION_GRANTED
 
-        // 1. If this app is Default Dialer (ROLE_DIALER), place call directly via TelecomManager
         if (hasCallPermission && telecomManager != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val isDefault = telecomManager.defaultDialerPackage == context.packageName
             if (isDefault) {
@@ -513,7 +480,6 @@ object DialerRepository {
             }
         }
 
-        // 2. Direct cellular call via Intent.ACTION_CALL
         if (hasCallPermission) {
             try {
                 val callIntent = Intent(Intent.ACTION_CALL, uri).apply {
@@ -526,7 +492,6 @@ object DialerRepository {
             }
         }
 
-        // 3. Fallback to ACTION_DIAL
         try {
             val dialIntent = Intent(Intent.ACTION_DIAL, uri).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
@@ -589,9 +554,6 @@ object DialerRepository {
         }
     }
 
-    /**
-     * Check if a phone number exists in system contacts.
-     */
     fun isNumberInContacts(context: Context, phoneNumber: String): Boolean {
         val cleanNumber = phoneNumber.trim()
         if (cleanNumber.isBlank()) return false
@@ -610,9 +572,6 @@ object DialerRepository {
         }
     }
 
-    /**
-     * Launch the system Contacts app to create a new contact with pre-filled phone number and optional name.
-     */
     fun openSystemSaveContact(context: Context, phoneNumber: String, initialName: String? = null) {
         val cleanNumber = phoneNumber.trim()
         try {
@@ -645,9 +604,6 @@ object DialerRepository {
         }
     }
 
-    /**
-     * Launch the system Contacts app to add this phone number to an existing contact.
-     */
     fun openSystemAddToExistingContact(context: Context, phoneNumber: String) {
         val cleanNumber = phoneNumber.trim()
         try {
@@ -663,17 +619,12 @@ object DialerRepository {
         }
     }
 
-    /**
-     * Programmatically insert a new contact into Android's Contacts Provider.
-     * Requires WRITE_CONTACTS permission. Always saves in CallerProfile for instant local reflection.
-     */
     suspend fun saveNewContact(context: Context, displayName: String, phoneNumber: String): Boolean = withContext(Dispatchers.IO) {
         val appContext = context.applicationContext ?: context
         val trimmedName = displayName.trim()
         val trimmedNumber = phoneNumber.trim()
         if (trimmedNumber.isBlank()) return@withContext false
 
-        // Always save to in-app CallerProfile immediately for instant zero-lag UI update
         CallerProfileManager.saveCustomName(appContext, trimmedNumber, trimmedName.ifBlank { trimmedNumber })
 
         if (ContextCompat.checkSelfPermission(appContext, Manifest.permission.WRITE_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
@@ -720,11 +671,6 @@ object DialerRepository {
         }
     }
 
-    /**
-     * Programmatically toggle or set the STARRED / Favorite flag for a contact.
-     * Updates ContactsContract.Contacts directly if WRITE_CONTACTS permission is available,
-     * and always updates inMemoryContactsCache + cached_contacts.json for instant UI reactivity.
-     */
     suspend fun setContactStarred(context: Context, contactId: Long, phoneNumber: String, starred: Boolean): Boolean = withContext(Dispatchers.IO) {
         val appContext = context.applicationContext ?: context
         var providerSuccess = false
@@ -735,7 +681,6 @@ object DialerRepository {
                     put(ContactsContract.Contacts.STARRED, if (starred) 1 else 0)
                 }
 
-                // Try 1: By contact ID
                 if (contactId > 0) {
                     val contactUri = ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, contactId)
                     val rows = appContext.contentResolver.update(contactUri, values, null, null)
@@ -745,7 +690,6 @@ object DialerRepository {
                     }
                 }
 
-                // Try 2: By phone lookup if ID update didn't affect rows
                 if (!providerSuccess && phoneNumber.isNotBlank()) {
                     val clean = phoneNumber.trim()
                     val lookupUri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(clean))
@@ -778,7 +722,6 @@ object DialerRepository {
             Log.w(TAG, "setContactStarred: WRITE_CONTACTS permission not granted, updating local cache only")
         }
 
-        // Always update in-memory cache and persisted cached_contacts.json for instant zero-lag UI reaction
         try {
             val normTarget = PHONE_CLEAN_REGEX.replace(phoneNumber, "")
             val currentList = inMemoryContactsCache ?: getCachedContacts(appContext)
@@ -800,4 +743,3 @@ object DialerRepository {
         true
     }
 }
-

@@ -9,11 +9,6 @@ import android.os.Build
 import android.os.PowerManager
 import android.util.Log
 
-/**
- * Manages proximity sensor and PROXIMITY_SCREEN_OFF_WAKE_LOCK during in-call earpiece usage.
- * Automatically turns off the screen when the phone is held to the ear, and turns it back on
- * when pulled away, preventing accidental face touches during calls.
- */
 class CallProximityManager(private val context: Context) : SensorEventListener {
 
     private val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
@@ -48,23 +43,18 @@ class CallProximityManager(private val context: Context) : SensorEventListener {
         }
     }
 
-    /**
-     * Call when in earpiece mode during an active call (or ringing call where handset is used).
-     */
     fun acquire() {
         try {
-            // 1. Acquire PowerManager Proximity WakeLock if supported
             if (wakeLock == null) {
                 initWakeLock()
             }
             wakeLock?.let {
                 if (!it.isHeld) {
-                    it.acquire(3 * 60 * 60 * 1000L) // 3-hour safety timeout
+                    it.acquire(3 * 60 * 60 * 1000L)
                     Log.i(TAG, "Acquired in-call proximity wake lock")
                 }
             }
 
-            // 2. Also register SensorEventListener to monitor sensor transitions
             if (!isListeningSensor && proximitySensor != null && sensorManager != null) {
                 sensorManager.registerListener(this, proximitySensor, SensorManager.SENSOR_DELAY_NORMAL)
                 isListeningSensor = true
@@ -75,9 +65,6 @@ class CallProximityManager(private val context: Context) : SensorEventListener {
         }
     }
 
-    /**
-     * Call when switching to speakerphone, bluetooth headset, wired headphones, or call ended.
-     */
     fun release() {
         try {
             wakeLock?.let {
@@ -122,4 +109,3 @@ class CallProximityManager(private val context: Context) : SensorEventListener {
         private const val TAG = "CallProximityManager"
     }
 }
-

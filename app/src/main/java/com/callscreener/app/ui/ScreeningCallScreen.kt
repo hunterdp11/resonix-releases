@@ -236,7 +236,6 @@ fun ScreeningCallScreen(
     var isPresetManagerOpen by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
-    // Smooth auto-scroll to the newest message
     LaunchedEffect(state.messages.size) {
         if (state.messages.isNotEmpty()) {
             listState.animateScrollToItem(state.messages.size - 1)
@@ -257,7 +256,6 @@ fun ScreeningCallScreen(
         }
     }
 
-    // Prioritize contact name saved in phone's contacts; only show network owner name for unsaved contacts
     val effectiveCallerName = remember(state.callerNumber, state.callerName) {
         val savedName = DialerRepository.lookupContactName(context, state.callerNumber)
         if (!savedName.isNullOrBlank()) {
@@ -286,7 +284,6 @@ fun ScreeningCallScreen(
             .fillMaxSize()
             .background(GlassBackgroundGradient)
     ) {
-        // Living Chromatic Liquid Aurora Backdrop
         AmbientLiquidBackdrop(isRinging = currentDisplayMode == CallDisplayMode.INCOMING_RINGING)
 
         AnimatedContent(
@@ -328,7 +325,6 @@ fun ScreeningCallScreen(
         ) { mode ->
             when (mode) {
                 CallDisplayMode.INCOMING_RINGING -> {
-                    // Full-Screen OEM Incoming Call Interface
                     OemIncomingCallScreen(
                         callerName = effectiveCallerName,
                         callerNumber = state.callerNumber,
@@ -342,7 +338,6 @@ fun ScreeningCallScreen(
                     )
                 }
                 CallDisplayMode.STANDARD_IN_CALL -> {
-                    // Standard In-Call Dialer (Material You Monet Architecture)
                     StandardInCallScreen(
                         callerName = effectiveCallerName,
                         callerNumber = state.callerNumber,
@@ -369,7 +364,6 @@ fun ScreeningCallScreen(
                     )
                 }
                 CallDisplayMode.ASSISTANT_SCREENING -> {
-                    // Authentic Material You Google Pixel Call Screen
                     MaterialYouAssistantScreeningScreen(
                         state = state,
                         callerName = effectiveCallerName,
@@ -427,7 +421,6 @@ fun ScreeningCallScreen(
             }
         }
 
-        // Shared Fluid Morphing Decline / End Call / Hang Up Button (Continuous layer across transitions)
         SharedMorphingDeclineButton(
             mode = currentDisplayMode,
             isQuickReplyOpen = isQuickReplyOpen,
@@ -437,7 +430,6 @@ fun ScreeningCallScreen(
             isCallEnded = state.status == CallStatus.ENDED
         )
 
-        // 6. Secondary Tools Modal Bottom Sheet (Rendered above everything so it never gets overridden)
         ScreeningToolsBottomSheet(
             visible = isToolsMenuOpen,
             onDismiss = { isToolsMenuOpen = false },
@@ -473,12 +465,6 @@ fun ScreeningCallScreen(
     }
 }
 
-/**
- * Shared Fluid Morphing Decline / Hang Up / End Call Action Button.
- * Continually morphs across CallDisplayMode states (Ringing -> Assistant Screening -> Active In-Call)
- * with fluid Pixel Material You spring physics, liquid squish & stretch on press, specular glint shimmer,
- * and breathing ruby halo aura.
- */
 @Composable
 fun SharedMorphingDeclineButton(
     mode: CallDisplayMode,
@@ -547,7 +533,6 @@ fun SharedMorphingDeclineButton(
         }
         val targetHasLabel = mode == CallDisplayMode.ASSISTANT_SCREENING
 
-        // Stutter-free fluid critically-damped spring physics (Google Pixel 120Hz feel)
         val morphSpringSpec = spring<Dp>(
             dampingRatio = 0.88f,
             stiffness = Spring.StiffnessMediumLow
@@ -602,7 +587,6 @@ fun SharedMorphingDeclineButton(
             label = "morphIconRotation"
         )
 
-        // Continuous Ambient Halo & Glint Sweeps
         val infiniteTransition = rememberInfiniteTransition(label = "morphInfinite")
         val auraPulse by infiniteTransition.animateFloat(
             initialValue = 1.0f,
@@ -632,7 +616,6 @@ fun SharedMorphingDeclineButton(
             label = "morphGlintPhase"
         )
 
-        // Anchored at BottomStart with lambda offset: renders purely on RenderThread without layout thrashing
         Box(
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -644,7 +627,6 @@ fun SharedMorphingDeclineButton(
                 }
                 .size(buttonWidth, buttonHeight)
         ) {
-            // 1. Living Breathing Ruby Halo Aura (Animates with button)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -666,7 +648,6 @@ fun SharedMorphingDeclineButton(
                     )
             )
 
-            // 2. Liquid Morphing Decline / Hang Up Button
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -683,7 +664,7 @@ fun SharedMorphingDeclineButton(
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                Color(0xFFFF334B), // Vibrant Saturated Ruby Red
+                                Color(0xFFFF334B),
                                 Color(0xFFF01438),
                                 Color(0xFFD00826)
                             )
@@ -710,7 +691,6 @@ fun SharedMorphingDeclineButton(
                     },
                 contentAlignment = Alignment.Center
             ) {
-                // Specular lens highlight morphing with corner radius
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -727,7 +707,6 @@ fun SharedMorphingDeclineButton(
                         )
                 )
 
-                // Specular glint shimmer sweep across button surface
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val glintW = size.width * 0.45f
                     val currentX = (size.width + glintW * 2) * glintPhase - glintW
@@ -744,7 +723,6 @@ fun SharedMorphingDeclineButton(
                     )
                 }
 
-                // Morphing Content: Icon and smooth revealing "Hang up" text
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center,
@@ -782,10 +760,6 @@ fun SharedMorphingDeclineButton(
     }
 }
 
-/**
- * Authentic Material You / Google Pixel Call Screen Interface
- * Minimalist, authentic, uncluttered, user-friendly, and Monet-themed.
- */
 @Composable
 fun MaterialYouAssistantScreeningScreen(
     state: CallSessionState,
@@ -826,7 +800,6 @@ fun MaterialYouAssistantScreeningScreen(
             .fillMaxSize()
             .background(monetColors.surface)
     ) {
-        // Main Screening Column
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -834,7 +807,6 @@ fun MaterialYouAssistantScreeningScreen(
                 .navigationBarsPadding()
                 .imePadding()
         ) {
-            // 1. Material You Minimal Top App Bar (~64dp)
             ScreeningTopAppBar(
                 callerName = callerName,
                 callerNumber = callerNumber,
@@ -852,7 +824,6 @@ fun MaterialYouAssistantScreeningScreen(
                 monetColors = monetColors
             )
 
-            // 2. Central Live Transcript Timeline (Flex weight 1f)
             ScreeningTranscriptView(
                 messages = state.messages,
                 isTtsSpeaking = state.isTtsSpeaking,
@@ -866,7 +837,6 @@ fun MaterialYouAssistantScreeningScreen(
                     .fillMaxWidth()
             )
 
-            // 3. Quick Replies & Custom Audio Presets Row (Single-tap access)
             ScreeningResponsesAndAudioSection(
                 quickReplies = state.quickReplies,
                 onReplySelected = onQuickReplySelected,
@@ -885,7 +855,6 @@ fun MaterialYouAssistantScreeningScreen(
 
             Spacer(modifier = Modifier.height(2.dp))
 
-            // 4. Type-to-Speak Input Bar (Pixel-perfect aligned, keyboard icon)
             ScreeningTypeToSpeakBar(
                 text = inputText,
                 onTextChanged = onInputTextChanged,
@@ -897,7 +866,6 @@ fun MaterialYouAssistantScreeningScreen(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // 5. Smart Echo Chamber & Speech Jammer Capsule (Easily accessible right above call action buttons)
             SmartJammerControl(
                 isActive = state.isSpeechJammerActive,
                 onToggle = onToggleSpeechJammer,
@@ -909,7 +877,6 @@ fun MaterialYouAssistantScreeningScreen(
                 monetColors = monetColors
             )
 
-            // 6. Bottom Two-Decision Action Bar (Hang Up & Take Over Call Screen Buttons)
             ScreeningBottomActionBar(
                 onHangUp = onHangUp,
                 onTakeOver = onTakeOver,
@@ -920,9 +887,6 @@ fun MaterialYouAssistantScreeningScreen(
     }
 }
 
-/**
- * Material You Minimal Top App Bar with Caller ID & Quick Actions
- */
 @Composable
 private fun ScreeningTopAppBar(
     callerName: String?,
@@ -976,7 +940,6 @@ private fun ScreeningTopAppBar(
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Contact Avatar Disc
         Box(
             modifier = Modifier.size(44.dp),
             contentAlignment = Alignment.Center
@@ -1010,7 +973,6 @@ private fun ScreeningTopAppBar(
 
         Spacer(modifier = Modifier.width(12.dp))
 
-        // Title and Live Subtitle Column
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.Center
@@ -1029,7 +991,6 @@ private fun ScreeningTopAppBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // Live Blue Pulse Dot
                 Box(
                     modifier = Modifier
                         .size(6.dp)
@@ -1043,7 +1004,6 @@ private fun ScreeningTopAppBar(
                     fontWeight = FontWeight.Normal
                 )
 
-                // Recording Indicator if active
                 if (isRecording) {
                     Box(
                         modifier = Modifier
@@ -1063,12 +1023,10 @@ private fun ScreeningTopAppBar(
             }
         }
 
-        // Action Icons (Speaker, Mute, Tools)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            // Speaker Button
             Box(
                 modifier = Modifier
                     .size(38.dp)
@@ -1093,7 +1051,6 @@ private fun ScreeningTopAppBar(
                 )
             }
 
-            // Mute Button
             Box(
                 modifier = Modifier
                     .size(38.dp)
@@ -1118,7 +1075,6 @@ private fun ScreeningTopAppBar(
                 )
             }
 
-            // Tools / Tuning Button (Opens bottom sheet)
             Box(
                 modifier = Modifier
                     .size(38.dp)
@@ -1152,19 +1108,16 @@ private fun ScreeningTopAppBar(
     }
 }
 
-/**
- * Iconic Google Assistant 4-Dot Breathing Wave Animation
- */
 @Composable
 fun PixelAssistantWaveDots(
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "dotsWave")
     val dotColors = listOf(
-        Color(0xFF4285F4), // Google Blue
-        Color(0xFFEA4335), // Google Red
-        Color(0xFFFBBC05), // Google Yellow
-        Color(0xFF34A853)  // Google Green
+        Color(0xFF4285F4),
+        Color(0xFFEA4335),
+        Color(0xFFFBBC05),
+        Color(0xFF34A853)
     )
     val wavePhase by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -1197,9 +1150,6 @@ fun PixelAssistantWaveDots(
     }
 }
 
-/**
- * Live Screening Transcript Stream with Google Assistant Breathing Empty State
- */
 @Composable
 private fun ScreeningTranscriptView(
     messages: List<ChatMessage>,
@@ -1249,7 +1199,6 @@ private fun ScreeningTranscriptView(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                // Living Audio Status Pill
                 Box(
                     modifier = Modifier
                         .clip(CircleShape)
@@ -1298,7 +1247,6 @@ private fun ScreeningTranscriptView(
                     MaterialYouCallScreenBubble(msg, monetColors)
                 }
 
-                // If user is speaking live via speech-to-text:
                 if (isListeningToUser && userLiveTranscript.isNotBlank()) {
                     item {
                         Box(
@@ -1347,7 +1295,6 @@ private fun ScreeningTranscriptView(
                     }
                 }
 
-                // If TTS speaking live indicator
                 if (isTtsSpeaking) {
                     item {
                         Box(
@@ -1378,9 +1325,6 @@ private fun ScreeningTranscriptView(
     }
 }
 
-/**
- * Material You Native Chat Bubble for Caller & Assistant
- */
 @Composable
 fun MaterialYouCallScreenBubble(
     message: ChatMessage,
@@ -1454,7 +1398,6 @@ fun MaterialYouCallScreenBubble(
                 }
             }
         } else {
-            // Assistant Bubble (Right)
             Column(
                 modifier = Modifier.fillMaxWidth(0.85f),
                 horizontalAlignment = Alignment.End
@@ -1503,10 +1446,6 @@ private enum class ScreeningActionTab {
     CUSTOM_AUDIO
 }
 
-/**
- * Suggested Responses & Custom Audio Soundboard Presets Row
- * Allows one-tap access to Quick Replies and Custom Audio directly on the main UI.
- */
 @Composable
 private fun ScreeningResponsesAndAudioSection(
     quickReplies: List<QuickReply>,
@@ -1527,7 +1466,6 @@ private fun ScreeningResponsesAndAudioSection(
     val haptic = LocalHapticFeedback.current
     var activeTab by remember { mutableStateOf(ScreeningActionTab.QUICK_REPLIES) }
 
-    // Standard default responses combined with custom user replies
     val defaultSuggestions = remember {
         listOf(
             QuickReply(id = "who", title = "Who is this?", spokenText = "May I ask who is calling, please?"),
@@ -1541,11 +1479,9 @@ private fun ScreeningResponsesAndAudioSection(
     val allReplies = remember(quickReplies) {
         val list = mutableListOf<QuickReply>()
         val seen = mutableSetOf<String>()
-        // User custom replies first
         quickReplies.forEach {
             if (seen.add(it.id)) list.add(it)
         }
-        // Then defaults
         defaultSuggestions.forEach {
             if (seen.add(it.id)) list.add(it)
         }
@@ -1557,7 +1493,6 @@ private fun ScreeningResponsesAndAudioSection(
             .fillMaxWidth()
             .padding(vertical = 2.dp)
     ) {
-        // Tab Pills: [ 💬 Quick Replies ]  [ 🎵 Custom Audio (count) ]
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1565,7 +1500,6 @@ private fun ScreeningResponsesAndAudioSection(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Quick Replies Tab
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
@@ -1605,7 +1539,6 @@ private fun ScreeningResponsesAndAudioSection(
                 }
             }
 
-            // Custom Audio Tab
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
@@ -1646,7 +1579,6 @@ private fun ScreeningResponsesAndAudioSection(
             }
         }
 
-        // Dedicated Now Playing / Paused Custom Audio Capsule
         AnimatedVisibility(
             visible = isAudioPresetPlaying || isAudioPresetPaused,
             enter = fadeIn(tween(180)) + expandVertically(tween(200)),
@@ -1721,7 +1653,6 @@ private fun ScreeningResponsesAndAudioSection(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        // Pause / Resume Button
                         Box(
                             modifier = Modifier
                                 .height(28.dp)
@@ -1753,7 +1684,6 @@ private fun ScreeningResponsesAndAudioSection(
                             }
                         }
 
-                        // Stop Button
                         Box(
                             modifier = Modifier
                                 .size(28.dp)
@@ -1777,7 +1707,6 @@ private fun ScreeningResponsesAndAudioSection(
             }
         }
 
-        // Horizontal List of Action Chips
         LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1820,7 +1749,6 @@ private fun ScreeningResponsesAndAudioSection(
                     }
                 }
             } else {
-                // Custom Audio Presets
                 itemsIndexed(presets, key = { index, preset -> "preset_${preset.id}_$index" }) { _, preset ->
                     val isCurrent = playingAudioPresetId == preset.id
                     val isPlayingThis = isCurrent && isAudioPresetPlaying && !isAudioPresetPaused
@@ -1881,7 +1809,6 @@ private fun ScreeningResponsesAndAudioSection(
                     }
                 }
 
-                // Trailing Manage Presets Chip
                 item {
                     Box(
                         modifier = Modifier
@@ -1919,11 +1846,6 @@ private fun ScreeningResponsesAndAudioSection(
     }
 }
 
-/**
- * Type-to-Speak Pill Input Bar with Send & Push-to-Talk Mic Actions.
- * Replaced AI sparkle icon with clean keyboard icon.
- * Uses BasicTextField for pixel-perfect vertical centering and alignment.
- */
 @Composable
 private fun ScreeningTypeToSpeakBar(
     text: String,
@@ -1945,7 +1867,6 @@ private fun ScreeningTypeToSpeakBar(
 
     val isHasText = text.isNotBlank()
 
-    // Outer unified Liquid Glass capsule container
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1987,7 +1908,6 @@ private fun ScreeningTypeToSpeakBar(
             .padding(start = 12.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Leading Keyboard Icon inside subtle tinted disc
         Box(
             modifier = Modifier
                 .size(32.dp)
@@ -2008,7 +1928,6 @@ private fun ScreeningTypeToSpeakBar(
 
         Spacer(modifier = Modifier.width(10.dp))
 
-        // Center Text Input with Pixel-Perfect vertical alignment
         BasicTextField(
             value = text,
             onValueChange = onTextChanged,
@@ -2043,7 +1962,6 @@ private fun ScreeningTypeToSpeakBar(
             }
         )
 
-        // Clear text button if not blank
         if (isHasText) {
             Box(
                 modifier = Modifier
@@ -2065,7 +1983,6 @@ private fun ScreeningTypeToSpeakBar(
             Spacer(modifier = Modifier.width(4.dp))
         }
 
-        // Integrated Trailing Action Button: Saturated Send Rocket or Mic Voice
         if (isHasText) {
             Box(
                 modifier = Modifier
@@ -2130,9 +2047,6 @@ private fun ScreeningTypeToSpeakBar(
     }
 }
 
-/**
- * Symmetrical Material You Two-Decision Action Bar (Hang up & Take over)
- */
 @Composable
 private fun ScreeningBottomActionBar(
     onHangUp: () -> Unit,
@@ -2154,7 +2068,6 @@ private fun ScreeningBottomActionBar(
         label = "actionBarGlint"
     )
 
-    // Tactile Springs & Morph for Hang Up
     val hangUpSource = remember { MutableInteractionSource() }
     val isHangUpPressed by hangUpSource.collectIsPressedAsState()
     val hangUpScaleX by animateFloatAsState(
@@ -2183,7 +2096,6 @@ private fun ScreeningBottomActionBar(
         label = "hangUpIconRotation"
     )
 
-    // Tactile Springs & Morph for Take Over
     val takeOverSource = remember { MutableInteractionSource() }
     val isTakeOverPressed by takeOverSource.collectIsPressedAsState()
     val takeOverScaleX by animateFloatAsState(
@@ -2219,7 +2131,6 @@ private fun ScreeningBottomActionBar(
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Decline / Hang Up Button (Saturated Ruby Red with Liquid Morph)
         if (!isHangUpHandledExternally) {
             Box(
                 modifier = Modifier
@@ -2263,7 +2174,6 @@ private fun ScreeningBottomActionBar(
                     },
                 contentAlignment = Alignment.Center
             ) {
-                // Top glass lens glint morphing with corner radius
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2280,7 +2190,6 @@ private fun ScreeningBottomActionBar(
                         )
                 )
 
-                // Specular glint shimmer sweep
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val glintW = size.width * 0.45f
                     val currentX = (size.width + glintW * 2) * glintPhase - glintW
@@ -2321,7 +2230,6 @@ private fun ScreeningBottomActionBar(
                 }
             }
         } else {
-            // Invisible placeholder so Take Over button on the right stays identically aligned while Morphing button renders smoothly on top
             Spacer(
                 modifier = Modifier
                     .weight(1f)
@@ -2329,7 +2237,6 @@ private fun ScreeningBottomActionBar(
             )
         }
 
-        // Take Over / Answer Button (Saturated Emerald Green with Liquid Morph)
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -2372,7 +2279,6 @@ private fun ScreeningBottomActionBar(
                 },
             contentAlignment = Alignment.Center
         ) {
-            // Top glass lens glint morphing with corner radius
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2389,7 +2295,6 @@ private fun ScreeningBottomActionBar(
                     )
             )
 
-            // Specular glint shimmer sweep
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val glintW = size.width * 0.45f
                 val currentX = (size.width + glintW * 2) * glintPhase - glintW
@@ -2432,11 +2337,6 @@ private fun ScreeningBottomActionBar(
     }
 }
 
-/**
- * Secondary Tools Modal Bottom Sheet
- * Tucks all advanced options (Voice Relay mode, Personas, Soundboard Presets, Jammer, Recording)
- * cleanly into an accessible Material 3 sheet without cluttering the primary screening interface.
- */
 @Composable
 private fun ScreeningToolsBottomSheet(
     visible: Boolean,
@@ -2483,7 +2383,7 @@ private fun ScreeningToolsBottomSheet(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(enabled = false) {} // Prevent click-through
+                    .clickable(enabled = false) {}
                     .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                     .background(monetColors.surfaceContainerHigh)
                     .border(1.dp, monetColors.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
@@ -2494,7 +2394,6 @@ private fun ScreeningToolsBottomSheet(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Drag Handle
                     Box(
                         modifier = Modifier
                             .size(36.dp, 4.dp)
@@ -2503,7 +2402,6 @@ private fun ScreeningToolsBottomSheet(
                             .align(Alignment.CenterHorizontally)
                     )
 
-                    // Header Row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -2543,7 +2441,6 @@ private fun ScreeningToolsBottomSheet(
                         }
                     }
 
-                    // 1. Audio Mode Relay Switcher
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
                             text = "VOICE RELAY MODE",
@@ -2627,7 +2524,6 @@ private fun ScreeningToolsBottomSheet(
                         }
                     }
 
-                    // 2. Voice Persona Selection
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
                             text = "VOICE PERSONA",
@@ -2680,7 +2576,6 @@ private fun ScreeningToolsBottomSheet(
                         }
                     }
 
-                    // 3. Soundboard Presets
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -2763,13 +2658,11 @@ private fun ScreeningToolsBottomSheet(
                         }
                     }
 
-                    // 4. Speech Jammer & Recording Controls Row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Speech Jammer Pill
                         Box(modifier = Modifier.weight(1f)) {
                             SmartJammerControl(
                                 isActive = isSpeechJammerActive,
@@ -2781,7 +2674,6 @@ private fun ScreeningToolsBottomSheet(
                             )
                         }
 
-                        // Call Audio Record Pill
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(20.dp))
@@ -2823,11 +2715,6 @@ private fun ScreeningToolsBottomSheet(
     }
 }
 
-/**
- * Smart, ultra-compact in-call Speech Jammer & Echo Chamber capsule.
- * Replaces large clunky card with a minimal, premium single-row pill.
- * Features centered, beautifully aligned mode (ECHO/DAF) and action (ENGAGE/ACTIVE) pills.
- */
 @Composable
 fun SmartJammerControl(
     isActive: Boolean,
@@ -2864,7 +2751,6 @@ fun SmartJammerControl(
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Mode Icon Disc (Tap to cycle mode)
         Box(
             modifier = Modifier
                 .size(32.dp)
@@ -2887,7 +2773,6 @@ fun SmartJammerControl(
 
         Spacer(modifier = Modifier.width(10.dp))
 
-        // Center: Interactive Mode Title & Subtitle (Tap to switch mode)
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -2939,7 +2824,6 @@ fun SmartJammerControl(
 
         Spacer(modifier = Modifier.width(6.dp))
 
-        // User Voice Mic Pill
         Box(
             modifier = Modifier
                 .size(32.dp)
@@ -2970,7 +2854,6 @@ fun SmartJammerControl(
 
         Spacer(modifier = Modifier.width(6.dp))
 
-        // Minimal Pixel Action Pill (Active / Engage)
         Box(
             modifier = Modifier
                 .height(32.dp)
@@ -3000,10 +2883,6 @@ fun SmartJammerControl(
     }
 }
 
-
-/**
- * Animated Apple-Style 5-Bar Jumping Waveform with Luminous Gradient Ends
- */
 @Composable
 fun JumpingAudioWaveform(color: Color, isPlaying: Boolean) {
     val transition = rememberInfiniteTransition(label = "waveform")
@@ -3060,16 +2939,10 @@ fun WaveBar(heightDp: Float, color: Color) {
     )
 }
 
-/**
- * Living Chromatic Liquid Aurora Backdrop:
- * Deep Obsidian canvas with dynamic drifting chromatic orbs, fluid ambient light dispersion,
- * and rhythmic acoustic breathing when ringing.
- */
 @Composable
 fun AmbientLiquidBackdrop(isRinging: Boolean = false) {
     val infiniteTransition = rememberInfiniteTransition(label = "auroraShift")
 
-    // Slow organic chromatic drift coordinates
     val phase1 by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
@@ -3089,7 +2962,6 @@ fun AmbientLiquidBackdrop(isRinging: Boolean = false) {
         label = "phase2"
     )
 
-    // Breathing pulse for orbs (faster & more pronounced when ringing)
     val breathingPulse by infiniteTransition.animateFloat(
         initialValue = 0.88f,
         targetValue = 1.18f,
@@ -3121,7 +2993,6 @@ fun AmbientLiquidBackdrop(isRinging: Boolean = false) {
             val rad1 = Math.toRadians(phase1.toDouble())
             val rad2 = Math.toRadians(phase2.toDouble())
 
-            // Orb 1: Upper-Mid Drift (Electric Azure & Cyan)
             val orb1X = (width * 0.50f) + (width * 0.30f * Math.sin(rad1).toFloat())
             val orb1Y = (height * 0.28f) + (height * 0.12f * Math.cos(rad1).toFloat())
             val orb1Radius = width * 0.72f * breathingPulse
@@ -3129,8 +3000,8 @@ fun AmbientLiquidBackdrop(isRinging: Boolean = false) {
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        Color(0x38007AFF), // Electric Blue
-                        Color(0x2200D2FF), // Cyan Sheen
+                        Color(0x38007AFF),
+                        Color(0x2200D2FF),
                         Color(0x0C0044BB),
                         Color.Transparent
                     ),
@@ -3141,7 +3012,6 @@ fun AmbientLiquidBackdrop(isRinging: Boolean = false) {
                 center = Offset(orb1X, orb1Y)
             )
 
-            // Orb 2: Lower-Mid Drift (Deep Violet & Royal Purple)
             val orb2X = (width * 0.48f) + (width * 0.32f * Math.cos(rad2).toFloat())
             val orb2Y = (height * 0.58f) + (height * 0.14f * Math.sin(rad2).toFloat())
             val orb2Radius = width * 0.76f * (2.05f - breathingPulse)
@@ -3149,8 +3019,8 @@ fun AmbientLiquidBackdrop(isRinging: Boolean = false) {
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        Color(0x325856D6), // Deep Indigo / Violet
-                        Color(0x1EAF52DE), // Royal Purple
+                        Color(0x325856D6),
+                        Color(0x1EAF52DE),
                         Color(0x08331166),
                         Color.Transparent
                     ),
@@ -3161,19 +3031,18 @@ fun AmbientLiquidBackdrop(isRinging: Boolean = false) {
                 center = Offset(orb2X, orb2Y)
             )
 
-            // Orb 3: Bottom Controls Glow (Emerald & Seafoam Mint when incoming ringing, or subtle oceanic teal)
             val orb3Y = height * 0.86f
             val orb3Radius = width * 0.62f * breathingPulse
             val orb3Colors = if (isRinging) {
                 listOf(
-                    Color(0x3830D158).copy(alpha = ringPulse * 0.55f), // Emerald radiance
+                    Color(0x3830D158).copy(alpha = ringPulse * 0.55f),
                     Color(0x2200C7BE).copy(alpha = ringPulse * 0.38f),
                     Color(0x0A004D40),
                     Color.Transparent
                 )
             } else {
                 listOf(
-                    Color(0x2000B4D8), // Oceanic Teal
+                    Color(0x2000B4D8),
                     Color(0x0E0077B6),
                     Color.Transparent
                 )
@@ -3190,7 +3059,6 @@ fun AmbientLiquidBackdrop(isRinging: Boolean = false) {
             )
         }
 
-        // Pristine subtle top sheen (Apple glass dispersion)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -3206,7 +3074,6 @@ fun AmbientLiquidBackdrop(isRinging: Boolean = false) {
                 )
         )
 
-        // Soft ambient vignette for deep focus
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -3223,15 +3090,11 @@ fun AmbientLiquidBackdrop(isRinging: Boolean = false) {
     }
 }
 
-
-/**
- * Authentic Pixel Monet Dark Color Scheme Fallback (Android 11 or non-Monet devices).
- */
 internal fun getPixelMonetDarkColorScheme(): ColorScheme {
     return darkColorScheme(
-        primary = Color(0xFFA8C7FA),          // Google Blue (Pixel primary)
+        primary = Color(0xFFA8C7FA),
         onPrimary = Color(0xFF042E69),
-        primaryContainer = Color(0xFF234479), // Tonal container
+        primaryContainer = Color(0xFF234479),
         onPrimaryContainer = Color(0xFFD3E3FD),
         secondary = Color(0xFFC2E7FF),
         secondaryContainer = Color(0xFF2A4257),
@@ -3239,7 +3102,7 @@ internal fun getPixelMonetDarkColorScheme(): ColorScheme {
         tertiary = Color(0xFFD0BCFF),
         tertiaryContainer = Color(0xFF4A4458),
         onTertiaryContainer = Color(0xFFE8DEF8),
-        surface = Color(0xFF111318),          // Pixel Obsidian/Charcoal surface
+        surface = Color(0xFF111318),
         surfaceContainer = Color(0xFF1E2025),
         surfaceContainerHigh = Color(0xFF282A2F),
         surfaceContainerHighest = Color(0xFF33353A),
@@ -3253,19 +3116,6 @@ internal fun getPixelMonetDarkColorScheme(): ColorScheme {
     )
 }
 
-/**
- * Android Monet / Material You Pixel Incoming Call Screen.
- *
- * Implements the authentic Google Phone / Pixel Material 3 architecture:
- * - Dynamic Monet color extraction (dynamicDarkColorScheme on Android 12+ / Pixel fallback)
- * - Atmospheric wallpaper-tinted ambient orbs with organic breathing
- * - Centered Google Verified Caller chip with security shield and live pulse dot
- * - Generous Material 3 circular contact avatar with soothing ambient primary wave ripples
- * - Large, clean Google Sans headline typography for caller name & number
- * - The Iconic Google Pixel "Screen call" Material 3 elevated pill button with sparkles & Assistant badge
- * - Dedicated Quick Reply action ("Reply") with a Material 3 canned response sheet
- * - Symmetrical, high-contrast, tactile Google Phone circular action buttons (Decline Red & Answer Green)
- */
 @Composable
 fun OemIncomingCallScreen(
     callerName: String?,
@@ -3298,7 +3148,6 @@ fun OemIncomingCallScreen(
 
     val infiniteTransition = rememberInfiniteTransition(label = "monetIncomingAnimations")
 
-    // Ambient wallpaper-tinted background breathing
     val orbBreath by infiniteTransition.animateFloat(
         initialValue = 0.90f,
         targetValue = 1.12f,
@@ -3309,7 +3158,6 @@ fun OemIncomingCallScreen(
         label = "orbBreath"
     )
 
-    // Avatar subtle breathing pulse
     val avatarPulse by infiniteTransition.animateFloat(
         initialValue = 1.0f,
         targetValue = 1.04f,
@@ -3320,7 +3168,6 @@ fun OemIncomingCallScreen(
         label = "avatarPulse"
     )
 
-    // Answer button aura ring pulse
     val answerPulse by infiniteTransition.animateFloat(
         initialValue = 1.0f,
         targetValue = 1.18f,
@@ -3331,7 +3178,6 @@ fun OemIncomingCallScreen(
         label = "answerPulse"
     )
 
-    // Ringing handset subtle wiggle
     val phoneWiggleAngle by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 0f,
@@ -3352,7 +3198,6 @@ fun OemIncomingCallScreen(
         label = "phoneWiggleAngle"
     )
 
-    // Enhanced Endless Screen Call Button Animations
     val screenShimmerPhase by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
@@ -3373,7 +3218,6 @@ fun OemIncomingCallScreen(
         label = "screenAuraPulse"
     )
 
-    // Tactile Springs for Decline Button
     val declineSource = remember { MutableInteractionSource() }
     val isDeclinePressed by declineSource.collectIsPressedAsState()
     val declineScale by animateFloatAsState(
@@ -3382,7 +3226,6 @@ fun OemIncomingCallScreen(
         label = "declineScale"
     )
 
-    // Drag & Press State for Answer Button (Supports both swipe up and tap)
     var isAnswerPressed by remember { mutableStateOf(false) }
     var dragOffsetY by remember { mutableStateOf(0f) }
     val animatedOffsetY by animateFloatAsState(
@@ -3400,7 +3243,6 @@ fun OemIncomingCallScreen(
         label = "answerScale"
     )
 
-    // Screen Call Button Tactile State
     val screenSource = remember { MutableInteractionSource() }
     val isScreenPressed by screenSource.collectIsPressedAsState()
     val screenScale by animateFloatAsState(
@@ -3409,7 +3251,6 @@ fun OemIncomingCallScreen(
         label = "screenScale"
     )
 
-    // Quick Reply Button Tactile State
     val replySource = remember { MutableInteractionSource() }
     val isReplyPressed by replySource.collectIsPressedAsState()
     val replyScale by animateFloatAsState(
@@ -3456,7 +3297,6 @@ fun OemIncomingCallScreen(
             .fillMaxSize()
             .background(monetColors.surface)
     ) {
-        // Full Screen Content Column (Google Dialer Expressive Incoming Call Screen)
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -3466,19 +3306,16 @@ fun OemIncomingCallScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // TOP SECTION: Google Dialer Caller Info & Avatar
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 16.dp)
             ) {
-                // Caller Portrait Container (Google Dialer 120dp Avatar)
                 Box(
                     modifier = Modifier.size(124.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Soft ambient halo ring
                     Box(
                         modifier = Modifier
                             .size(120.dp)
@@ -3486,7 +3323,6 @@ fun OemIncomingCallScreen(
                             .background(monetColors.primary.copy(alpha = 0.12f), CircleShape)
                     )
 
-                    // Central Avatar Circle
                     Box(
                         modifier = Modifier
                             .size(112.dp)
@@ -3534,7 +3370,6 @@ fun OemIncomingCallScreen(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                // Caller Headline Name (Google Sans Aesthetic)
                 Text(
                     text = displayCallerTitle,
                     color = monetColors.onSurface,
@@ -3547,7 +3382,6 @@ fun OemIncomingCallScreen(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Caller Phone Number
                 Text(
                     text = displayCallerNumber,
                     color = monetColors.onSurfaceVariant,
@@ -3559,12 +3393,10 @@ fun OemIncomingCallScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // HD Voice & Spam Protection Badges Row
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Modern HD Voice Badge
                     Box(
                         modifier = Modifier
                             .clip(CircleShape)
@@ -3592,7 +3424,6 @@ fun OemIncomingCallScreen(
                         }
                     }
 
-                    // Spam Protection / Verified Badge
                     Box(
                         modifier = Modifier
                             .clip(CircleShape)
@@ -3621,14 +3452,12 @@ fun OemIncomingCallScreen(
                 }
             }
 
-            // BOTTOM SECTION: Controls anchored in thumb zone
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp)
             ) {
-                // 1. Signature Google Pixel "Screen call" Pill Button
                 BoxWithConstraints(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -3669,8 +3498,8 @@ fun OemIncomingCallScreen(
                                     colors = listOf(
                                         monetColors.outlineVariant.copy(alpha = 0.35f),
                                         monetColors.primary.copy(alpha = 0.40f),
-                                        Color(0xFF4285F4).copy(alpha = 0.85f), // Radiant Google Blue
-                                        Color(0xFF34A853).copy(alpha = 0.80f), // Google Green accent
+                                        Color(0xFF4285F4).copy(alpha = 0.85f),
+                                        Color(0xFF34A853).copy(alpha = 0.80f),
                                         monetColors.primary.copy(alpha = 0.85f),
                                         monetColors.outlineVariant.copy(alpha = 0.35f)
                                     ),
@@ -3693,7 +3522,6 @@ fun OemIncomingCallScreen(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Assistant Screening Icon Disc
                             Box(
                                 modifier = Modifier
                                     .size(36.dp)
@@ -3721,7 +3549,6 @@ fun OemIncomingCallScreen(
 
                             Spacer(modifier = Modifier.weight(1f))
 
-                            // Assistant Badge
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
@@ -3747,7 +3574,6 @@ fun OemIncomingCallScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 2. Google Dialer "Quick reply" Capsule Pill Button
                 Box(
                     modifier = Modifier
                         .graphicsLayer {
@@ -3806,7 +3632,6 @@ fun OemIncomingCallScreen(
 
                 Spacer(modifier = Modifier.height(26.dp))
 
-                // 3. Pixel-Perfect Symmetric Action Buttons Row (Decline & Answer)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -3814,7 +3639,6 @@ fun OemIncomingCallScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // DECLINE (Left)
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -3841,7 +3665,7 @@ fun OemIncomingCallScreen(
                                         .background(
                                             Brush.verticalGradient(
                                                 listOf(
-                                                    Color(0xFFE53935), // Google Dialer Decline Red
+                                                    Color(0xFFE53935),
                                                     Color(0xFFD32F2F),
                                                     Color(0xFFC62828)
                                                 )
@@ -3865,7 +3689,6 @@ fun OemIncomingCallScreen(
                                     )
                                 }
                             } else {
-                                // Keep exact 72.dp placeholder so layout remains 100% stable during transitions
                                 Spacer(modifier = Modifier.size(72.dp))
                             }
                         }
@@ -3881,7 +3704,6 @@ fun OemIncomingCallScreen(
                         )
                     }
 
-                    // ANSWER (Right - Supports tap & swipe up)
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -3891,7 +3713,6 @@ fun OemIncomingCallScreen(
                             modifier = Modifier.size(72.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            // Ambient glowing pulse ring behind answer button
                             Box(
                                 modifier = Modifier
                                     .size(72.dp)
@@ -3908,7 +3729,6 @@ fun OemIncomingCallScreen(
                                     )
                             )
 
-                            // Answer Button with Upward Drag Offset & Tap Support
                             Box(
                                 modifier = Modifier
                                     .offset { IntOffset(0, animatedOffsetY.roundToInt()) }
@@ -3926,9 +3746,9 @@ fun OemIncomingCallScreen(
                                     .background(
                                         Brush.verticalGradient(
                                             listOf(
-                                                Color(0xFF00E676), // Vibrant Neon Emerald Highlight
-                                                Color(0xFF00C853), // Punchy Saturated Google Green
-                                                Color(0xFF00963E)  // Deep Saturated Emerald Base
+                                                Color(0xFF00E676),
+                                                Color(0xFF00C853),
+                                                Color(0xFF00963E)
                                             )
                                         )
                                     )
@@ -3971,7 +3791,6 @@ fun OemIncomingCallScreen(
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
-                                // Top specular glass highlight
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -4013,7 +3832,6 @@ fun OemIncomingCallScreen(
             }
         }
 
-        // Material 3 Quick Reply Bottom Sheet Modal
         AnimatedVisibility(
             visible = effectiveQuickReplyOpen,
             enter = fadeIn(tween(200)) + slideInVertically(tween(300)) { it },
@@ -4031,7 +3849,7 @@ fun OemIncomingCallScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(enabled = false) {} // Prevent click-through
+                        .clickable(enabled = false) {}
                         .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                         .background(monetColors.surfaceContainerHigh)
                         .border(1.dp, monetColors.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
@@ -4042,7 +3860,6 @@ fun OemIncomingCallScreen(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        // Drag Handle
                         Box(
                             modifier = Modifier
                                 .size(36.dp, 4.dp)
@@ -4051,7 +3868,6 @@ fun OemIncomingCallScreen(
                                 .align(Alignment.CenterHorizontally)
                         )
 
-                        // Sheet Header
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -4082,7 +3898,6 @@ fun OemIncomingCallScreen(
                             }
                         }
 
-                        // Canned Quick Reply Options
                         val quickMessages = listOf(
                             "Can't talk now. What's up?",
                             "I'll call you right back.",
@@ -4131,26 +3946,6 @@ fun OemIncomingCallScreen(
     }
 }
 
-/**
- * Standard In-Call Dialer Screen (ColorOS / MIUI / iOS style)
- * Displayed when user answers a call directly without assistant screening.
- * Features:
- * - Minimalist OLED dark theme with ambient liquid backdrop
- * - Large contact avatar & initials with soft glowing rim
- * - Clean caller name, number & monospace duration timer
- * - Symmetrical 6-button in-call control grid:
- *   1. Mute (Toggle mic mute)
- *   2. Keypad (In-call DTMF dialpad for automated phone menus)
- *   3. Speaker (Hands-free speakerphone / earpiece)
- *   4. Record (REC) (One-tap dual-side call recording with active pulsing indicator)
- *   5. Hold (Call hold toggle)
- *   6. Screen with AI (Hand over to assistant screening anytime)
- * - Large Red End Call Button
- */
-/**
- * Authentic Material You / Google Pixel In-Call Screen
- * Minimal, modern, Monet-themed active call screen.
- */
 @Composable
 fun StandardInCallScreen(
     callerName: String?,
@@ -4252,7 +4047,6 @@ fun StandardInCallScreen(
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
-        // Full Screen Content Column
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -4261,7 +4055,6 @@ fun StandardInCallScreen(
         ) {
             Spacer(modifier = Modifier.height(14.dp))
 
-            // 1. Android 17 Inspired Dynamic Live Call Capsule (Frosted Glass Floating Island)
             Box(
                 modifier = Modifier
                     .shadow(
@@ -4288,11 +4081,10 @@ fun StandardInCallScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Pulsing Connection Status Beacon
                     val dotColor = when (status) {
                         CallStatus.ON_HOLD -> AppleAmber
                         CallStatus.DIALING -> monetColors.primary
-                        else -> Color(0xFF34A853) // Active Google Green
+                        else -> Color(0xFF34A853)
                     }
                     val dotAlpha by rememberInfiniteTransition(label = "liveCallDot").animateFloat(
                         initialValue = 0.50f,
@@ -4313,7 +4105,6 @@ fun StandardInCallScreen(
                             )
                     )
 
-                    // Call Duration / State (Google Sans Monospace)
                     Text(
                         text = when (status) {
                             CallStatus.ON_HOLD -> "ON HOLD"
@@ -4331,7 +4122,6 @@ fun StandardInCallScreen(
                         letterSpacing = 0.4.sp
                     )
 
-                    // Separator Bullet
                     Box(
                         modifier = Modifier
                             .size(3.dp)
@@ -4339,7 +4129,6 @@ fun StandardInCallScreen(
                             .background(monetColors.onSurfaceVariant.copy(alpha = 0.40f))
                     )
 
-                    // HD Voice Badge
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -4359,7 +4148,6 @@ fun StandardInCallScreen(
                         )
                     }
 
-                    // Pulsing Red REC Badge (when recording is active)
                     if (isRecording) {
                         Box(
                             modifier = Modifier
@@ -4418,12 +4206,10 @@ fun StandardInCallScreen(
 
             Spacer(modifier = Modifier.height(animatedAvatarSpacer))
 
-            // 2. Pixel Expressive Hero Contact Avatar (Concentric Atmospheric Depth & Specular Sheen)
             Box(
                 modifier = Modifier.size(animatedAvatarSize),
                 contentAlignment = Alignment.Center
             ) {
-                // Soft Ambient Radial Gradient Depth Aura
                 Box(
                     modifier = Modifier
                         .size(animatedAvatarSize * 1.34f)
@@ -4439,7 +4225,6 @@ fun StandardInCallScreen(
                         )
                 )
 
-                // Central Tactile Squircle Avatar Disc
                 Box(
                     modifier = Modifier
                         .size(animatedAvatarSize)
@@ -4500,7 +4285,6 @@ fun StandardInCallScreen(
 
             Spacer(modifier = Modifier.height(animatedTitleSpacer))
 
-            // 3. Caller Title (Google Sans Display Typography)
             Text(
                 text = displayCallerTitle,
                 color = monetColors.onSurface,
@@ -4513,7 +4297,6 @@ fun StandardInCallScreen(
                 textAlign = TextAlign.Center
             )
 
-            // 4. Caller Phone Number & Quick Save (Fluidly animated container with zero layout jitter)
             AnimatedVisibility(
                 visible = !showKeypad,
                 enter = fadeIn(tween(180, delayMillis = 40)) + expandVertically(tween(240, easing = FastOutSlowInEasing)),
@@ -4535,7 +4318,6 @@ fun StandardInCallScreen(
                         )
                     }
 
-                    // Quick Save Contact pill if caller is an unsaved number
                     if (!isNumberHidden && callerNumber.isNotBlank() &&
                         (callerName.isNullOrBlank() || callerName == callerNumber || callerName.equals("Unknown Caller", ignoreCase = true))
                     ) {
@@ -4573,7 +4355,6 @@ fun StandardInCallScreen(
                 }
             }
 
-            // 5. Middle Section: Dynamic Keypad in Stable Flexible Spacer (Fluid slide & fade from dialer)
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -4596,7 +4377,6 @@ fun StandardInCallScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        // Modern Frosted Glass DTMF Display Pill
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth(0.88f)
@@ -4648,7 +4428,6 @@ fun StandardInCallScreen(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // 3x4 DTMF Keypad Grid
                         val keypadRows = remember {
                             listOf(
                                 listOf('1' to "", '2' to "ABC", '3' to "DEF"),
@@ -4681,7 +4460,6 @@ fun StandardInCallScreen(
                 }
             }
 
-            // 6. Echo Chamber & Speech Jammer Capsule (Ergonomically aligned directly above in-call action buttons)
             AnimatedVisibility(
                 visible = !showKeypad && status != CallStatus.ENDED,
                 enter = fadeIn(tween(200, delayMillis = 40)) + expandVertically(tween(240, easing = FastOutSlowInEasing)),
@@ -4702,14 +4480,12 @@ fun StandardInCallScreen(
                 }
             }
 
-            // 7. Symmetrical Pixel Expressive Action Buttons (3 Columns, Perfect Vertical and Horizontal Alignment)
             Column(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 4.dp)
             ) {
-                // Row 1: Mute | Keypad (Toggles open/close) | Speaker
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -4758,7 +4534,6 @@ fun StandardInCallScreen(
                     }
                 }
 
-                // Row 2: Record | Hold | Screen with AI (Only when Keypad is closed)
                 AnimatedVisibility(
                     visible = !showKeypad,
                     enter = fadeIn(tween(200, delayMillis = 40)) + expandVertically(tween(240, easing = FastOutSlowInEasing)),
@@ -4817,7 +4592,6 @@ fun StandardInCallScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 8. Symmetrical, Tactile Google Phone Red End Call Button with Liquid Morph & Living Aura
             val endCallInfiniteTransition = rememberInfiniteTransition(label = "endCallInfinite")
             val endCallAuraPulse by endCallInfiniteTransition.animateFloat(
                 initialValue = 1.0f,
@@ -4881,7 +4655,6 @@ fun StandardInCallScreen(
                     modifier = Modifier.size(width = 84.dp, height = 76.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Living Breathing Ruby Aura Halo
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -4903,7 +4676,6 @@ fun StandardInCallScreen(
                             )
                     )
 
-                    // Morphing Liquid Button
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -4920,7 +4692,7 @@ fun StandardInCallScreen(
                             .background(
                                 Brush.verticalGradient(
                                     listOf(
-                                        Color(0xFFFF334B), // Vibrant Saturated Ruby Red
+                                        Color(0xFFFF334B),
                                         Color(0xFFF01438),
                                         Color(0xFFD00826)
                                     )
@@ -4946,7 +4718,6 @@ fun StandardInCallScreen(
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        // Morphing Top glass glint highlight
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -4963,7 +4734,6 @@ fun StandardInCallScreen(
                                 )
                         )
 
-                        // Specular Glint Shimmer Sweep
                         Canvas(modifier = Modifier.fillMaxSize()) {
                             val glintW = size.width * 0.45f
                             val currentX = (size.width + glintW * 2) * endCallGlintPhase - glintW
@@ -4993,7 +4763,6 @@ fun StandardInCallScreen(
                     }
                 }
             } else {
-                // Invisible placeholder keeping in-call layout spacing identical while Morphing button renders smoothly on top
                 Spacer(modifier = Modifier.size(width = 84.dp, height = 76.dp))
             }
 
@@ -5002,11 +4771,6 @@ fun StandardInCallScreen(
     }
 }
 
-/**
- * Material You / Pixel Expressive ("Expresso") In-Call Action Tile Button.
- * Tactile squircle tile with smooth corner radius morphing, dynamic Monet container depth,
- * top specular glass glint, and perfectly aligned typography.
- */
 @Composable
 fun InCallActionButton(
     icon: ImageVector,
@@ -5097,7 +4861,6 @@ fun InCallActionButton(
                 ) { onClick() },
             contentAlignment = Alignment.Center
         ) {
-            // Top specular glass highlight
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -5136,10 +4899,6 @@ fun InCallActionButton(
     }
 }
 
-/**
- * Material You / Pixel Expressive ("Expresso") In-Call DTMF Key.
- * Tactile squircle key with bold typography and instant haptic spring response.
- */
 @Composable
 fun InCallDtmfKey(
     digit: Char,
@@ -5219,7 +4978,6 @@ fun InCallDtmfKey(
         }
     }
 }
-
 
 private fun formatDuration(seconds: Long): String {
     val mins = seconds / 60

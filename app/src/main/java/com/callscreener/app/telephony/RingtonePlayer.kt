@@ -12,10 +12,6 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.util.Log
 
-/**
- * Handles incoming call ringtone and vibration playback when CallScreeningInCallService
- * is operating as the active InCallService (IN_CALL_SERVICE_RINGING).
- */
 object RingtonePlayer {
 
     private const val TAG = "RingtonePlayer"
@@ -36,7 +32,6 @@ object RingtonePlayer {
 
             Log.i(TAG, "Starting ringtone & vibration; ringerMode = $ringerMode")
 
-            // 1. Play Ringtone if ringer mode is NORMAL
             if (ringerMode == AudioManager.RINGER_MODE_NORMAL) {
                 var ringtoneUri: Uri? = RingtoneManager.getActualDefaultRingtoneUri(context, RingtoneManager.TYPE_RINGTONE)
                 if (ringtoneUri == null) {
@@ -60,7 +55,6 @@ object RingtonePlayer {
                 }
             }
 
-            // 2. Play Vibration if not SILENT
             CallVibrator.startRingingVibration(context)
 
             isPlaying = true
@@ -88,4 +82,3 @@ object RingtonePlayer {
         }
     }
 }
-

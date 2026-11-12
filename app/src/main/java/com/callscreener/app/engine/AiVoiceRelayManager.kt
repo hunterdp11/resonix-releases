@@ -21,19 +21,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.Locale
 
-/**
- * AI Voice Relay Engine (Speech-to-AI-Voice)
- *
- * Allows the user to speak naturally into their phone microphone during a call.
- * The engine captures and transcribes their speech in real time with live feedback,
- * and immediately converts it into the selected studio-quality AI Voice Persona
- * (Chloe / Zoe / Pooja / Kavya / etc.) to inject into the call stream.
- *
- * Guarantees:
- * - Robust speech recognition on all devices (on-device engine where available, fallback to Google Speech Services).
- * - Immediate live partial transcription so text is visible in real-time.
- * - Continuous auto-reconnection loop so subsequent speech is never missed.
- */
 class AiVoiceRelayManager(private val context: Context) : RecognitionListener {
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -70,7 +57,6 @@ class AiVoiceRelayManager(private val context: Context) : RecognitionListener {
             return
         }
 
-        // Verify RECORD_AUDIO permission
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             Log.w(TAG, "Cannot start SpeechRecognizer: RECORD_AUDIO permission is not granted")
             _isListening.value = false
@@ -89,7 +75,6 @@ class AiVoiceRelayManager(private val context: Context) : RecognitionListener {
                     return@post
                 }
 
-                // If recognizer is active or already exists, cancel previous session cleanly
                 try {
                     speechRecognizer?.cancel()
                 } catch (_: Exception) {}
@@ -220,12 +205,10 @@ class AiVoiceRelayManager(private val context: Context) : RecognitionListener {
         _isListening.value = false
         _livePartialTranscript.value = ""
 
-        // If listening was cancelled or TTS is speaking, do not restart
         if (!isListeningActive || isTtsCurrentlySpeaking) {
             return
         }
 
-        // Standard silence or pause during speech session: immediately resume listening
         if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
             consecutiveErrors = 0
             mainHandler.postDelayed({
@@ -280,7 +263,6 @@ class AiVoiceRelayManager(private val context: Context) : RecognitionListener {
             }
             _speechEvents.tryEmit(text)
         } else if (isListeningActive && !isTtsCurrentlySpeaking) {
-            // No speech detected in this buffer, restart listening seamlessly
             mainHandler.postDelayed({
                 if (isListeningActive && !isTtsCurrentlySpeaking && !_isListening.value) {
                     startListening()

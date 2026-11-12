@@ -41,4 +41,3 @@ class CallScreenerApp : Application() {
             private set
     }
 }
-

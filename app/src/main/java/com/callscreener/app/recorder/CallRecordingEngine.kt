@@ -48,9 +48,6 @@ class CallRecordingEngine(private val context: Context) {
         private const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
     }
 
-    /**
-     * Start recording the phone call with dual-side root mixer audio capture.
-     */
     fun startRecording(callerNumber: String, isSimulated: Boolean): File? {
         if (isRecording) {
             Log.w(TAG, "Recording is already active")
@@ -58,20 +55,16 @@ class CallRecordingEngine(private val context: Context) {
         }
 
         try {
-            // 1. Prepare output WAV file
             val recordingsDir = getRecordingsDir()
             val cleanNumber = callerNumber.replace(Regex("[^0-9+]"), "").ifBlank { "Unknown" }
             val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
             val wavFile = File(recordingsDir, "Call_${cleanNumber}_${timestamp}.wav")
             currentFile = wavFile
 
-            // 2. Unmask Hardware In-Call ALSA Mixer Controls if Root is available
             scope.launch {
                 unmaskRootAudioMixer(isSimulated)
             }
 
-            // 3. Initialize AudioRecord with prioritized audio sources
-            // Priority: VOICE_CALL (source 4) -> VOICE_COMMUNICATION (source 7) -> MIC (source 1)
             val bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT) * 2
             val record = createAudioRecord(bufferSize)
 
@@ -86,7 +79,6 @@ class CallRecordingEngine(private val context: Context) {
             isRecording = true
             Log.i(TAG, "Call recording started -> ${wavFile.absolutePath}")
 
-            // 4. Background recording loop writing PCM data with WAV header
             recordingJob = scope.launch {
                 writeWavAudioStream(wavFile, record, bufferSize)
             }
@@ -99,9 +91,6 @@ class CallRecordingEngine(private val context: Context) {
         }
     }
 
-    /**
-     * Stop the active call recording and finalize the RIFF WAV header.
-     */
     fun stopRecording(): File? {
         if (!isRecording) return currentFile
         isRecording = false
@@ -131,14 +120,11 @@ class CallRecordingEngine(private val context: Context) {
         }
     }
 
-    /**
-     * Selects and creates AudioRecord, prioritizing VOICE_CALL for dual-side capture.
-     */
     private fun createAudioRecord(bufferSize: Int): AudioRecord? {
         val audioSources = intArrayOf(
-            MediaRecorder.AudioSource.VOICE_CALL,          // Source 4: Uplink + Downlink
-            MediaRecorder.AudioSource.VOICE_COMMUNICATION, // Source 7: Hardware AEC in-call communication
-            MediaRecorder.AudioSource.MIC                  // Source 1: Standard microphone fallback
+            MediaRecorder.AudioSource.VOICE_CALL,
+            MediaRecorder.AudioSource.VOICE_COMMUNICATION,
+            MediaRecorder.AudioSource.MIC
         )
 
         for (source in audioSources) {
@@ -162,10 +148,6 @@ class CallRecordingEngine(private val context: Context) {
         return null
     }
 
-    /**
-     * Configure hardware in-call parameters via root for Qualcomm & MediaTek chipsets
-     * so that the call's audio downlink (remote party) routes directly to the recording buffer.
-     */
     private suspend fun unmaskRootAudioMixer(isSimulated: Boolean) {
         if (isSimulated) return
         if (!RootPrivilegeManager.isRootAvailable() && !RootPrivilegeManager.isPrivilegedApp(context)) return
@@ -180,16 +162,12 @@ class CallRecordingEngine(private val context: Context) {
         }
     }
 
-    /**
-     * Streams PCM audio from AudioRecord into WAV file, leaving 44-byte placeholder header.
-     */
     private fun writeWavAudioStream(wavFile: File, record: AudioRecord, bufferSize: Int) {
         val buffer = ByteArray(bufferSize)
         var totalAudioLen = 0L
 
         try {
             FileOutputStream(wavFile).use { fos ->
-                // Write placeholder 44-byte header
                 fos.write(ByteArray(44))
 
                 while (isRecording && recordingJob?.isActive == true) {
@@ -207,9 +185,6 @@ class CallRecordingEngine(private val context: Context) {
         }
     }
 
-    /**
-     * Finalizes the 44-byte RIFF WAVE header with accurate total size fields.
-     */
     private fun finalizeWavHeader(wavFile: File) {
         val totalAudioLen = wavFile.length() - 44
         val totalDataLen = totalAudioLen + 36
@@ -220,20 +195,17 @@ class CallRecordingEngine(private val context: Context) {
         try {
             RandomAccessFile(wavFile, "rw").use { raf ->
                 raf.seek(0)
-                // RIFF header
                 raf.writeBytes("RIFF")
                 raf.writeInt(Integer.reverseBytes(totalDataLen.toInt()))
                 raf.writeBytes("WAVE")
-                // fmt subchunk
                 raf.writeBytes("fmt ")
-                raf.writeInt(Integer.reverseBytes(16)) // subchunk1size (16 for PCM)
-                raf.writeShort(java.lang.Short.reverseBytes(1.toShort()).toInt()) // AudioFormat (1 = PCM)
+                raf.writeInt(Integer.reverseBytes(16))
+                raf.writeShort(java.lang.Short.reverseBytes(1.toShort()).toInt())
                 raf.writeShort(java.lang.Short.reverseBytes(channels.toShort()).toInt())
                 raf.writeInt(Integer.reverseBytes(SAMPLE_RATE))
                 raf.writeInt(Integer.reverseBytes(byteRate))
                 raf.writeShort(java.lang.Short.reverseBytes(blockAlign.toShort()).toInt())
-                raf.writeShort(java.lang.Short.reverseBytes(16.toShort()).toInt()) // BitsPerSample
-                // data subchunk
+                raf.writeShort(java.lang.Short.reverseBytes(16.toShort()).toInt())
                 raf.writeBytes("data")
                 raf.writeInt(Integer.reverseBytes(totalAudioLen.toInt()))
             }
@@ -263,7 +235,6 @@ class CallRecordingEngine(private val context: Context) {
             val sizeKb = file.length() / 1024
             val sizeFormatted = if (sizeKb > 1024) String.format(Locale.US, "%.1f MB", sizeKb / 1024.0) else "$sizeKb KB"
 
-            // Estimate duration from 44.1kHz 16-bit mono PCM (88200 bytes per second)
             val audioBytes = (file.length() - 44).coerceAtLeast(0)
             val durationSeconds = audioBytes / (SAMPLE_RATE * 2)
 
@@ -290,4 +261,3 @@ class CallRecordingEngine(private val context: Context) {
         }
     }
 }
-

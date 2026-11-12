@@ -92,15 +92,6 @@ import com.callscreener.app.ui.theme.GoogleSans
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/**
- * Pixel Expressive Blocked Numbers Management Screen
- * Matches Google Pixel Phone's native Blocked numbers layout:
- * - Clean Top Bar with Back Arrow & "Blocked numbers" title
- * - "Unknown" callers toggle: block calls from unidentified callers
- * - "+ Add a number" action row to block by number or contact
- * - Minimal, high-contrast list of blocked contacts with one-tap 'X' unblock button
- * - Minimal empty state when no numbers are blocked
- */
 @Composable
 fun PixelBlockedNumbersScreen(
     onDismiss: () -> Unit,
@@ -130,17 +121,14 @@ fun PixelBlockedNumbersScreen(
         animateDismiss()
     }
 
-    // SharedPreferences for Unknown caller blocking toggle
     val blockPrefs = remember { context.getSharedPreferences("call_screener_block_prefs", Context.MODE_PRIVATE) }
     var blockUnknownCallers by remember {
         mutableStateOf(blockPrefs.getBoolean("block_unknown_callers", false))
     }
 
-    // Dialog state for adding a number manually
     var showAddManualDialog by remember { mutableStateOf(false) }
     var showContactPicker by remember { mutableStateOf(false) }
 
-    // Contacts cache for picker
     var contacts by remember { mutableStateOf<List<ContactItem>>(emptyList()) }
     LaunchedEffect(Unit) {
         contacts = DialerRepository.loadContacts(context)
@@ -171,7 +159,6 @@ fun PixelBlockedNumbersScreen(
                     .statusBarsPadding()
                     .navigationBarsPadding()
             ) {
-                // Top App Bar
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -206,14 +193,12 @@ fun PixelBlockedNumbersScreen(
                     )
                 }
 
-                // Main Content List
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Top Controls Group (Unknown callers switch & Add buttons)
                     item {
                         Column(
                             modifier = Modifier
@@ -224,7 +209,6 @@ fun PixelBlockedNumbersScreen(
                                 .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(22.dp))
                                 .padding(vertical = 4.dp)
                         ) {
-                            // Row 1: Unknown callers
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -265,7 +249,6 @@ fun PixelBlockedNumbersScreen(
                                 )
                             }
 
-                            // Divider
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -274,7 +257,6 @@ fun PixelBlockedNumbersScreen(
                                     .background(monetColors.outlineVariant.copy(alpha = 0.25f))
                             )
 
-                            // Row 2: Add a number manually
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -325,7 +307,6 @@ fun PixelBlockedNumbersScreen(
                                 )
                             }
 
-                            // Divider
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -334,7 +315,6 @@ fun PixelBlockedNumbersScreen(
                                     .background(monetColors.outlineVariant.copy(alpha = 0.25f))
                             )
 
-                            // Row 3: Pick from contacts
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -387,7 +367,6 @@ fun PixelBlockedNumbersScreen(
                         }
                     }
 
-                    // Section Title: Blocked Numbers List
                     item {
                         Row(
                             modifier = Modifier
@@ -415,7 +394,6 @@ fun PixelBlockedNumbersScreen(
                         }
                     }
 
-                    // Empty State
                     if (blockedList.isEmpty()) {
                         item {
                             Column(
@@ -466,7 +444,6 @@ fun PixelBlockedNumbersScreen(
                             }
                         }
                     } else {
-                        // Blocked Numbers Cards
                         items(blockedList, key = { it.number }) { item ->
                             BlockedContactRow(
                                 contact = item,
@@ -492,7 +469,6 @@ fun PixelBlockedNumbersScreen(
         }
     }
 
-    // Modal: Add Number Manually
     if (showAddManualDialog) {
         AddManualBlockDialog(
             monetColors = monetColors,
@@ -507,7 +483,6 @@ fun PixelBlockedNumbersScreen(
         )
     }
 
-    // Modal: Contact Picker
     if (showContactPicker) {
         BlockContactPickerModal(
             contacts = contacts,
@@ -522,9 +497,6 @@ fun PixelBlockedNumbersScreen(
     }
 }
 
-/**
- * Clean Pixel Expressive Blocked Contact Row
- */
 @Composable
 private fun BlockedContactRow(
     contact: BlockedContact,
@@ -556,7 +528,6 @@ private fun BlockedContactRow(
                 }
                 val contactBitmap = rememberContactPhotoBitmap(resolvedPhoto, reloadKey = photoVersion)
 
-                // Avatar circle with photo or block badge
                 Box(
                     modifier = Modifier.size(40.dp),
                     contentAlignment = Alignment.Center
@@ -627,7 +598,6 @@ private fun BlockedContactRow(
                 }
             }
 
-            // Quick Unblock Button ('X')
             IconButton(
                 onClick = onUnblock,
                 modifier = Modifier
@@ -646,9 +616,6 @@ private fun BlockedContactRow(
     }
 }
 
-/**
- * Pixel Modal Dialog: Add Phone Number Manually
- */
 @Composable
 private fun AddManualBlockDialog(
     monetColors: ColorScheme,
@@ -753,9 +720,6 @@ private fun AddManualBlockDialog(
     }
 }
 
-/**
- * Pixel Contact Picker Modal: Select existing contact to block
- */
 @Composable
 private fun BlockContactPickerModal(
     contacts: List<ContactItem>,
@@ -789,7 +753,6 @@ private fun BlockContactPickerModal(
                     .fillMaxSize()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -817,7 +780,6 @@ private fun BlockContactPickerModal(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Search Bar
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -879,7 +841,6 @@ private fun BlockContactPickerModal(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Contacts List
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -963,9 +924,6 @@ private fun BlockContactPickerModal(
     }
 }
 
-/**
- * Backward compatibility alias for any existing references
- */
 @Composable
 fun BlockedNumbersDialog(
     blockManager: CallBlockManager,

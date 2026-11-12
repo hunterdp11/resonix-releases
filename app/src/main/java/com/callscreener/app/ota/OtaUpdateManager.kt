@@ -47,7 +47,7 @@ sealed class UpdateCheckStatus {
 sealed class DownloadStatus {
     object Idle : DownloadStatus()
     data class Downloading(
-        val progress: Float, // 0.0f to 1.0f
+        val progress: Float,
         val downloadedBytes: Long,
         val totalBytes: Long
     ) : DownloadStatus()
@@ -62,7 +62,6 @@ object OtaUpdateManager {
     private const val PREFS_NAME = "resonix_ota_prefs"
     private const val KEY_UPDATE_URL = "ota_feed_url"
 
-    // Fixed official releases repository update feed URL
     const val DEFAULT_UPDATE_URL = "https://raw.githubusercontent.com/hunterdp11/resonix-releases/main/update.json"
 
     private val _checkStatus = MutableStateFlow<UpdateCheckStatus>(UpdateCheckStatus.Idle)
@@ -96,9 +95,6 @@ object OtaUpdateManager {
         _downloadStatus.value = DownloadStatus.Idle
     }
 
-    /**
-     * Checks for updates against the configured OTA endpoint.
-     */
     suspend fun checkForUpdates(context: Context, customUrl: String? = null): UpdateCheckStatus = withContext(Dispatchers.IO) {
         _checkStatus.value = UpdateCheckStatus.Checking
         val feedUrl = customUrl?.takeIf { it.isNotBlank() } ?: getUpdateUrl(context)
@@ -151,9 +147,6 @@ object OtaUpdateManager {
         }
     }
 
-    /**
-     * Streams and downloads the APK with real-time byte progress reporting.
-     */
     suspend fun downloadUpdate(
         context: Context,
         info: UpdateInfo
@@ -164,7 +157,6 @@ object OtaUpdateManager {
         val safeName = "Resonix-v${info.versionName}.apk"
         val outputFile = File(updatesDir, safeName)
 
-        // Delete any partial or existing file
         if (outputFile.exists()) outputFile.delete()
 
         try {
@@ -213,9 +205,6 @@ object OtaUpdateManager {
         }
     }
 
-    /**
-     * Checks if the app can trigger package installations without permission gate.
-     */
     fun canRequestPackageInstalls(context: Context): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.packageManager.canRequestPackageInstalls()
@@ -224,11 +213,6 @@ object OtaUpdateManager {
         }
     }
 
-    /**
-     * Standard non-root Android PackageInstaller installation via FileProvider.
-     * Android automatically recognizes the matching package name and signature,
-     * seamlessly performing an in-place upgrade with ZERO data loss.
-     */
     fun installUpdateStandard(context: Context, apkFile: File): Result<Unit> {
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
@@ -260,11 +244,6 @@ object OtaUpdateManager {
         }
     }
 
-    /**
-     * Seamless 1-Tap Root Update for Root Enhanced users.
-     * Installs in-place silently using `pm install -r` and updates the Magisk/KernelSU
-     * module priv-app directory so persistence across reboot is guaranteed!
-     */
     suspend fun installUpdateRoot(context: Context, apkFile: File): Result<String> = withContext(Dispatchers.IO) {
         _downloadStatus.value = DownloadStatus.Installing
         val apkPath = apkFile.absolutePath
@@ -273,14 +252,12 @@ object OtaUpdateManager {
 
         if (!pmSuccess) {
             Log.w(TAG, "Root pm install failed: $pmOutput, falling back to standard installer")
-            // Fall back to standard installer
             withContext(Dispatchers.Main) {
                 installUpdateStandard(context, apkFile)
             }
             return@withContext Result.failure(Exception("Root install failed: $pmOutput"))
         }
 
-        // Also update the Magisk / KernelSU module directory if it exists
         val modulePrivAppPath = "/data/adb/modules/resonix/system/priv-app/Resonix/Resonix.apk"
         val moduleDir = "/data/adb/modules/resonix"
         RootPrivilegeManager.executeSuCommand(
@@ -289,10 +266,6 @@ object OtaUpdateManager {
 
         Result.success("Update installed successfully via Superuser! Resonix is now up to date.")
     }
-
-    // =========================================================================
-    // HTTP UTILITIES (Handles 301/302/307/308 redirects effortlessly)
-    // =========================================================================
 
     private fun fetchUrlWithRedirects(urlString: String, maxRedirects: Int = 5): String {
         var currentUrl = urlString
@@ -381,4 +354,3 @@ object OtaUpdateManager {
         throw IllegalStateException("Too many redirects ($redirects)")
     }
 }
-

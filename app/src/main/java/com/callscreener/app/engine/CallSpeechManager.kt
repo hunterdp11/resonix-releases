@@ -62,7 +62,6 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
     private fun ensureTtsInitialized() {
         if (textToSpeech == null) {
             try {
-                // Prioritize Google TTS for official WaveNet neural female voices
                 textToSpeech = TextToSpeech(context.applicationContext, this, "com.google.android.tts")
             } catch (e: Exception) {
                 try {
@@ -100,7 +99,6 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
                 }
             }
 
-            // Always configure persona-specific voice (gender, language, pitch, speed)
             applyVoiceForPersona(persona)
         } catch (e: Exception) {
             Log.w(TAG, "Error in applyVoiceForText", e)
@@ -110,11 +108,10 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
 
     private fun applyVoiceForPersona(persona: VoicePersona) {
         val tts = textToSpeech ?: return
-        tts.setPitch(persona.pitch) // 1.0f for natural, human sound
+        tts.setPitch(persona.pitch)
         tts.setSpeechRate(persona.speed)
 
         try {
-            // Explicitly set the language/locale for the persona (e.g. Hindi "hi-IN" or English "en-US")
             val targetLocale = persona.locale
             val langResult = tts.setLanguage(targetLocale)
             if (langResult == TextToSpeech.LANG_MISSING_DATA || langResult == TextToSpeech.LANG_NOT_SUPPORTED) {
@@ -128,16 +125,14 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
 
             val availableVoices = tts.voices
             if (!availableVoices.isNullOrEmpty()) {
-                val targetLangCode = persona.languageCode // "hi" or "en"
+                val targetLangCode = persona.languageCode
 
-                // 1. Filter voices for target language (e.g. "hi")
                 val langVoices = availableVoices.filter { voice ->
                     voice.locale.language.equals(targetLangCode, ignoreCase = true)
                 }
                 val candidateVoices = if (langVoices.isNotEmpty()) {
                     langVoices
                 } else if (persona.isHindi) {
-                    // Fallback to Indian English (en-IN) if pure Hindi voice pack is not downloaded
                     val indianVoices = availableVoices.filter {
                         it.locale.country.equals("IN", ignoreCase = true)
                     }
@@ -152,30 +147,25 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
 
                 val matchingVoice = when (persona.gender) {
                     VoiceGender.FEMALE -> {
-                        // 1. Keyword match with Neural / WaveNet quality
                         candidateVoices.firstOrNull { voice ->
                             val vName = voice.name.lowercase()
                             val matchesKw = persona.voiceKeywords.any { kw -> vName.contains(kw) }
                             val isNeural = isNeuralQuality(voice)
                             isFemaleVoiceName(vName) && matchesKw && isNeural
                         }
-                        // 2. Keyword match in any installed female voice
                         ?: candidateVoices.firstOrNull { voice ->
                             val vName = voice.name.lowercase()
                             val matchesKw = persona.voiceKeywords.any { kw -> vName.contains(kw) }
                             isFemaleVoiceName(vName) && matchesKw && !isNotInstalled(voice)
                         }
-                        // 3. Any neural female voice
                         ?: candidateVoices.firstOrNull { voice ->
                             val vName = voice.name.lowercase()
                             isFemaleVoiceName(vName) && isNeuralQuality(voice)
                         }
-                        // 4. Any installed female voice
                         ?: candidateVoices.firstOrNull { voice ->
                             val vName = voice.name.lowercase()
                             isFemaleVoiceName(vName) && !isNotInstalled(voice)
                         }
-                        // 5. General female fallback
                         ?: candidateVoices.firstOrNull { voice ->
                             isFemaleVoiceName(voice.name.lowercase())
                         }
@@ -183,37 +173,30 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
                         ?: candidateVoices.firstOrNull()
                     }
                     VoiceGender.MALE -> {
-                        // 1. Keyword match in candidate voices with neural quality
                         candidateVoices.firstOrNull { voice ->
                             val vName = voice.name.lowercase()
                             val matchesKw = persona.voiceKeywords.any { kw -> vName.contains(kw) }
                             isMaleVoiceName(vName) && matchesKw && isNeuralQuality(voice)
                         }
-                        // 2. Keyword match in candidate voices
                         ?: candidateVoices.firstOrNull { voice ->
                             val vName = voice.name.lowercase()
                             val matchesKw = persona.voiceKeywords.any { kw -> vName.contains(kw) }
                             isMaleVoiceName(vName) && matchesKw && !isNotInstalled(voice)
                         }
-                        // 3. Any installed male voice in target language/candidates
                         ?: candidateVoices.firstOrNull { voice ->
                             val vName = voice.name.lowercase()
                             isMaleVoiceName(vName) && !isNotInstalled(voice)
                         }
-                        // 4. Any male voice in candidates
                         ?: candidateVoices.firstOrNull { voice ->
                             isMaleVoiceName(voice.name.lowercase())
                         }
-                        // 5. Expand search to all available voices on the device for an installed male voice
                         ?: availableVoices.firstOrNull { voice ->
                             val vName = voice.name.lowercase()
                             isMaleVoiceName(vName) && !isNotInstalled(voice)
                         }
-                        // 6. Any male voice installed anywhere
                         ?: availableVoices.firstOrNull { voice ->
                             isMaleVoiceName(voice.name.lowercase())
                         }
-                        // 7. Last resort: candidate voice (will apply deep masculine pitch shift below)
                         ?: candidateVoices.firstOrNull()
                     }
                     VoiceGender.NEUTRAL -> candidateVoices.firstOrNull()
@@ -224,22 +207,18 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
                     Log.i(TAG, "Assigned natural voice: ${matchingVoice.name} (quality=${matchingVoice.quality}, locale=${matchingVoice.locale}) for persona: ${persona.name}")
                 }
 
-                // Dynamic Pitch Calibration for Authentic Masculine / Feminine Register
                 var targetPitch = persona.pitch
                 if (persona.gender == VoiceGender.MALE) {
                     val isConfirmedMale = matchingVoice != null && isMaleVoiceName(matchingVoice.name.lowercase())
                     if (!isConfirmedMale) {
-                        // If user device only has female voice model, lower pitch to deep masculine vocal tract register
                         targetPitch = minOf(targetPitch, 0.62f)
                         Log.w(TAG, "No confirmed male voice on device; shifted pitch to deep masculine register: $targetPitch")
                     } else {
-                        // Confirmed male voice: ensure natural masculine depth
                         targetPitch = minOf(targetPitch, 0.85f)
                     }
                 } else if (persona.gender == VoiceGender.FEMALE) {
                     val isConfirmedFemale = matchingVoice != null && isFemaleVoiceName(matchingVoice.name.lowercase())
                     if (!isConfirmedFemale) {
-                        // If fallback landed on a non-female voice, elevate pitch to natural feminine register
                         targetPitch = maxOf(targetPitch, 1.15f)
                         Log.w(TAG, "No confirmed female voice on device; shifted pitch to feminine register: $targetPitch")
                     }
@@ -292,7 +271,6 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
                     tts.language = Locale.US
                 }
 
-                // Default audio attributes: allow media output for Bluetooth buds
                 val audioAttributes = AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_MEDIA)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
@@ -304,7 +282,6 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
                 tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {
                         if (utteranceId != null && utteranceListeners.containsKey(utteranceId)) {
-                            // Synthesizing to audio file for injection
                             return
                         }
                         _isSpeaking.value = true
@@ -382,7 +359,6 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
             return
         }
 
-        // Active Carrier Call: Synthesize speech and inject directly into call uplink!
         _isSpeaking.value = true
         scope.launch {
             try {
@@ -427,7 +403,6 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
                 }
                 utteranceListeners.remove(utteranceId)
 
-                // Safety polling if engine completed writing file without firing onDone
                 if (!synthSuccess) {
                     var waitMs = 0
                     var lastSize = -1L
@@ -453,7 +428,6 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
 
                 if (synthSuccess && tempWavFile.exists() && tempWavFile.length() > 44) {
                     Log.i(TAG, "Speech synthesized successfully (${tempWavFile.length()} bytes). Injecting into call uplink...")
-                    // Play comfortable local monitor preview so user hears it softly on their phone (~22% vol)
                     onAudioFileReadyForMonitor?.invoke(tempWavFile)
 
                     injector.injectAudioFile(tempWavFile) { injected ->
@@ -476,10 +450,6 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
         }
     }
 
-    /**
-     * Converts Romanized Hinglish vocabulary to authentic Devanagari script so Android's Hindi
-     * neural TTS engine pronounces every word with native Indian phonetics instead of awkward English phonetics.
-     */
     private fun normalizeHinglishForTts(input: String, persona: VoicePersona): String {
         if (!persona.isHindi) return input
         val devanagariCount = input.count { it in '\u0900'..'\u097F' }
@@ -562,10 +532,8 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
 
         if (isSimulated) {
             try {
-                // Ensure audio mode is normal so Bluetooth A2DP / media stream delivers audio directly
                 audioManager.mode = AudioManager.MODE_NORMAL
 
-                // Request transient audio focus for speech playback
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
                         .setAudioAttributes(
@@ -605,7 +573,6 @@ class CallSpeechManager(private val context: Context) : TextToSpeech.OnInitListe
             putString("networkTts", "true")
         }
 
-        // Re-apply persona voice and calibrated masculine/feminine pitch so it is never overridden
         applyVoiceForText(text, _activePersona.value)
 
         val result = textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)

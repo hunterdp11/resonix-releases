@@ -23,10 +23,6 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
-/**
- * Root Call Blocking Modes:
- * Determines what the blocked caller experiences when their call is intercepted.
- */
 enum class BlockRejectMode(val displayName: String, val description: String) {
     NUMBER_DOES_NOT_EXIST(
         "Number Does Not Exist (ITU-T SIT Tones)",
@@ -63,11 +59,6 @@ data class BlockedContact(
     val forwardToName: String? = null
 )
 
-/**
- * CallBlockManager — Ultra-low latency, Root-powered per-contact Call Blocker.
- * Intercepts incoming cellular calls at both the Telecom CallScreening layer and the
- * physical baseband modem layer (RIL / AT+CHUP) so callers never hear a single ring.
- */
 class CallBlockManager private constructor(private val appContext: Context) {
 
     companion object {
@@ -85,20 +76,13 @@ class CallBlockManager private constructor(private val appContext: Context) {
                 INSTANCE ?: CallBlockManager(context.applicationContext).also { INSTANCE = it }
             }
 
-        /**
-         * Normalizes a phone number to bare digits for robust matching across international/national prefixes.
-         */
         fun normalizeDigits(number: String): String = number.filter { it.isDigit() }
 
-        /**
-         * Checks if two phone numbers match (handles +country codes, local vs full numbers).
-         */
         fun numbersMatch(num1: String, num2: String): Boolean {
             val d1 = normalizeDigits(num1)
             val d2 = normalizeDigits(num2)
             if (d1.isEmpty() || d2.isEmpty()) return false
             if (d1 == d2) return true
-            // Match last 10 digits for standard phone matching across country code differences
             return if (d1.length >= 7 && d2.length >= 7) {
                 val minLen = minOf(10, minOf(d1.length, d2.length))
                 d1.takeLast(minLen) == d2.takeLast(minLen)
@@ -141,10 +125,6 @@ class CallBlockManager private constructor(private val appContext: Context) {
     var defaultForwardName: String?
         get() = prefs.getString("default_forward_name", null)
         set(value) { prefs.edit().putString("default_forward_name", value).apply() }
-
-    // -----------------------------------------------------------------------------------------
-    // Public Blocklist Operations
-    // -----------------------------------------------------------------------------------------
 
     fun isBlocked(number: String): Boolean {
         if (!isRootBlockingEnabled) return false
@@ -222,14 +202,6 @@ class CallBlockManager private constructor(private val appContext: Context) {
         Log.i(TAG, "All blocked numbers cleared")
     }
 
-    // -----------------------------------------------------------------------------------------
-    // Root-Powered Hardware Interception & Call Deflection
-    // -----------------------------------------------------------------------------------------
-
-    /**
-     * Arms or clears Carrier Call Forwarding on Busy (CFB / **67* / 3GPP TS 22.082).
-     * When armed, any declined/rejected call is routed by the cell tower MSC to targetNumber.
-     */
     fun syncCarrierCallForwarding(targetNumber: String?, onComplete: ((Boolean, String) -> Unit)? = null) {
         val clean = targetNumber?.trim()?.replace(" ", "")?.replace("-", "")
         CoroutineScope(Dispatchers.IO).launch {
@@ -238,12 +210,11 @@ class CallBlockManager private constructor(private val appContext: Context) {
                 var success = false
                 var message = "Carrier CFB armed for $clean"
 
-                // 1. Android TelephonyManager API via reflection (CallForwardingInfo is @SystemApi)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     try {
                         val cfiClass = Class.forName("android.telephony.CallForwardingInfo")
                         val ctor = cfiClass.getConstructor(Int::class.javaPrimitiveType, String::class.java, Int::class.javaPrimitiveType)
-                        val cfi = ctor.newInstance(1 /* REASON_BUSY */, clean, 20)
+                        val cfi = ctor.newInstance(1 , clean, 20)
                         val tm = appContext.getSystemService(TelephonyManager::class.java)
                         val method = tm.javaClass.getMethod("setCallForwarding", cfiClass, java.util.concurrent.Executor::class.java, java.util.function.Consumer::class.java)
                         method.invoke(tm, cfi, appContext.mainExecutor, java.util.function.Consumer<Int> { result ->
@@ -255,7 +226,6 @@ class CallBlockManager private constructor(private val appContext: Context) {
                     }
                 }
 
-                // 2. Baseband RIL AT command injection via su
                 if (RootPrivilegeManager.isRootAvailableCached()) {
                     try {
                         RootPrivilegeManager.executeSuCommand("""
@@ -280,7 +250,7 @@ class CallBlockManager private constructor(private val appContext: Context) {
                     try {
                         val cfiClass = Class.forName("android.telephony.CallForwardingInfo")
                         val ctor = cfiClass.getConstructor(Int::class.javaPrimitiveType, String::class.java, Int::class.javaPrimitiveType)
-                        val cfi = ctor.newInstance(1 /* REASON_BUSY */, "", 0)
+                        val cfi = ctor.newInstance(1 , "", 0)
                         val tm = appContext.getSystemService(TelephonyManager::class.java)
                         val method = tm.javaClass.getMethod("setCallForwarding", cfiClass, java.util.concurrent.Executor::class.java, java.util.function.Consumer::class.java)
                         method.invoke(tm, cfi, appContext.mainExecutor, java.util.function.Consumer<Int> {})
@@ -307,9 +277,6 @@ class CallBlockManager private constructor(private val appContext: Context) {
         }
     }
 
-    /**
-     * Creates an Intent to dial the standard GSM Call Forwarding when Busy registration code (**67*<target>#).
-     */
     fun getCarrierArmIntent(targetNumber: String): Intent {
         val clean = targetNumber.trim().replace(" ", "").replace("-", "")
         return Intent(Intent.ACTION_CALL).apply {
@@ -318,27 +285,16 @@ class CallBlockManager private constructor(private val appContext: Context) {
         }
     }
 
-    /**
-     * Silently deflects/forwards an incoming ringing call to a target contact without answering.
-     * Combines:
-     * 1. Immediate suppression of ringing & missed call notifications on this device.
-     * 2. 3GPP VoLTE/IMS Call Deflection (SIP 302 Moved Temporarily).
-     * 3. Baseband modem AT command for Call Forwarding on Busy and Explicit Call Transfer.
-     * 4. Android Telecom decline (REJECT_REASON_DECLINED / User Busy), allowing the cellular tower to route the call to target.
-     */
     fun deflectOrForwardCall(call: Call, targetNumber: String, callerNumber: String? = null): Boolean {
         val cleanTarget = targetNumber.trim().replace(" ", "").replace("-", "")
         if (cleanTarget.isBlank()) return false
         Log.i(TAG, "Executing Silent Call Deflection to: $cleanTarget (from caller: $callerNumber)")
 
-        // 0. Suppress ringing & missed call notifications immediately
         CallScreeningInCallService.markCallBlocked(callerNumber)
         NotificationHelper.cancelCallNotification(appContext)
         callerNumber?.let { NotificationHelper.cancelMissedCallNotification(appContext, it) }
         RingtonePlayer.stop(appContext)
 
-        // 1. Android Telecom Call.deflect (API 28+ / Android 9.0+)
-        // Transmits 3GPP Call Deflection protocol message over IMS signaling to the carrier core
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             try {
                 val targetUri = Uri.fromParts("tel", cleanTarget, null)
@@ -349,10 +305,8 @@ class CallBlockManager private constructor(private val appContext: Context) {
             }
         }
 
-        // 2. Arm carrier CFB (Call Forwarding on Busy) immediately for this target
         syncCarrierCallForwarding(cleanTarget)
 
-        // 3. Baseband RIL MMI / AT Command Deflection (GSM Supplementary Services via su)
         if (RootPrivilegeManager.isRootAvailableCached()) {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
@@ -369,7 +323,6 @@ class CallBlockManager private constructor(private val appContext: Context) {
             }
         }
 
-        // 4. Reject call locally so carrier network routes the call to the forwarded target
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 call.reject(Call.REJECT_REASON_DECLINED)
@@ -383,15 +336,10 @@ class CallBlockManager private constructor(private val appContext: Context) {
         return true
     }
 
-    /**
-     * Executes immediate baseband RIL termination via su shell.
-     * Drops cellular call setup in < 5ms before the carrier can sound a ring on the caller side.
-     */
     fun executeRootZeroRingDrop() {
         if (!RootPrivilegeManager.isRootAvailable()) return
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Tier 1: Fast direct Telecom command + modem hangup
                 val atScript = buildString {
                     append("cmd telecom end-call 2>/dev/null || true\n")
                     append("for dev in /dev/smd0 /dev/smd11 /dev/smd7 /dev/atpool0 /dev/radio/atcmds /dev/radio/pttycmd1 /dev/ttyC0 /dev/umts_atc0; do\n")
@@ -409,17 +357,9 @@ class CallBlockManager private constructor(private val appContext: Context) {
         }
     }
 
-    /**
-     * Intercepts a blocked call immediately with zero caller ringback:
-     * Answers silently in 0ms, injects carrier stealth audio / SIT tones, and disconnects.
-     */
     fun handleBlockedInCall(call: Call, callerNumber: String) {
         StealthBlockAudioEngine.handleStealthBlock(appContext, call, callerNumber, blockMode)
     }
-
-    // -----------------------------------------------------------------------------------------
-    // Persistence
-    // -----------------------------------------------------------------------------------------
 
     private fun loadBlockedContacts(): List<BlockedContact> {
         val raw = prefs.getString(KEY_BLOCKED_JSON, null) ?: return emptyList()

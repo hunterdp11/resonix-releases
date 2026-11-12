@@ -53,7 +53,6 @@ class ScreeningCallActivity : ComponentActivity() {
                 val state by sessionManager.sessionState.collectAsState()
                 val presets by sessionManager.presetManager.presets.collectAsState()
 
-                // Close activity when call ends
                 if (state.status == CallStatus.ENDED && state.messages.isEmpty()) {
                     finish()
                 }
@@ -116,4 +115,3 @@ class ScreeningCallActivity : ComponentActivity() {
         }
     }
 }
-

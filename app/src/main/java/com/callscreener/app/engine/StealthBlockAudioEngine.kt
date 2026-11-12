@@ -29,16 +29,6 @@ import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.sin
 
-/**
- * StealthBlockAudioEngine — Zero-latency carrier-grade audio emulation for blocked callers.
- *
- * Implements:
- * 1. Mathematically pure ITU-T E.180 Special Information Tones (SIT: 950Hz, 1400Hz, 1800Hz)
- *    to trigger automated dialer purging and convince human callers the number is dead/unallocated.
- * 2. Rapid Fast-Busy / Network Congestion reorder tones (480Hz + 620Hz dual tone).
- * 3. Pre-cached, carrier-authentic "Number Does Not Exist" and "Switched Off" verbal announcements.
- * 4. Instant-answer (<10ms) + modem ALSA injection to completely eliminate the 2-second ringing.
- */
 object StealthBlockAudioEngine {
 
     private const val TAG = "StealthBlockAudio"
@@ -48,9 +38,6 @@ object StealthBlockAudioEngine {
     @Volatile
     private var isInitialized = false
 
-    /**
-     * Pre-generates tone files and warms up operator announcements on app startup.
-     */
     fun prewarm(context: Context) {
         if (isInitialized) return
         isInitialized = true
@@ -66,19 +53,11 @@ object StealthBlockAudioEngine {
         }
     }
 
-    /**
-     * Intercepts a blocked incoming call in 0 milliseconds:
-     * 1. Answers immediately so the cell tower kills the caller's ringback tone in 0 seconds.
-     * 2. Hardware-mutes user's mic via ALSA tinymix so zero ambient sound leaks.
-     * 3. Injects the selected stealth carrier notice (SIT beeps + voice, or instant drop).
-     * 4. Disconnects the call cleanly.
-     */
     fun handleStealthBlock(context: Context, call: Call, callerNumber: String, mode: BlockRejectMode) {
         scope.launch {
             try {
                 Log.i(TAG, ">>> STEALTH BLOCK INTERCEPT: Number='$callerNumber', Mode='${mode.name}'")
 
-                // Step 1: Immediately silence device audio & telecom mute
                 val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
                 try {
                     audioManager.isMicrophoneMute = true
@@ -87,7 +66,6 @@ object StealthBlockAudioEngine {
                     CallScreeningInCallService.setCallMute(true)
                 } catch (_: Exception) {}
 
-                // Hardware mute mic via root ALSA to ensure ZERO ambient leak to caller
                 RootPrivilegeManager.executeAsync {
                     val script = """
                         tinymix 'Voice Tx Mute' 1 2>/dev/null || true
@@ -99,8 +77,6 @@ object StealthBlockAudioEngine {
                     RootPrivilegeManager.executeSuCommand(script)
                 }
 
-                // Step 2: Answer call immediately on Main thread!
-                // Answering transmits SIP 200 OK to the cell tower, which INSTANTLY TERMINATES ringback!
                 withContext(Dispatchers.Main) {
                     try {
                         call.answer(VideoProfile.STATE_AUDIO_ONLY)
@@ -110,11 +86,8 @@ object StealthBlockAudioEngine {
                     }
                 }
 
-                // Step 3: Handle specific mode
                 when (mode) {
                     BlockRejectMode.INSTANT_CARRIER_DROP -> {
-                        // Dead Drop: Connected for 35ms then disconnected.
-                        // Caller sees "Call Ended" with ZERO rings and NO busy tone!
                         delay(35L)
                         disconnectAndDrop(context, call)
                     }
@@ -167,7 +140,6 @@ object StealthBlockAudioEngine {
                     }
 
                     BlockRejectMode.FORWARD_TO_TARGET -> {
-                        // Handled upstream via deflect
                         disconnectAndDrop(context, call)
                     }
                 }
@@ -187,17 +159,6 @@ object StealthBlockAudioEngine {
         Log.i(TAG, "Stealth call terminated & modem dropped.")
     }
 
-    // ---------------------------------------------------------------------------------------------
-    // Audio Generation & Mathematical Tones
-    // ---------------------------------------------------------------------------------------------
-
-    /**
-     * Generates ITU-T Special Information Tone (SIT) bytes:
-     * - 950 Hz for 330 ms
-     * - 1400 Hz for 330 ms
-     * - 1800 Hz for 330 ms
-     * - 150 ms silence
-     */
     fun generateSitTonePcm(): ByteArray {
         val bos = ByteArrayOutputStream()
         appendTone(bos, 950.0, 330)
@@ -207,10 +168,6 @@ object StealthBlockAudioEngine {
         return bos.toByteArray()
     }
 
-    /**
-     * Generates standard cellular Fast-Busy / Reorder Tone bytes:
-     * - Dual frequency (480 Hz + 620 Hz), 250ms ON, 250ms OFF for 2 cycles.
-     */
     fun generateFastBusyPcm(): ByteArray {
         val bos = ByteArrayOutputStream()
         for (i in 0 until 2) {
@@ -293,7 +250,7 @@ object StealthBlockAudioEngine {
         header[17] = 0
         header[18] = 0
         header[19] = 0
-        header[20] = 1 // PCM
+        header[20] = 1
         header[21] = 0
         header[22] = channels.toByte()
         header[23] = 0
@@ -305,9 +262,9 @@ object StealthBlockAudioEngine {
         header[29] = ((byteRate shr 8) and 0xff).toByte()
         header[30] = ((byteRate shr 16) and 0xff).toByte()
         header[31] = ((byteRate shr 24) and 0xff).toByte()
-        header[32] = (channels * 2).toByte() // block align
+        header[32] = (channels * 2).toByte()
         header[33] = 0
-        header[34] = 16 // bits per sample
+        header[34] = 16
         header[35] = 0
         header[36] = 'd'.code.toByte()
         header[37] = 'a'.code.toByte()
@@ -324,10 +281,6 @@ object StealthBlockAudioEngine {
         }
     }
 
-    // ---------------------------------------------------------------------------------------------
-    // Audio Injection into Telephony Modem
-    // ---------------------------------------------------------------------------------------------
-
     private suspend fun injectWavToCall(context: Context, wavFile: File) = withContext(Dispatchers.IO) {
         if (!wavFile.exists() || wavFile.length() < 100) return@withContext
         val injector = RootCallAudioInjector(context)
@@ -335,10 +288,6 @@ object StealthBlockAudioEngine {
             Log.d(TAG, "Stealth audio notice injected: $ok (${wavFile.name})")
         }
     }
-
-    // ---------------------------------------------------------------------------------------------
-    // TTS Background Pre-Warm
-    // ---------------------------------------------------------------------------------------------
 
     private fun prewarmTtsAnnouncements(context: Context, dir: File) {
         var tts: TextToSpeech? = null
@@ -405,7 +354,6 @@ object StealthBlockAudioEngine {
                 }
 
                 if (tempWav.exists() && tempWav.length() > 44) {
-                    // Prepend SIT Tone PCM to TTS PCM to form a unified carrier file
                     val ttsPcm = readWavDataOnly(tempWav)
                     val merged = ByteArrayOutputStream().apply {
                         write(sitPcm)
@@ -432,4 +380,3 @@ object StealthBlockAudioEngine {
         return data
     }
 }
-

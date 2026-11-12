@@ -39,26 +39,6 @@ enum class JammerMode(val displayName: String, val badge: String, val subtitle: 
     )
 }
 
-/**
- * Acoustic Speech Jammer & Infinite Echo Chamber Engine.
- *
- * Mode 1 (DAF Jammer):
- * Captures in-call vocal audio (remote caller + local microphone via VOICE_CALL / VOICE_DOWNLINK)
- * and feeds it back into the call uplink with a precise 180ms - 240ms delay,
- * inducing psychoacoustic speech-motor collision and stutter arrest in the caller.
- *
- * Mode 2 (Infinite Echo Chamber):
- * Multi-tap recursive feedback loop with warm 1st-order IIR low-pass damping,
- * projecting cathedral/stadium echoes into the cellular uplink.
- *
- * Audio Routing Architecture:
- * - Telephony Uplink Track: AudioTrack with USAGE_VOICE_COMMUNICATION explicitly routed
- *   to AudioDeviceInfo.TYPE_TELEPHONY for baseband cellular modem Voice Tx injection.
- * - Media Mixer Track: AudioTrack with USAGE_MEDIA & FLAG_AUDIBILITY_ENFORCED for Qualcomm /
- *   MediaTek ALSA in-call hardware music mixers (Incall_Music MultiMedia1/2).
- * - Monitor Track: AudioTrack with USAGE_VOICE_COMMUNICATION @ 16kHz for active real-time
- *   local ear/speaker monitoring so the user clearly hears the delayed audio and acoustic reflections.
- */
 class SpeechJammerEngine private constructor(private val appContext: Context) {
 
     private val prefs = appContext.getSharedPreferences("call_screener_speech_jammer_prefs", Context.MODE_PRIVATE)
@@ -82,15 +62,12 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
         }
     }
 
-    // Active state
     private val _isJammerActive = MutableStateFlow(false)
     val isJammerActive: StateFlow<Boolean> = _isJammerActive.asStateFlow()
 
-    // Real-time audio disruption level (0.0f to 1.0f) for live UI pulsating visualizers
     private val _liveDisruptionLevel = MutableStateFlow(0.0f)
     val liveDisruptionLevel: StateFlow<Float> = _liveDisruptionLevel.asStateFlow()
 
-    // Configurable Settings
     var isEnabled: Boolean
         get() = prefs.getBoolean("jammer_enabled", true)
         set(value) { prefs.edit().putBoolean("jammer_enabled", value).apply() }
@@ -139,7 +116,6 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
         get() = prefs.getBoolean("jammer_auto_unknown", false)
         set(value) { prefs.edit().putBoolean("jammer_auto_unknown", value).apply() }
 
-    // Option: Echo user's voice into the call (two-way echo chamber)
     var isEchoUserVoiceEnabled: Boolean
         get() = prefs.getBoolean("jammer_echo_user_voice", false)
         set(value) {
@@ -151,7 +127,6 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
     private val _isEchoUserVoiceFlow = MutableStateFlow(isEchoUserVoiceEnabled)
     val isEchoUserVoiceFlow: StateFlow<Boolean> = _isEchoUserVoiceFlow.asStateFlow()
 
-    // Audio Pipeline State
     private var audioRecord: AudioRecord? = null
     private var userMicRecord: AudioRecord? = null
     private var telephonyUplinkTrack: AudioTrack? = null
@@ -169,7 +144,6 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
     private var originalMediaVolume = -1
     private var originalVoiceVolume = -1
 
-    // DAF Circular Buffer: 32,768 samples @ 16kHz = ~2.04 seconds capacity
     private val ringBufferSize = 32768
     private val ringBufferMask = ringBufferSize - 1
     private val ringBuffer = FloatArray(ringBufferSize)
@@ -187,9 +161,6 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
         Log.i(TAG, "Speech Jammer delay calibrated: ${ms}ms ($delaySamples samples @ ${DSP_SAMPLE_RATE}Hz)")
     }
 
-    /**
-     * Dynamically update Echo User Voice mode (starts/stops mic recording if active).
-     */
     fun setEchoUserVoice(enabled: Boolean) {
         isEchoUserVoiceEnabled = enabled
         if (isRunning && !isTestMode) {
@@ -211,13 +182,6 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
         }
     }
 
-    /**
-     * Start the real-time Speech Jammer during a live phone call or test lab.
-     *
-     * @param forTestLab If true, captures local mic for testing in headphones/speaker;
-     *                   If false, captures telephony voice and injects into call uplink via multi-destination
-     *                   routing (telephony track, ALSA mixers, in-call monitor).
-     */
     @Synchronized
     fun startJammer(forTestLab: Boolean = false): Boolean {
         if (isRunning) {
@@ -230,7 +194,6 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
 
         val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
 
-        // 1. Unmask hardware in-call mixers synchronously via root if on active call and boost in-call & media stream volumes
         if (!forTestLab) {
             unmaskInCallHardwareMixersSync()
             try {
@@ -249,7 +212,6 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
             } catch (_: Exception) {}
         }
 
-        // 2. Initialize AudioRecord (prioritizing VOICE_CALL and VOICE_DOWNLINK for remote caller audio capture)
         val recordBufSize = max(
             AudioRecord.getMinBufferSize(DSP_SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT) * 4,
             8192
@@ -262,7 +224,6 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
         }
         audioRecord = record
 
-        // Initialize dedicated microphone capture if "Echo My Voice" is active during live call
         if (!forTestLab && isEchoUserVoiceEnabled) {
             userMicRecord = createUserMicAudioRecord(recordBufSize)
             Log.i(TAG, "Initialized User Mic AudioRecord for two-way echo chamber (userMicRecord != null: ${userMicRecord != null})")
@@ -270,9 +231,6 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
             userMicRecord = null
         }
 
-        // Explicitly disable AcousticEchoCanceler:
-        // AEC actively detects 180-240ms delayed auditory feedback & echo reflections
-        // and subtracts/mutes them. Disabling AEC allows the full echo to reach the caller unhindered.
         if (AcousticEchoCanceler.isAvailable()) {
             try {
                 echoCanceler = AcousticEchoCanceler.create(record.audioSessionId)?.apply {
@@ -284,7 +242,6 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
             }
         }
 
-        // 3. Initialize AudioTracks for playback / injection
         val outChannelConfig = AudioFormat.CHANNEL_OUT_MONO
         val outEncoding = AudioFormat.ENCODING_PCM_16BIT
         val minTrackBuf = AudioTrack.getMinBufferSize(DSP_SAMPLE_RATE, outChannelConfig, outEncoding)
@@ -297,7 +254,6 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
             .build()
 
         if (forTestLab) {
-            // Local monitor track ONLY for Test Lab preview
             val testAttrs = AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
@@ -323,7 +279,6 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
             telephonyUplinkTrack = null
             mediaMixerTrack = null
         } else {
-            // Live In-Call Mode: Multi-Destination Audio Pipeline
             val outputs = try {
                 audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS) ?: emptyArray()
             } catch (_: Exception) {
@@ -331,7 +286,6 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
             }
             val telephonyDevice = outputs.firstOrNull { it.type == AudioDeviceInfo.TYPE_TELEPHONY }
 
-            // A) Direct Telephony Modem Uplink Track (USAGE_VOICE_COMMUNICATION + TYPE_TELEPHONY device routing)
             val telephonyAttrs = AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
@@ -365,7 +319,6 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
                 telephonyUplinkTrack = tTrack
             }
 
-            // B) Qualcomm / MediaTek ALSA Incall_Music Track (USAGE_MEDIA with FLAG_AUDIBILITY_ENFORCED)
             val mediaAttrs = AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
@@ -390,7 +343,6 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
                 Log.i(TAG, "Speech Jammer media mixer track initialized @ 16kHz for ALSA Incall_Music")
             }
 
-            // C) In-Call Communication Monitor Track (earpiece / speakerphone real-time feedback for local user)
             val commAttrs = AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
@@ -421,13 +373,11 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
             return false
         }
 
-        // Reset buffer
         synchronized(ringBuffer) {
             ringBuffer.fill(0.0f)
             writePos = 0
         }
 
-        // Start I/O with pre-roll
         val preRoll = ShortArray(512)
         try {
             telephonyUplinkTrack?.apply {
@@ -455,7 +405,6 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
         isRunning = true
         _isJammerActive.value = true
 
-        // Launch real-time DSP worker thread with urgent audio priority
         processingThread = Thread({
             Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
             runDafDspLoop(record)
@@ -467,9 +416,6 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
         return true
     }
 
-    /**
-     * Stop the Speech Jammer and restore normal call audio.
-     */
     @Synchronized
     fun stopJammer() {
         if (!isRunning) return
@@ -550,33 +496,23 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
         }
     }
 
-    /**
-     * Real-time DSP audio loop: reads audio (remote caller + mic), applies DAF delay
-     * or recursive multi-tap cathedral echo, bandpass filters to isolate vocal formants,
-     * and streams boosted audio into in-call uplink (telephony & ALSA) and local monitor.
-     */
     private fun runDafDspLoop(record: AudioRecord) {
-        val chunkSize = 256 // 16ms chunk size @ 16kHz
+        val chunkSize = 256
         val inShorts = ShortArray(chunkSize)
         val micShorts = ShortArray(chunkSize)
         val outShorts = ShortArray(chunkSize)
         val inFloats = FloatArray(chunkSize)
         val outFloats = FloatArray(chunkSize)
 
-        // Bandpass Filter States:
-        // 1. High-Pass Filter @ ~80 Hz: removes DC bias, handling thumps, AC mains hum
         var hpfPrevIn = 0.0f
         var hpfPrevOut = 0.0f
         val hpfAlpha = 0.968f
 
-        // 2. Low-Pass Filter @ ~4200 Hz: keeps speech crisp while eliminating ultrasonic quantization noise
         var lpfPrevOut = 0.0f
         val lpfAlpha = 0.62f
 
-        // Echo feedback damping filter state (1st-order IIR warm low-pass)
         var prevEchoDamped = 0.0f
 
-        // VAD & AGC
         var rollingSpeechPeak = 0.25f
         var smoothLevel = 0.0f
 
@@ -589,7 +525,6 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
                 continue
             }
 
-            // Capture local user microphone in parallel if "Echo My Voice" is active
             val micRec = userMicRecord
             val micReadCount = if (isEchoUserVoiceEnabled && micRec != null && micRec.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
                 try {
@@ -602,9 +537,6 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
             val currentDelay = delaySamples
             val decay = echoDecay
 
-            // -----------------------------------------------------------------
-            // Step 1: Bandpass Filter (80Hz HPF + 4200Hz LPF) & Energy Calculation
-            // -----------------------------------------------------------------
             var chunkEnergySum = 0.0f
             var chunkMaxAbs = 0.0f
 
@@ -613,12 +545,10 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
                 val micSample = if (i < micReadCount) (micShorts[i].toFloat() / 32768.0f) * 1.35f else 0.0f
                 val combined = (callerSample + micSample).coerceIn(-1.0f, 1.0f)
 
-                // 1st-order High-Pass Filter @ ~80 Hz
                 val hpfOut = hpfAlpha * (hpfPrevOut + combined - hpfPrevIn)
                 hpfPrevIn = combined
                 hpfPrevOut = hpfOut
 
-                // 1st-order Low-Pass Filter @ ~4200 Hz
                 val lpfOut = lpfPrevOut + lpfAlpha * (hpfOut - lpfPrevOut)
                 lpfPrevOut = lpfOut
 
@@ -630,7 +560,6 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
 
             val chunkRms = sqrt(chunkEnergySum / readCount)
 
-            // Dynamic AGC tracking for speech peaks
             if (chunkMaxAbs > 0.015f) {
                 rollingSpeechPeak = rollingSpeechPeak * 0.90f + chunkMaxAbs * 0.10f
                 rollingSpeechPeak = rollingSpeechPeak.coerceIn(0.10f, 0.90f)
@@ -638,19 +567,14 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
                 rollingSpeechPeak = max(rollingSpeechPeak * 0.999f, 0.12f)
             }
 
-            // Studio AGC makeup gain clamped to [1.0f, 2.5f]
             val agcGain = (0.78f / rollingSpeechPeak).coerceIn(1.0f, 2.5f)
 
-            // -----------------------------------------------------------------
-            // Step 2: DSP Processing per Mode
-            // -----------------------------------------------------------------
             var outEnergySum = 0.0f
 
             for (i in 0 until readCount) {
                 val sampleIn = inFloats[i]
 
                 if (currentMode == JammerMode.INFINITE_ECHO) {
-                    // INFINITE ECHO CHAMBER: Multi-tap recursive feedback
                     val tap1Delay = currentDelay.coerceIn(800, 4800)
                     val tap2Delay = (currentDelay * 1.65f).toInt().coerceIn(1300, 8000)
                     val tap3Delay = (currentDelay * 2.35f).toInt().coerceIn(1850, 11500)
@@ -659,18 +583,14 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
                     val s2 = ringBuffer[(writePos - tap2Delay) and ringBufferMask]
                     val s3 = ringBuffer[(writePos - tap3Delay) and ringBufferMask]
 
-                    // Weighted multi-tap reflections
                     val rawEcho = (s1 * 0.75f + s2 * 0.50f + s3 * 0.35f) * decay
 
-                    // 1st-order warm low-pass damping filter (simulates air absorption)
                     prevEchoDamped = 0.80f * rawEcho + 0.20f * prevEchoDamped
 
-                    // Feedback into circular buffer: input + damped reflections
                     val feedbackCoeff = (decay * 0.80f).coerceIn(0.35f, 0.85f)
                     ringBuffer[writePos] = (sampleIn + prevEchoDamped * feedbackCoeff).coerceIn(-1.0f, 1.0f)
                     writePos = (writePos + 1) and ringBufferMask
 
-                    // High-gain output amplification so caller hears every reflection crystal clear
                     val outEcho = prevEchoDamped * (gain * 1.85f)
                     val clampedOut = softKneeLimit(outEcho)
 
@@ -679,16 +599,12 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
                     outEnergySum += clampedOut * clampedOut
 
                 } else {
-                    // DAF JAMMER: PUNCHY DELAYED AUDITORY FEEDBACK
-                    // Store input sample continuously in circular ring buffer
                     ringBuffer[writePos] = sampleIn
 
-                    // Read from currentDelay samples ago
                     val readPos = (writePos - currentDelay) and ringBufferMask
                     val delayedSample = ringBuffer[readPos]
                     writePos = (writePos + 1) and ringBufferMask
 
-                    // Dynamic amplification with AGC and user intensity gain
                     val amplified = delayedSample * agcGain * (gain * 1.85f)
                     val clampedOut = softKneeLimit(amplified)
 
@@ -700,9 +616,6 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
 
             val chunkOutRms = sqrt(outEnergySum / readCount)
 
-            // -----------------------------------------------------------------
-            // Step 3: Non-Blocking Audio Output Stream to all active destination tracks
-            // -----------------------------------------------------------------
             try {
                 telephonyUplinkTrack?.write(outShorts, 0, readCount, AudioTrack.WRITE_NON_BLOCKING)
             } catch (_: Exception) {}
@@ -715,18 +628,12 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
                 monitorAudioTrack?.write(outShorts, 0, readCount, AudioTrack.WRITE_NON_BLOCKING)
             } catch (_: Exception) {}
 
-            // Update live UI disruption level for visual pulsating rings
             val liveLevel = max(chunkRms, chunkOutRms)
             smoothLevel = smoothLevel * 0.70f + liveLevel * 0.30f
             _liveDisruptionLevel.value = smoothLevel.coerceIn(0.0f, 1.0f)
         }
     }
 
-    /**
-     * Professional broadcast soft-knee limiter.
-     * Preserves linear transparency up to 0.65 full scale, smoothly compressing
-     * louder peaks above 0.65 to prevent harsh digital clipping.
-     */
     private fun softKneeLimit(x: Float): Float {
         val absX = abs(x)
         val knee = 0.65f
@@ -737,10 +644,6 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
         return if (x >= 0.0f) compressed.coerceAtMost(limit) else -compressed.coerceAtMost(limit)
     }
 
-    /**
-     * Initializes AudioRecord cleanly, prioritizing VOICE_CALL and VOICE_DOWNLINK for true two-way capture.
-     * Does NOT stop or break the AudioRecord instance prior to active streaming.
-     */
     private fun createAudioRecord(bufferSize: Int): AudioRecord? {
         val channelIn = AudioFormat.CHANNEL_IN_MONO
         val encoding = AudioFormat.ENCODING_PCM_16BIT
@@ -753,11 +656,11 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
             )
         } else {
             intArrayOf(
-                MediaRecorder.AudioSource.VOICE_CALL,          // 1st: Both caller + user voice on cellular calls
-                MediaRecorder.AudioSource.VOICE_DOWNLINK,      // 2nd: Remote caller voice
-                MediaRecorder.AudioSource.VOICE_COMMUNICATION, // 3rd: Telecom voice communication
-                MediaRecorder.AudioSource.MIC,                  // 4th: Physical mic
-                MediaRecorder.AudioSource.DEFAULT              // 5th: Default mic
+                MediaRecorder.AudioSource.VOICE_CALL,
+                MediaRecorder.AudioSource.VOICE_DOWNLINK,
+                MediaRecorder.AudioSource.VOICE_COMMUNICATION,
+                MediaRecorder.AudioSource.MIC,
+                MediaRecorder.AudioSource.DEFAULT
             )
         }
 
@@ -804,9 +707,6 @@ class SpeechJammerEngine private constructor(private val appContext: Context) {
         return null
     }
 
-    /**
-     * Initializes AudioRecord specifically for the local physical microphone when "Echo My Voice" is enabled.
-     */
     private fun createUserMicAudioRecord(bufferSize: Int): AudioRecord? {
         val channelIn = AudioFormat.CHANNEL_IN_MONO
         val encoding = AudioFormat.ENCODING_PCM_16BIT

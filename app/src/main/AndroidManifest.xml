@@ -1,13 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Privileged System & Root Permissions for Direct In-Call Audio Injection -->
     <uses-permission android:name="android.permission.MODIFY_PHONE_STATE" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_ROUTING" />
     <uses-permission android:name="android.permission.CAPTURE_AUDIO_OUTPUT" />
     <uses-permission android:name="android.permission.CONTROL_INCALL_EXPERIENCE" />
 
-    <!-- Standard Permissions required for Default Dialer, Call Screening, and AI LLM Engine -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -45,7 +43,6 @@
         android:usesCleartextTraffic="true"
         android:networkSecurityConfig="@xml/network_security_config">
 
-        <!-- Main Launcher & Dialer Activity -->
         <activity
             android:name="com.callscreener.app.ui.MainActivity"
             android:exported="true"
@@ -56,7 +53,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Mandatory intent-filters to qualify for Android Default Dialer (ROLE_DIALER) -->
             <intent-filter>
                 <action android:name="android.intent.action.DIAL" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -71,7 +67,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Live Call Screening Interactive Activity -->
         <activity
             android:name=".ui.ScreeningCallActivity"
             android:exported="false"
@@ -80,7 +75,6 @@
             android:turnScreenOn="true"
             android:windowSoftInputMode="adjustResize" />
 
-        <!-- InCallService: Controls call audio, answering, holding, and termination -->
         <service
             android:name=".service.CallScreeningInCallService"
             android:exported="true"
@@ -96,7 +90,6 @@
                 android:value="true" />
         </service>
 
-        <!-- CallScreeningService: Pre-screens incoming calls before ringing -->
         <service
             android:name=".service.CallScreeningFilterService"
             android:exported="true"
@@ -106,7 +99,6 @@
             </intent-filter>
         </service>
 
-        <!-- FileProvider for Sharing Call Recordings -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -117,7 +109,6 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- Call Notification Action Receiver -->
         <receiver
             android:name=".receiver.CallNotificationReceiver"
             android:exported="false" />

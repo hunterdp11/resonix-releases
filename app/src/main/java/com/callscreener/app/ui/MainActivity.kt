@@ -325,11 +325,9 @@ class MainActivity : ComponentActivity() {
                 }
                 val coroutineScope = rememberCoroutineScope()
 
-                // Immediate permission launcher invoked right after welcome screens/setup
                 val onboardingPermissionLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestMultiplePermissions()
                 ) { _ ->
-                    // Prewarm and load contacts & call logs immediately so dashboard lands pre-loaded
                     coroutineScope.launch(Dispatchers.IO) {
                         val freshContacts = DialerRepository.loadContacts(this@MainActivity)
                         DialerRepository.loadCallLogs(this@MainActivity, freshContacts)
@@ -539,7 +537,6 @@ fun MainDashboard(
         permissionTrigger++
     }
 
-    // Verify all permissions on dashboard entry
     LaunchedEffect(Unit) {
         val ungranted = PermissionHelper.getUngrantedPermissions(context)
         if (ungranted.isNotEmpty()) {
@@ -549,7 +546,6 @@ fun MainDashboard(
         }
     }
 
-    // Refresh contacts and call logs whenever permissions are updated or app is resumed
     LaunchedEffect(permissionTrigger, resumeTrigger) {
         if (PermissionHelper.hasContactsAndCallLogPermissions(context)) {
             withContext(Dispatchers.IO) {
@@ -585,10 +581,8 @@ fun MainDashboard(
             .fillMaxSize()
             .background(monetColors.surface)
     ) {
-        // Material You Dynamic Backdrop
         PixelLiquidBackdrop(monetColors = monetColors)
 
-        // Tab Content extending full edge-to-edge behind floating dock
         Box(
             modifier = Modifier.fillMaxSize()
         ) {
@@ -697,7 +691,6 @@ fun MainDashboard(
             }
         }
 
-        // Google Pixel Material You Dynamic Floating Dock Bar
         LiquidGlassBottomBar(
             currentTab = currentTab,
             onTabSelected = { currentTab = it },
@@ -708,7 +701,6 @@ fun MainDashboard(
                 .padding(bottom = 10.dp)
         )
 
-        // iOS 26 Full Specular Liquid Glass Contact Details Modal Sheet
         selectedContactForDetails?.let { contact ->
             val contactHistory = remember(contact.number, callLogs) {
                 val cleanTarget = contact.number.replace(Regex("[^0-9]"), "")
@@ -760,7 +752,6 @@ fun MainDashboard(
             )
         }
 
-        // Dedicated Telephony & System Settings Sheet (Opened via 3-dots in Keypad header)
         if (isSettingsOpen) {
             DialerSettingsSheet(
                 isDefaultDialer = isDefaultDialer,
@@ -778,7 +769,6 @@ fun MainDashboard(
             )
         }
 
-        // Dedicated Presets & Quick Replies Management Screen (Reorder, Align, Edit, Delete)
         if (isPresetManagerOpen) {
             PresetManagementScreen(
                 presetManager = sessionManager.presetManager,
@@ -790,20 +780,13 @@ fun MainDashboard(
     }
 }
 
-/**
- * Google Pixel Material You Dynamic Backdrop:
- * Cohesive dynamic Monet surface with subtle ambient top radiance.
- * Edge-to-edge, seamlessly unified with no black voids or harsh cutoffs.
- */
 @Composable
 fun PixelLiquidBackdrop(monetColors: ColorScheme) {
     Canvas(modifier = Modifier.fillMaxSize()) {
         val height = size.height
 
-        // 1. Dynamic Monet Surface Base
         drawRect(color = monetColors.surface)
 
-        // 2. Subtle Static Top Status Bar Ambient Sheen
         drawRect(
             brush = Brush.verticalGradient(
                 listOf(
@@ -818,16 +801,6 @@ fun PixelLiquidBackdrop(monetColors: ColorScheme) {
     }
 }
 
-/**
- * Google Pixel Expressive / Material You Floating Dock Navigation Bar:
- * - Authentic Pixel Material 3 Expressive design inspired by Google Phone (dial)
- * - Dynamic Material You Monet colors (surfaceContainer, secondaryContainer, onSecondaryContainer)
- * - Active pill indicator (58dp x 32dp capsule) behind the active tab icon
- * - Expressive iconography (History, People, Dialpad, AutoAwesome Gemini Sparkles)
- * - Fluid gestural swipe/scrubbing across tabs with real-time finger tracking, dynamic liquid pill expansion,
- *   crisp boundary-crossing haptics, and seamless release commitment
- * - Concentric, mathematically balanced layout with Google Sans typography
- */
 @Composable
 fun LiquidGlassBottomBar(
     currentTab: DialerTab,
@@ -868,7 +841,6 @@ fun LiquidGlassBottomBar(
         }
     }
 
-    // Outer Floating Material You Capsule Dock Container - Solid opaque background, comfortably sized
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -888,7 +860,6 @@ fun LiquidGlassBottomBar(
                 shape = CircleShape
             )
     ) {
-        // Subtle top specular hairline for premium depth
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -904,7 +875,6 @@ fun LiquidGlassBottomBar(
                 )
         )
 
-        // Interactive Layer: Sliding Indicator Pill + Expressive Tab Items + Swipe/Scrub Gesture
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
@@ -919,7 +889,6 @@ fun LiquidGlassBottomBar(
             val halfPillPx = with(density) { (standardPillWidthDp / 2f).toPx() }
             val pillTopY = with(density) { 6.dp.roundToPx() }
 
-            // Center of the active tab
             val activeTabCenterPx = tabWidthPx * (selectedIndex + 0.5f)
 
             val targetLeftPx = if (isSwiping) {
@@ -934,15 +903,14 @@ fun LiquidGlassBottomBar(
                 activeTabCenterPx + halfPillPx
             }
 
-            // Authentic Material 3 Expressive morphing pill (leading edge expands forward, trailing follows)
             val animLeftPx by animateFloatAsState(
                 targetValue = targetLeftPx,
                 animationSpec = if (isSwiping) {
                     spring(dampingRatio = 0.90f, stiffness = Spring.StiffnessHigh)
                 } else if (isMovingRight) {
-                    spring(dampingRatio = 0.86f, stiffness = 380f) // Trailing edge follows
+                    spring(dampingRatio = 0.86f, stiffness = 380f)
                 } else {
-                    spring(dampingRatio = 0.78f, stiffness = 560f) // Leading edge leaps forward
+                    spring(dampingRatio = 0.78f, stiffness = 560f)
                 },
                 label = "dockPillLeft"
             )
@@ -952,16 +920,15 @@ fun LiquidGlassBottomBar(
                 animationSpec = if (isSwiping) {
                     spring(dampingRatio = 0.90f, stiffness = Spring.StiffnessHigh)
                 } else if (isMovingRight) {
-                    spring(dampingRatio = 0.78f, stiffness = 560f) // Leading edge leaps forward
+                    spring(dampingRatio = 0.78f, stiffness = 560f)
                 } else {
-                    spring(dampingRatio = 0.86f, stiffness = 380f) // Trailing edge follows
+                    spring(dampingRatio = 0.86f, stiffness = 380f)
                 },
                 label = "dockPillRight"
             )
 
             val pillWidthDp = with(density) { (animRightPx - animLeftPx).coerceAtLeast(halfPillPx * 2f).toDp() }
 
-            // Sleek Material 3 Expressive Active Indicator Pill (morphing dynamically behind active tab)
             Box(
                 modifier = Modifier
                     .offset {
@@ -981,7 +948,6 @@ fun LiquidGlassBottomBar(
                     )
             )
 
-            // Tab Items Row (Concentric icons and typography with unified pointer gesture)
             Row(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1021,7 +987,6 @@ fun LiquidGlassBottomBar(
                                             }
                                         }
                                     } else {
-                                        // Pointer released
                                         change.consume()
                                         if (isDragging) {
                                             isSwiping = false
@@ -1030,7 +995,6 @@ fun LiquidGlassBottomBar(
                                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             onTabSelected(tabs[finalIndex].first)
                                         } else {
-                                            // Quick tap
                                             val tapIndex = (down.position.x / tabWidthPx).toInt().coerceIn(0, totalTabs - 1)
                                             hoveredIndex = tapIndex
                                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -1049,18 +1013,15 @@ fun LiquidGlassBottomBar(
                 tabs.forEachIndexed { index, (_, icon, label) ->
                     val isTargetActive = if (isSwiping) (hoveredIndex == index) else (selectedIndex == index)
 
-                    // Dial style: Inactive icons are large (28dp) and centered in the bar.
-                    // Active icons morph down from large (28dp) to compact (22dp) and move up to leave plenty of room for label.
                     val iconSize by animateDpAsState(
                         targetValue = if (isTargetActive) 22.dp else 28.dp,
                         animationSpec = spring(
-                            dampingRatio = 0.65f, // Tactile smooth morph ("bade se chote hoke")
+                            dampingRatio = 0.65f,
                             stiffness = Spring.StiffnessMediumLow
                         ),
                         label = "tabIconSize_$index"
                     )
 
-                    // Active icon smoothly moves up by 12dp (from centerY = 0 to -12dp) so label fits comfortably below with airy padding
                     val iconOffsetY by animateDpAsState(
                         targetValue = if (isTargetActive) (-12).dp else 0.dp,
                         animationSpec = spring(
@@ -1097,7 +1058,6 @@ fun LiquidGlassBottomBar(
                             .fillMaxHeight(),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Icon element: positioned at dead center when inactive, moves up when active inside the pill
                         Box(
                             modifier = Modifier
                                 .offset(y = iconOffsetY)
@@ -1112,7 +1072,6 @@ fun LiquidGlassBottomBar(
                             )
                         }
 
-                        // Label element: smoothly fades in below the active indicator pill with spacious breathing room
                         if (labelAlpha > 0.01f) {
                             Text(
                                 text = label,
@@ -1138,9 +1097,6 @@ fun LiquidGlassBottomBar(
     }
 }
 
-/**
- * Helper to format call duration into human-readable string (e.g. "3m 12s", "45s")
- */
 private fun formatCallDuration(seconds: Long): String {
     return if (seconds >= 3600) {
         val h = seconds / 3600
@@ -1155,9 +1111,6 @@ private fun formatCallDuration(seconds: Long): String {
     }
 }
 
-/**
- * Helper to compute authentic Material You dynamic Monet pastel avatar colors
- */
 private fun getMonetAvatarColors(name: String, monetColors: ColorScheme): Pair<Color, Color> {
     val hash = kotlin.math.abs(name.hashCode()) % 3
     return when (hash) {
@@ -1167,9 +1120,6 @@ private fun getMonetAvatarColors(name: String, monetColors: ColorScheme): Pair<C
     }
 }
 
-/**
- * Helper to compute 1-2 character initials for contact avatars
- */
 private fun getContactInitials(name: String): String {
     val parts = name.trim().split(" ").filter { it.isNotBlank() }
     return if (parts.size >= 2) {
@@ -1181,11 +1131,6 @@ private fun getContactInitials(name: String): String {
     }
 }
 
-/**
- * Unified Material You / Pixel Expressive Contact Avatar Composable
- * Automatically resolves and prioritizes manual gallery photos, system phonebook photos,
- * and falls back to dynamic Monet pastel avatars with initials.
- */
 @Composable
 fun ContactAvatar(
     name: String,
@@ -1236,9 +1181,6 @@ fun ContactAvatar(
     }
 }
 
-/**
- * Screen 1: Recents (Material You / Expressive Pixel Call History, Dynamic Monet Squircles & Direction Badges)
- */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun RecentsScreen(
@@ -1297,7 +1239,6 @@ fun RecentsScreen(
             targetState = selectedFilter,
             transitionSpec = {
                 if (targetState == "Missed") {
-                    // Fluid slide from right with gentle spring bounce + crossfade
                     (slideInHorizontally(
                         animationSpec = spring(
                             dampingRatio = 0.82f,
@@ -1314,7 +1255,6 @@ fun RecentsScreen(
                         ) + fadeOut(animationSpec = tween(160, easing = FastOutLinearInEasing))
                     )
                 } else {
-                    // Fluid slide from left with gentle spring bounce + crossfade
                     (slideInHorizontally(
                         animationSpec = spring(
                             dampingRatio = 0.82f,
@@ -1414,7 +1354,6 @@ fun RecentsScreen(
                 }
             }
         } else {
-            // LazyColumn extends edge-to-edge; items scroll fluidly underneath the transparent status bar!
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(top = statusBarTop + 162.dp, bottom = 120.dp, start = 18.dp, end = 18.dp),
@@ -1482,7 +1421,6 @@ fun RecentsScreen(
                             label = "recentRowScale"
                         )
 
-                        // Material You / Expressive Squircle Call Log Card
                         Box(
                             modifier = Modifier
                                 .animateItemPlacement()
@@ -1518,7 +1456,6 @@ fun RecentsScreen(
                                     ?: contactsPhotoMap[logDigits]
                                     ?: if (logDigits.length >= 7) contactsPhotoMap[logDigits.takeLast(7)] else null
 
-                                // Dynamic Monet Pastel Avatar or Custom/Contact Photo
                                 ContactAvatar(
                                     name = callerName,
                                     number = log.number,
@@ -1529,7 +1466,6 @@ fun RecentsScreen(
 
                                 Spacer(modifier = Modifier.width(12.dp))
 
-                                // Caller info & Call Subtitle
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = callerName,
@@ -1545,7 +1481,6 @@ fun RecentsScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
-                                        // Direction Icon
                                         val (directionIcon, directionColor) = when {
                                             isMissed -> Icons.Filled.CallMissed to Color(0xFFFF5252)
                                             isOutgoing -> Icons.Filled.CallMade to Color(0xFF2196F3)
@@ -1591,7 +1526,6 @@ fun RecentsScreen(
                                         fontFamily = GoogleSans
                                     )
 
-                                    // Quick Emerald Call Button
                                     val callInteraction = remember { MutableInteractionSource() }
                                     val isCallPressed by callInteraction.collectIsPressedAsState()
                                     val callScale by animateFloatAsState(
@@ -1624,7 +1558,6 @@ fun RecentsScreen(
                                         )
                                     }
 
-                                    // Info Button (Details)
                                     val infoInteraction = remember { MutableInteractionSource() }
                                     val isInfoPressed by infoInteraction.collectIsPressedAsState()
                                     val infoScale by animateFloatAsState(
@@ -1674,10 +1607,9 @@ fun RecentsScreen(
                     }
                 }
             }
-        } // Close else
-    } // Close AnimatedContent
+        }
+    }
 
-    // Pinned Top Header with Pixel Search Bar & Segmented Filter
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1695,7 +1627,6 @@ fun RecentsScreen(
                 .statusBarsPadding()
                 .padding(top = 10.dp, bottom = 12.dp)
         ) {
-            // 1. Section Header: Big Title & Segmented Filter ("All" | "Missed")
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1712,7 +1643,6 @@ fun RecentsScreen(
                     letterSpacing = (-0.8).sp
                 )
 
-                // Material You Expressive Segmented Capsule: All | Missed
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(18.dp))
@@ -1863,7 +1793,6 @@ fun RecentsScreen(
         }
     }
 
-    // Call Log Details Dialog
     selectedLogForDetails?.let { log ->
         CallLogDetailsDialog(
             log = log,
@@ -1877,9 +1806,6 @@ fun RecentsScreen(
     }
 }
 
-/**
- * Pixel Expressive / Material You Minimalist Full-Screen Caller & Contact Details Screen
- */
 @Composable
 fun Ios26LiquidContactDetailsSheet(
     contact: ContactItem,
@@ -1936,7 +1862,6 @@ fun Ios26LiquidContactDetailsSheet(
     }
     val isUnknownNumber = !isContactSaved
 
-    // Custom Profile Photo Management
     val photoVer = CallerProfileManager.photoVersionState.intValue
     var customPhotoPath by remember(contact.number, photoVer) {
         mutableStateOf(CallerProfileManager.getCustomPhotoPath(context, contact.number) ?: contact.photoUri)
@@ -1960,7 +1885,6 @@ fun Ios26LiquidContactDetailsSheet(
         }
     }
 
-    // Persistent Caller Profile Settings
     val savedProfile = remember(contact.number) {
         CallerProfileManager.getProfile(context, contact.number)
     }
@@ -2035,7 +1959,6 @@ fun Ios26LiquidContactDetailsSheet(
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // 1. Pixel Expressive Top App Bar
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2048,7 +1971,6 @@ fun Ios26LiquidContactDetailsSheet(
                             .padding(horizontal = 16.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Back Navigation Button
                         IconButton(
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -2067,7 +1989,6 @@ fun Ios26LiquidContactDetailsSheet(
                             )
                         }
 
-                        // Title (Properly start-aligned next to back button, never pushed by trailing action buttons)
                         Text(
                             text = if (isUnknownNumber) "Caller details" else "Contact info",
                             color = monetColors.onSurface,
@@ -2082,13 +2003,11 @@ fun Ios26LiquidContactDetailsSheet(
                                 .weight(1f)
                         )
 
-                        // Top Bar Action Buttons - Well-spaced, clean circular action pills with no overlap
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             if (isContactSaved) {
-                                // Star / Favorite Button
                                 val starContainerBg by animateColorAsState(
                                     targetValue = if (isStarredState) Color(0xFFFFB74D).copy(alpha = 0.22f)
                                     else monetColors.surfaceContainerHighest.copy(alpha = 0.85f),
@@ -2134,7 +2053,6 @@ fun Ios26LiquidContactDetailsSheet(
                                     )
                                 }
 
-                                // Edit Contact Button
                                 IconButton(
                                     onClick = {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -2167,7 +2085,6 @@ fun Ios26LiquidContactDetailsSheet(
                                 }
                             }
 
-                            // Share Action Button (Clean, single icon for sharing)
                             IconButton(
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -2194,7 +2111,6 @@ fun Ios26LiquidContactDetailsSheet(
                     }
                 }
 
-                // 2. Main Scrollable Content
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -2205,7 +2121,6 @@ fun Ios26LiquidContactDetailsSheet(
                 ) {
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    // Hero Avatar & Identity Section
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -2245,7 +2160,6 @@ fun Ios26LiquidContactDetailsSheet(
                                 }
                             }
 
-                            // Small Camera Pill at Bottom-Right
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.BottomEnd)
@@ -2300,7 +2214,6 @@ fun Ios26LiquidContactDetailsSheet(
                             }
                         }
 
-                        // Headline & Subtitle
                         Text(
                             text = if (isUnknownNumber) formattedNum else contact.name,
                             color = monetColors.onSurface,
@@ -2324,7 +2237,6 @@ fun Ios26LiquidContactDetailsSheet(
                             )
                         }
 
-                        // Status Badge Pill
                         Box(
                             modifier = Modifier
                                 .clip(CircleShape)
@@ -2354,7 +2266,6 @@ fun Ios26LiquidContactDetailsSheet(
                             }
                         }
 
-                        // Single, Elegant "Save to contacts" Action for Unsaved Contacts
                         if (isUnknownNumber) {
                             Button(
                                 onClick = {
@@ -2393,7 +2304,6 @@ fun Ios26LiquidContactDetailsSheet(
                         }
                     }
 
-                    // 3. Pixel Expressive Tactile Action Row (Call, Message, Screen AI, WhatsApp)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -2451,7 +2361,6 @@ fun Ios26LiquidContactDetailsSheet(
                         )
                     }
 
-                    // Card 1: Phone Details Card
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -2523,7 +2432,6 @@ fun Ios26LiquidContactDetailsSheet(
                         }
                     }
 
-                    // Card 2: Call Screener AI Options Card
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -2682,7 +2590,6 @@ fun Ios26LiquidContactDetailsSheet(
                         }
                     }
 
-                    // Card 3: Recent Call History Card
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -2794,7 +2701,6 @@ fun Ios26LiquidContactDetailsSheet(
                         }
                     }
 
-                    // Card 4: Security (Block & Report Spam / Unblock)
                     val blockManager = remember { com.callscreener.app.engine.CallBlockManager.getInstance(context) }
                     var isContactBlocked by remember { mutableStateOf(blockManager.isBlocked(contact.number)) }
 
@@ -2859,7 +2765,6 @@ fun Ios26LiquidContactDetailsSheet(
                         }
                     }
 
-                    // Bottom Spacer for Gesture Navigation Bar
                     Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
                     Spacer(modifier = Modifier.height(24.dp))
                 }
@@ -2970,7 +2875,6 @@ fun ContactHeroActionPill(
     }
 }
 
-
 @Composable
 fun CallLogDetailsDialog(
     log: CallLogItem,
@@ -3010,9 +2914,6 @@ fun CallLogDetailsDialog(
     )
 }
 
-/**
- * Unified Premium Obsidian Glass Search Bar (Clean glowing border, smooth clear transition & tactile feedback)
- */
 @Composable
 fun PremiumGlassSearchBar(
     query: String,
@@ -3122,11 +3023,6 @@ fun PremiumGlassSearchBar(
     }
 }
 
-
-
-/**
- * Screen 2: Contacts (Material You / Expressive Pixel Contacts, Dynamic Monet Squircles & Quick Actions)
- */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ContactsScreen(
@@ -3174,7 +3070,6 @@ fun ContactsScreen(
         }
     }
 
-    // Intelligent Frequent Contacts: Starred Contacts + Highest Call Frequency & Recency
     val frequentContacts = remember(contacts, callLogs, CallerProfileManager.photoVersionState.intValue) {
         if (contacts.isEmpty()) return@remember emptyList<ContactItem>()
 
@@ -3287,7 +3182,6 @@ fun ContactsScreen(
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(18.dp))
-                    // Add Contact Pill
                     Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(16.dp))
@@ -3321,7 +3215,6 @@ fun ContactsScreen(
                 }
             }
         } else {
-            // LazyColumn with generous top clearance for status bar + header
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(top = statusBarTop + 124.dp, bottom = 120.dp, start = 18.dp, end = 18.dp),
@@ -3445,7 +3338,6 @@ fun ContactsScreen(
 
                                         Spacer(modifier = Modifier.height(4.dp))
 
-                                        // Mini Call Button
                                         Box(
                                             modifier = Modifier
                                                 .size(28.dp)
@@ -3473,7 +3365,6 @@ fun ContactsScreen(
                     }
                 }
 
-                // Grouped Alphabetical Contacts
                 groupedContacts.forEach { (sectionKey, contactsInSection) ->
                     item(key = "section_$sectionKey") {
                         Row(
@@ -3532,7 +3423,6 @@ fun ContactsScreen(
                             label = "contactRowScale"
                         )
 
-                        // Material You / Expressive Squircle Contact Row
                         Box(
                             modifier = Modifier
                                 .animateItemPlacement()
@@ -3560,7 +3450,6 @@ fun ContactsScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Dynamic Monet Pastel Avatar or Custom Photo
                                 Box(
                                     modifier = Modifier.size(44.dp),
                                     contentAlignment = Alignment.Center
@@ -3626,7 +3515,6 @@ fun ContactsScreen(
                                         label = "msgBtnScale"
                                     )
 
-                                    // Send Message Button
                                     Box(
                                         modifier = Modifier
                                             .size(36.dp)
@@ -3652,7 +3540,6 @@ fun ContactsScreen(
                                         )
                                     }
 
-                                    // Contact Info Button (Per Contact Details Pill)
                                     val infoInteraction = remember { MutableInteractionSource() }
                                     val isInfoPressed by infoInteraction.collectIsPressedAsState()
                                     val infoScale by animateFloatAsState(
@@ -3694,7 +3581,6 @@ fun ContactsScreen(
                                         label = "callBtnScale"
                                     )
 
-                                    // Call Button
                                     Box(
                                         modifier = Modifier
                                             .size(36.dp)
@@ -3726,7 +3612,6 @@ fun ContactsScreen(
             }
         }
 
-        // Pinned Material 3 Top Header & Search Bar (Solid Gradient Background)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -3764,7 +3649,6 @@ fun ContactsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // + Add Contact Button
                     Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(14.dp))
@@ -3796,7 +3680,6 @@ fun ContactsScreen(
                         )
                     }
 
-                    // Total Count Pill
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(14.dp))
@@ -3887,7 +3770,6 @@ fun ContactsScreen(
                 }
             }
 
-            // Expressive Material 3 Search Bar
             PremiumGlassSearchBar(
                 query = searchQuery,
                 onQueryChange = { searchQuery = it },
@@ -3897,10 +3779,6 @@ fun ContactsScreen(
     }
 }
 
-/**
- * Modern Google Pixel Material 3 Expressive Search Capsule
- * Pill-shaped, dynamic Monet styling, integrated clear/mic & 3-dots overflow menu.
- */
 @Composable
 fun PixelDialerSearchBar(
     query: String,
@@ -4016,10 +3894,6 @@ fun PixelDialerSearchBar(
     }
 }
 
-/**
- * Modern Material 3 Expressive Pixel Dialpad Key Button
- * Squircle/Pill (28dp), tactile spring press scaling, Monet accent container response, Google Sans
- */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OemDialerKeyButton(
@@ -4111,10 +3985,6 @@ fun OemDialerKeyButton(
     }
 }
 
-/**
- * Modern Material 3 Expressive Pixel Emerald Call Button
- * Google Phone Call Green, tactile spring press scaling, elevated squircle (28dp), white handset icon
- */
 @Composable
 fun OemCallButton(
     monetColors: ColorScheme = getPixelMonetDarkColorScheme(),
@@ -4143,8 +4013,8 @@ fun OemCallButton(
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        Color(0xFF34A853), // Google Phone Call Green 500
-                        Color(0xFF1E8E3E)  // Google Phone Call Green 700
+                        Color(0xFF34A853),
+                        Color(0xFF1E8E3E)
                     )
                 )
             )
@@ -4179,9 +4049,6 @@ private data class KeypadRecentItem(
     val photoUri: String? = null
 )
 
-/**
- * Screen 3: Keypad (Google Pixel Material 3 Expressive Dialpad, T9 Suggestions, 100% Fixed Immobile Keys)
- */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun KeypadScreen(
@@ -4298,7 +4165,6 @@ fun KeypadScreen(
             .padding(bottom = 86.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 1. Pinned Header: "Keypad" Title
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -4318,7 +4184,6 @@ fun KeypadScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // 2. Google Pixel Search Pill with integrated Menu
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -4397,7 +4262,6 @@ fun KeypadScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // 2. Upper Dynamic Section: Recents / T9 Suggestions / Dialed Number
         AnimatedContent(
             targetState = typedNumber.isEmpty(),
             transitionSpec = {
@@ -4564,7 +4428,6 @@ fun KeypadScreen(
                             }
                         }
                     } else {
-                        // Premium Pixel Expressive Favorites & Recent Contacts
                         val keypadRecents = remember(callLogs, contacts, CallerProfileManager.photoVersionState.intValue) {
                             val list = mutableListOf<KeypadRecentItem>()
                             val seen = HashSet<String>()
@@ -4574,7 +4437,6 @@ fun KeypadScreen(
                                 return if (d.length >= 7) d.takeLast(10) else d.ifEmpty { num }
                             }
 
-                            // 1. Prioritize Starred / Favorite Contacts
                             for (c in contacts.filter { it.isStarred }) {
                                 val digits = norm(c.number)
                                 if (digits.isNotEmpty() && seen.add(digits)) {
@@ -4594,7 +4456,6 @@ fun KeypadScreen(
                                 }
                             }
 
-                            // 2. Add Recent Calls
                             for (log in callLogs) {
                                 val digits = norm(log.number)
                                 if (seen.add(digits)) {
@@ -4615,7 +4476,6 @@ fun KeypadScreen(
                                 }
                             }
 
-                            // 3. Fallback to contacts if call history is empty
                             if (list.isEmpty()) {
                                 contacts.take(8).map { c ->
                                     val customPhoto = CallerProfileManager.getCustomPhotoPath(context, c.number)
@@ -4740,7 +4600,6 @@ fun KeypadScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
-                                        // Large Avatar with Photo or Star badge
                                         Box(
                                             modifier = Modifier.size(44.dp),
                                             contentAlignment = Alignment.Center
@@ -4819,7 +4678,6 @@ fun KeypadScreen(
                                             }
                                         }
 
-                                        // Quick Emerald Call Button
                                         val callInteraction = remember { MutableInteractionSource() }
                                         val isCallPressed by callInteraction.collectIsPressedAsState()
                                         val callScale by animateFloatAsState(
@@ -4855,7 +4713,6 @@ fun KeypadScreen(
                                 }
                             }
                         } else {
-                            // OnePlus Empty Speed Dial / Favorites illustration
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -4918,7 +4775,6 @@ fun KeypadScreen(
                         }
                     }
                 } else {
-                    // TYPING STATE: DIALED NUMBER & T9 MATCHES
                     val textSize = when {
                         typedNumber.length > 15 -> 22.sp
                         typedNumber.length > 12 -> 26.sp
@@ -4972,7 +4828,6 @@ fun KeypadScreen(
                         )
                     }
 
-                    // T9 SUGGESTIONS CAROUSEL
                     AnimatedVisibility(
                         visible = t9Matches.isNotEmpty(),
                         enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(180)),
@@ -5108,7 +4963,6 @@ fun KeypadScreen(
                                             )
                                         }
 
-                                        // Quick Call Pill
                                         Box(
                                             modifier = Modifier
                                                 .size(30.dp)
@@ -5138,7 +4992,6 @@ fun KeypadScreen(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // 3. Pixel Material 3 Expressive Dialpad (Seamless, Floating, Dynamic Monet Surface)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -5176,15 +5029,12 @@ fun KeypadScreen(
                 }
             }
 
-            // 5th Row: Symmetrical Call & Backspace Row
             Row(
                 horizontalArrangement = Arrangement.spacedBy(18.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Column 1: Invisible 74dp placeholder for geometric centering under column 1
                 Box(modifier = Modifier.size(74.dp, 72.dp))
 
-                // Column 2: Pixel Emerald Call Button (Rock-solid directly under '0' key)
                 OemCallButton(
                     monetColors = monetColors,
                     onClick = {
@@ -5201,7 +5051,6 @@ fun KeypadScreen(
                     }
                 )
 
-                // Column 3: Backspace Button in 74dp slot with spring pop animation
                 Box(
                     modifier = Modifier.size(74.dp, 72.dp),
                     contentAlignment = Alignment.Center
@@ -5266,9 +5115,6 @@ fun KeypadScreen(
     }
 }
 
-/**
- * Screen 4: Assistant & Audio Studio (AI Voice Personas, Voice Relay, Audio Presets & Simulator)
- */
 @Composable
 fun AssistantTabScreen(
     onStartSimulation: () -> Unit,
@@ -5304,7 +5150,6 @@ fun AssistantTabScreen(
             .padding(start = 18.dp, end = 18.dp, top = statusBarTop + 10.dp, bottom = 120.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // App Header: Material You Pixel Expressive Header
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
@@ -5344,7 +5189,6 @@ fun AssistantTabScreen(
             }
         }
 
-        // Section 1: Real-Time Voice Studio & Live DSP
         SettingsSectionHeader(title = "VOICE STUDIO", monetColors = monetColors)
         GlassVoiceStudioCard(
             selectedPersona = selectedPersona,
@@ -5354,7 +5198,6 @@ fun AssistantTabScreen(
             monetColors = monetColors
         )
 
-        // Section 2: Audio Presets & Direct Hardware Uplink Soundboard
         presetManager?.let { pm ->
             SettingsSectionHeader(title = "SOUNDBOARD & PRESETS", monetColors = monetColors)
             GlassAudioPresetsCard(
@@ -5364,10 +5207,8 @@ fun AssistantTabScreen(
             )
         }
 
-        // Section 3: Call Screening & Simulation
         SettingsSectionHeader(title = "SCREENING BEHAVIOR & SIMULATOR", monetColors = monetColors)
         SettingsGroupCard(monetColors = monetColors) {
-            // Row 1: Automated Voice Greeting
             SettingsItemRow(
                 icon = Icons.Rounded.RecordVoiceOver,
                 iconTint = monetColors.primary,
@@ -5397,7 +5238,6 @@ fun AssistantTabScreen(
 
             SettingsDivider(monetColors = monetColors)
 
-            // Row 2: Call Screener Simulator
             SettingsItemRow(
                 icon = Icons.Rounded.Headphones,
                 iconTint = Color(0xFF81C995),
@@ -5443,9 +5283,6 @@ fun AssistantTabScreen(
     }
 }
 
-/**
- * iOS Liquid Specular Card: Operating Mode Switcher (Standard OEM vs Root-Enhanced)
- */
 @Composable
 fun GlassOperationModeCard(
     currentMode: AppOperationMode,
@@ -5473,7 +5310,6 @@ fun GlassOperationModeCard(
             .padding(18.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            // Header Row: Icon + Title + Status Pill
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -5516,7 +5352,6 @@ fun GlassOperationModeCard(
                     }
                 }
 
-                // Status Badge Pill
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(10.dp))
@@ -5544,7 +5379,6 @@ fun GlassOperationModeCard(
                 }
             }
 
-            // Segmented Liquid Glass Mode Selector Pill
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -5554,7 +5388,6 @@ fun GlassOperationModeCard(
                     .padding(3.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                // Segment 1: Standard (Non-Root)
                 val isStandard = currentMode == AppOperationMode.STANDARD
                 Box(
                     modifier = Modifier
@@ -5573,7 +5406,6 @@ fun GlassOperationModeCard(
                     )
                 }
 
-                // Segment 2: Root Enhanced
                 val isRoot = currentMode == AppOperationMode.ROOT_ENHANCED
                 Box(
                     modifier = Modifier
@@ -5598,7 +5430,6 @@ fun GlassOperationModeCard(
                 }
             }
 
-            // Mode Details Description & Capability List
             if (currentMode == AppOperationMode.STANDARD) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
@@ -5608,7 +5439,6 @@ fun GlassOperationModeCard(
                         lineHeight = 16.sp
                     )
 
-                    // Features checklist
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -5643,7 +5473,6 @@ fun GlassOperationModeCard(
                     }
                 }
             } else {
-                // ROOT_ENHANCED Details
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         text = "Root Enhanced Mode unlocks low-level hardware mixer control, hardware ALSA dual-side call recording, Qualcomm Audio HAL direct line injection, and real-time DSP Voice Changer.",
@@ -5652,7 +5481,6 @@ fun GlassOperationModeCard(
                         lineHeight = 16.sp
                     )
 
-                    // Features checklist
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -5667,7 +5495,6 @@ fun GlassOperationModeCard(
                         ModeFeatureRow("Magisk / KernelSU / APatch /system/priv-app Module", true)
                     }
 
-                    // Root Check Action Button
                     if (!rootAvailable) {
                         Button(
                             onClick = {
@@ -5720,9 +5547,6 @@ fun ModeFeatureRow(text: String, isIncluded: Boolean) {
     }
 }
 
-/**
- * iOS Frosted Glass Card: Default Phone App
- */
 @Composable
 fun GlassDefaultAppCard(
     isDefaultDialer: Boolean,
@@ -5813,9 +5637,6 @@ fun GlassDefaultAppCard(
     }
 }
 
-/**
- * iOS Frosted Glass Card: Root & System Priv-App Uplink
- */
 @Composable
 fun GlassRootPowerCard() {
     val context = LocalContext.current
@@ -6026,9 +5847,6 @@ fun GlassRootPowerCard() {
     }
 }
 
-/**
- * iOS Frosted Glass Card: Call Simulator
- */
 @Composable
 fun GlassSimulatorCard(onStartSimulation: () -> Unit) {
     Box(
@@ -6098,12 +5916,6 @@ fun GlassSimulatorCard(onStartSimulation: () -> Unit) {
     }
 }
 
-/**
- * Minimalist Luxury Monochromatic Voice Studio:
- * Streamlined category pill switch (Hindi & Hinglish, English Studio, Specialty Voices),
- * Monochromatic frosted glass chips with clean typography,
- * Monochromatic sample playback & speech relay mic controls with zero rainbow clutter.
- */
 @Composable
 fun GlassVoiceStudioCard(
     selectedPersona: VoicePersona,
@@ -6137,7 +5949,6 @@ fun GlassVoiceStudioCard(
             .padding(16.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            // Header Row: Material You Expressive Squircle
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
@@ -6177,7 +5988,6 @@ fun GlassVoiceStudioCard(
                 }
             }
 
-            // Material You Category Segmented Pill Bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -6211,7 +6021,6 @@ fun GlassVoiceStudioCard(
                 }
             }
 
-            // Horizontal Persona Carousel
             LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(currentPersonas, key = { it.id }) { persona ->
                     val isSelected = persona.id == selectedPersona.id
@@ -6292,8 +6101,6 @@ fun GlassVoiceStudioCard(
                 }
             }
 
-
-            // Live AI Voice Relay Transcript Capsule
             AnimatedVisibility(visible = sessionState.isListeningToUserSpeech || sessionState.userLiveTranscript.isNotBlank()) {
                 Box(
                     modifier = Modifier
@@ -6325,12 +6132,10 @@ fun GlassVoiceStudioCard(
                 }
             }
 
-            // Action Controls: Sample Voice & Test AI Voice Relay
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Button 1: Sample Voice
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -6376,7 +6181,6 @@ fun GlassVoiceStudioCard(
                     }
                 }
 
-                // Button 2: Test AI Voice Relay Mic
                 val isListening = sessionState.isListeningToUserSpeech
                 Box(
                     modifier = Modifier
@@ -6422,10 +6226,6 @@ fun GlassVoiceStudioCard(
     }
 }
 
-/**
- * iOS Minimalist Liquid Card: In-Call Audio Presets & Direct Hardware Uplink Soundboard
- * Clean, non-colourful, titanium glass aesthetic with direct link to the reorder/management hub.
- */
 @Composable
 fun GlassAudioPresetsCard(
     presetManager: AudioPresetManager,
@@ -6476,7 +6276,6 @@ fun GlassAudioPresetsCard(
             .padding(16.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            // Header Row: Material You Expressive Squircle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -6543,7 +6342,6 @@ fun GlassAudioPresetsCard(
                 }
             }
 
-            // Quick Access Preview (Top 3 Presets in Clean Pixel Squircles)
             val previewPresets = remember(presets) { presets.take(3) }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 previewPresets.forEach { preset ->
@@ -6647,7 +6445,6 @@ fun GlassAudioPresetsCard(
                 }
             }
 
-            // Primary Hub Banner Button: Opens the dedicated Preset Management Screen
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -6700,7 +6497,6 @@ fun GlassAudioPresetsCard(
                 }
             }
 
-            // Action Buttons: Add Custom Phrase & Import Audio File
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -6752,7 +6548,6 @@ fun GlassAudioPresetsCard(
         }
     }
 
-    // Dialog: Add Custom Text Preset
     if (showAddTextDialog) {
         Dialog(onDismissRequest = { showAddTextDialog = false }) {
             Box(
@@ -6835,7 +6630,6 @@ fun GlassAudioPresetsCard(
         }
     }
 
-    // Dialog: Import Audio File Preset
     if (showImportDialog && selectedAudioUri != null) {
         Dialog(onDismissRequest = { showImportDialog = false }) {
             Box(
@@ -6905,7 +6699,6 @@ fun GlassAudioPresetsCard(
         }
     }
 
-    // Dialog: Rename Preset
     if (showRenameDialog && presetToRenameId != null) {
         Dialog(onDismissRequest = { showRenameDialog = false }) {
             Box(
@@ -6971,9 +6764,6 @@ fun GlassAudioPresetsCard(
     }
 }
 
-/**
- * iOS Liquid Specular Card: Automated Voice Greeting (Assistant Studio)
- */
 @Composable
 fun GlassAssistantGreetingCard(
     isGreetingEnabled: Boolean,
@@ -7040,9 +6830,6 @@ fun GlassAssistantGreetingCard(
     }
 }
 
-/**
- * iOS Frosted Glass Card: System Telephony & Call Recording Engine
- */
 @Composable
 fun DialerSystemSettingsCard(
     autoScreenUnknown: Boolean,
@@ -7072,7 +6859,6 @@ fun DialerSystemSettingsCard(
                 letterSpacing = (-0.3).sp
             )
 
-            // Preference 1: Auto-Record Calls (Root Dual-Side)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -7116,7 +6902,6 @@ fun DialerSystemSettingsCard(
                 )
             }
 
-            // Saved Recordings Manager Button
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -7176,7 +6961,6 @@ fun DialerSystemSettingsCard(
                     .background(Color(0x18FFFFFF))
             )
 
-            // Preference 2: Hide Phone Number on Caller ID
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -7227,7 +7011,6 @@ fun DialerSystemSettingsCard(
                     .background(Color(0x18FFFFFF))
             )
 
-            // Preference 3: Auto-Screen Unknown Numbers
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -7266,9 +7049,6 @@ fun DialerSystemSettingsCard(
     }
 }
 
-/**
- * Material You / Pixel Expressive Settings Components
- */
 @Composable
 fun SettingsSectionHeader(
     title: String,
@@ -7327,7 +7107,6 @@ fun SettingsItemRow(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Uniform 40dp rounded squircle icon container
         Box(
             modifier = Modifier
                 .size(40.dp)
@@ -7346,7 +7125,6 @@ fun SettingsItemRow(
 
         Spacer(modifier = Modifier.width(14.dp))
 
-        // Aligned title and subtitle column in Google Sans
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.Center
@@ -7444,10 +7222,6 @@ private fun DeveloperSocialPill(
     }
 }
 
-/**
- * Dedicated Dialer & System Settings Modal Sheet
- * Opened via 3-dots in Keypad header.
- */
 @Composable
 fun DialerSettingsSheet(
     isDefaultDialer: Boolean,
@@ -7488,7 +7262,6 @@ fun DialerSettingsSheet(
     var isModuleInstalled by remember { mutableStateOf(RootPrivilegeManager.isMagiskModuleInstalled()) }
     var isInstalling by remember { mutableStateOf(false) }
 
-    // OTA Update System States
     val otaCheckStatus by OtaUpdateManager.checkStatus.collectAsState()
     val otaDownloadStatus by OtaUpdateManager.downloadStatus.collectAsState()
     var showUpdateDialog by remember { mutableStateOf(false) }
@@ -7535,7 +7308,6 @@ fun DialerSettingsSheet(
                 Column(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    // Modern Pixel Expressive Top App Bar
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -7587,7 +7359,6 @@ fun DialerSettingsSheet(
                         }
                     }
 
-                    // Settings Grouped Content List
                     Column(
                         modifier = Modifier
                             .weight(1f)
@@ -7596,12 +7367,8 @@ fun DialerSettingsSheet(
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // ==========================================
-                        // GROUP 1: CALL HANDLING & SCREENING
-                        // ==========================================
                         SettingsSectionHeader(title = "CALL HANDLING & SCREENING", monetColors = monetColors)
                         SettingsGroupCard(monetColors = monetColors) {
-                            // Row 1: Default Phone App
                             SettingsItemRow(
                                 icon = if (isDefaultDialer) Icons.Rounded.PhoneInTalk else Icons.Filled.Warning,
                                 iconTint = if (isDefaultDialer) Color(0xFF81C995) else monetColors.error,
@@ -7664,7 +7431,6 @@ fun DialerSettingsSheet(
 
                             SettingsDivider(monetColors = monetColors)
 
-                            // Row 2: Auto-Screen Unknown
                             SettingsItemRow(
                                 icon = Icons.Rounded.Security,
                                 iconTint = monetColors.primary,
@@ -7694,7 +7460,6 @@ fun DialerSettingsSheet(
 
                             SettingsDivider(monetColors = monetColors)
 
-                            // Row 3: Stealth Caller ID
                             SettingsItemRow(
                                 icon = Icons.Rounded.VisibilityOff,
                                 iconTint = monetColors.secondary,
@@ -7724,7 +7489,6 @@ fun DialerSettingsSheet(
 
                             SettingsDivider(monetColors = monetColors)
 
-                            // Row 4: Blocked Numbers Management
                             SettingsItemRow(
                                 icon = Icons.Rounded.Block,
                                 iconTint = Color(0xFFFF5252),
@@ -7747,9 +7511,6 @@ fun DialerSettingsSheet(
                             )
                         }
 
-                        // ==========================================
-                        // GROUP: CALL STATISTICS & INSIGHTS
-                        // ==========================================
                         SettingsSectionHeader(title = "CALL STATISTICS & INSIGHTS", monetColors = monetColors)
                         SettingsGroupCard(monetColors = monetColors) {
                             val totalTalkTime = remember(callLogs) { callLogs.sumOf { it.durationSeconds } }
@@ -7796,12 +7557,8 @@ fun DialerSettingsSheet(
                             )
                         }
 
-                        // ==========================================
-                        // GROUP 2: CALL RECORDING ENGINE
-                        // ==========================================
                         SettingsSectionHeader(title = "CALL RECORDING ENGINE", monetColors = monetColors)
                         SettingsGroupCard(monetColors = monetColors) {
-                            // Row 1: Auto-Record Calls
                             SettingsItemRow(
                                 icon = Icons.Filled.Mic,
                                 iconTint = Color(0xFFF28B82),
@@ -7831,7 +7588,6 @@ fun DialerSettingsSheet(
 
                             SettingsDivider(monetColors = monetColors)
 
-                            // Row 2: Saved Call Recordings Manager
                             SettingsItemRow(
                                 icon = Icons.Rounded.GraphicEq,
                                 iconTint = monetColors.tertiary,
@@ -7873,9 +7629,6 @@ fun DialerSettingsSheet(
                             )
                         }
 
-                        // ==========================================
-                        // GROUP 3: SPEECH JAMMER (ACOUSTIC DAF ENGINE)
-                        // ==========================================
                         SettingsSectionHeader(title = "SPEECH JAMMER (ACOUSTIC DAF ENGINE)", monetColors = monetColors)
                         SettingsGroupCard(monetColors = monetColors) {
                             val jammerEngine = remember { com.callscreener.app.engine.SpeechJammerEngine.getInstance(context) }
@@ -7952,12 +7705,8 @@ fun DialerSettingsSheet(
                             )
                         }
 
-                        // ==========================================
-                        // GROUP 4: OPERATING PROFILE & PRIVILEGES
-                        // ==========================================
                         SettingsSectionHeader(title = "OPERATING PROFILE & PRIVILEGES", monetColors = monetColors)
                         SettingsGroupCard(monetColors = monetColors) {
-                            // Minimal Expressive Segmented Pill Switcher
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -8199,12 +7948,8 @@ fun DialerSettingsSheet(
                             }
                         }
 
-                        // ==========================================
-                        // GROUP 5: SYSTEM & OTA UPDATES
-                        // ==========================================
                         SettingsSectionHeader(title = "SYSTEM & OTA UPDATES", monetColors = monetColors)
                         SettingsGroupCard(monetColors = monetColors) {
-                            // Row 1: Check for Updates
                             SettingsItemRow(
                                 icon = Icons.Rounded.SystemUpdate,
                                 iconTint = monetColors.primary,
@@ -8324,9 +8069,6 @@ fun DialerSettingsSheet(
                             )
                         }
 
-                        // ==========================================
-                        // GROUP 6: ABOUT DEVELOPER
-                        // ==========================================
                         SettingsSectionHeader(title = "ABOUT DEVELOPER", monetColors = monetColors)
                         SettingsGroupCard(monetColors = monetColors) {
                             Column(
@@ -8335,13 +8077,11 @@ fun DialerSettingsSheet(
                                     .padding(16.dp),
                                 verticalArrangement = Arrangement.spacedBy(14.dp)
                             ) {
-                                // Developer Profile Row
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                                 ) {
-                                    // Spiderman/Developer Avatar with glowing Monet border
                                     Box(
                                         modifier = Modifier
                                             .size(58.dp)
@@ -8413,12 +8153,10 @@ fun DialerSettingsSheet(
                                     }
                                 }
 
-                                // Interactive Quick Links (GitHub, Telegram, Gmail)
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    // GitHub
                                     DeveloperSocialPill(
                                         iconRes = com.callscreener.app.R.drawable.ic_github,
                                         label = "GitHub",
@@ -8436,7 +8174,6 @@ fun DialerSettingsSheet(
                                         }
                                     )
 
-                                    // Telegram
                                     DeveloperSocialPill(
                                         iconRes = com.callscreener.app.R.drawable.ic_telegram,
                                         label = "Telegram",
@@ -8454,7 +8191,6 @@ fun DialerSettingsSheet(
                                         }
                                     )
 
-                                    // Gmail
                                     DeveloperSocialPill(
                                         iconRes = com.callscreener.app.R.drawable.ic_gmail,
                                         label = "Email",
@@ -8557,10 +8293,6 @@ fun DialerSettingsSheet(
     }
 }
 
-// =========================================================================
-// CALL STATISTICS FEATURE (Google Pixel / Expressive Dialer Design)
-// =========================================================================
-
 enum class StatsDateRange(val label: String) {
     ALL_TIME("All time"),
     TODAY("Today"),
@@ -8585,15 +8317,6 @@ data class ContactCallMetric(
     val missedCount: Int
 )
 
-/**
- * Pixel Expressive Call Statistics Screen
- * Direct match to Google Dialer's CallStatsScreen:
- * - Date Range Filter Row (All time, Today, Last 7 days, Last 30 days)
- * - Call Type Filter Row (All, Incoming, Outgoing, Missed)
- * - Hero Summary Card with full duration, matching calls, and average duration
- * - 3 Mini Metric Cards (Incoming, Outgoing, Missed)
- * - Top Contacts Ranked List with Duration Progress Bars and One-Tap Call Action
- */
 @Composable
 fun CallStatsScreen(
     callLogs: List<CallLogItem>,
@@ -8661,7 +8384,6 @@ fun CallStatsScreen(
             if (totalCallCount > 0) totalDuration / totalCallCount else 0L
         }
 
-        // 3 Metric cards (breakdown for selected date range)
         val inLogs = remember(dateFilteredLogs) { dateFilteredLogs.filter { it.type == 1 } }
         val outLogs = remember(dateFilteredLogs) { dateFilteredLogs.filter { it.type == 2 } }
         val missedLogs = remember(dateFilteredLogs) { dateFilteredLogs.filter { it.type == 3 || it.type == 5 || it.type == 6 } }
@@ -8672,7 +8394,6 @@ fun CallStatsScreen(
         val outCount = outLogs.size
         val missedCount = missedLogs.size
 
-        // Top contacts breakdown
         val contactMetrics = remember(filteredLogs) {
             val grouped = filteredLogs.groupBy { log ->
                 val clean = log.number.trim().replace(Regex("[\\s\\-\\(\\)]"), "")
@@ -8726,12 +8447,11 @@ fun CallStatsScreen(
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
-                    ) {} // Intercept touches
+                    ) {}
             ) {
                 Column(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    // Pixel Expressive Top Bar
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -8804,13 +8524,11 @@ fun CallStatsScreen(
                         }
                     }
 
-                    // Content
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 32.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Date Range Filters
                         item {
                             StatsChoiceRow(
                                 items = StatsDateRange.values().toList(),
@@ -8821,7 +8539,6 @@ fun CallStatsScreen(
                             )
                         }
 
-                        // Call Type Filters
                         item {
                             StatsChoiceRow(
                                 items = StatsCallType.values().toList(),
@@ -8832,7 +8549,6 @@ fun CallStatsScreen(
                             )
                         }
 
-                        // Hero Summary Card
                         item {
                             StatsSummaryCard(
                                 dateRange = selectedDateRange,
@@ -8844,7 +8560,6 @@ fun CallStatsScreen(
                             )
                         }
 
-                        // 3 Mini Metric Cards
                         item {
                             StatsMetricCards(
                                 inCount = inCount,
@@ -8856,7 +8571,6 @@ fun CallStatsScreen(
                             )
                         }
 
-                        // Top Contacts Section Header
                         item {
                             Row(
                                 modifier = Modifier
@@ -8894,7 +8608,6 @@ fun CallStatsScreen(
                             }
                         }
 
-                        // Contact Metrics List
                         if (contactMetrics.isEmpty()) {
                             item {
                                 Box(
@@ -8960,9 +8673,6 @@ fun CallStatsScreen(
         }
 }
 
-/**
- * Filter Choice Row (Date Range & Call Type)
- */
 @Composable
 fun <T> StatsChoiceRow(
     items: List<T>,
@@ -9015,9 +8725,6 @@ fun <T> StatsChoiceRow(
     }
 }
 
-/**
- * Google Pixel Hero Summary Card
- */
 @Composable
 fun StatsSummaryCard(
     dateRange: StatsDateRange,
@@ -9050,7 +8757,6 @@ fun StatsSummaryCard(
         Column(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Filter Tag Pill
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -9072,7 +8778,6 @@ fun StatsSummaryCard(
                 }
             }
 
-            // Hero Duration
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     text = "Total Call Time",
@@ -9091,7 +8796,6 @@ fun StatsSummaryCard(
                 )
             }
 
-            // Stat Capsules Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -9172,9 +8876,6 @@ fun StatsSummaryCard(
     }
 }
 
-/**
- * Row of 3 Metric Breakdown Cards (Incoming, Outgoing, Missed)
- */
 @Composable
 fun StatsMetricCards(
     inCount: Int,
@@ -9288,9 +8989,6 @@ fun StatsMetricMiniCard(
     }
 }
 
-/**
- * Top Contact Metric Card with duration bar and call info
- */
 @Composable
 fun ContactMetricCard(
     contact: ContactCallMetric,
@@ -9394,7 +9092,6 @@ fun ContactMetricCard(
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                // Quick Call Action Pill
                 Box(
                     modifier = Modifier
                         .size(34.dp)
@@ -9411,7 +9108,6 @@ fun ContactMetricCard(
                 }
             }
 
-            // Duration Progress Bar (Pixel Expressive Rounded Track)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -9431,9 +9127,6 @@ fun ContactMetricCard(
     }
 }
 
-/**
- * Saved Call Recordings Manager Dialog with In-App Media Playback & Sharing
- */
 @Composable
 fun SavedRecordingsDialog(
     onDismiss: () -> Unit,
@@ -9513,14 +9206,13 @@ fun SavedRecordingsDialog(
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
-                    ) {} // Intercept touches
+                    ) {}
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .statusBarsPadding()
                 ) {
-                    // Pixel Expressive Top Bar
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -9585,14 +9277,12 @@ fun SavedRecordingsDialog(
                     }
 
                     if (recordings.isNotEmpty()) {
-                        // Quick Metric Overview Pills
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 6.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            // Pill 1: Total Files
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
@@ -9628,7 +9318,6 @@ fun SavedRecordingsDialog(
                                 }
                             }
 
-                            // Pill 2: Total Duration
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
@@ -9664,7 +9353,6 @@ fun SavedRecordingsDialog(
                                 }
                             }
 
-                            // Pill 3: Audio Format
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
@@ -9792,12 +9480,10 @@ fun SavedRecordingsDialog(
                                     Column(
                                         verticalArrangement = Arrangement.spacedBy(12.dp)
                                     ) {
-                                        // Header Row: Avatar, Name/Number, Timestamp
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            // Avatar Disc
                                             Box(
                                                 modifier = Modifier
                                                     .size(42.dp)
@@ -9845,13 +9531,11 @@ fun SavedRecordingsDialog(
                                             }
                                         }
 
-                                        // Badges & Action Bar
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
-                                            // Duration & Size Badges
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -9889,12 +9573,10 @@ fun SavedRecordingsDialog(
                                                 }
                                             }
 
-                                            // Media & Share/Delete Action Buttons
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                                             ) {
-                                                // Play / Pause Circle
                                                 IconButton(
                                                     onClick = {
                                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -9936,7 +9618,6 @@ fun SavedRecordingsDialog(
                                                     )
                                                 }
 
-                                                // Share Button
                                                 IconButton(
                                                     onClick = {
                                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -9971,7 +9652,6 @@ fun SavedRecordingsDialog(
                                                     )
                                                 }
 
-                                                // Delete Button
                                                 IconButton(
                                                     onClick = {
                                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -10009,9 +9689,6 @@ fun SavedRecordingsDialog(
         }
 }
 
-/**
- * iOS Frosted Glass Card: Architecture Information
- */
 @Composable
 fun GlassArchitectureCard() {
     Box(

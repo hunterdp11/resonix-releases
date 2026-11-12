@@ -107,11 +107,6 @@ enum class PresetManagerTab {
     QUICK_REPLIES
 }
 
-/**
- * Smooth Drag-and-Drop state manager for LazyColumn reordering.
- * Automatically recalculates target swap positions, compensates drag offset for zero visual jitter,
- * and handles edge auto-scrolling when dragging items across long lists.
- */
 class LazyListDragDropState(
     val listState: LazyListState,
     val onMove: (Int, Int) -> Unit
@@ -131,10 +126,8 @@ class LazyListDragDropState(
         val visibleItems = listState.layoutInfo.visibleItemsInfo
         val currentItemInfo = visibleItems.firstOrNull { it.index == currentDraggedIndex } ?: return
 
-        // Center of the dragged item in viewport coordinates
         val currentItemCenter = currentItemInfo.offset + (currentItemInfo.size / 2) + dragOffset
 
-        // Find candidate overlapping item in valid range [0, totalCount - 1]
         val targetItem = visibleItems.firstOrNull { item ->
             item.index in 0 until totalCount &&
             item.index != currentDraggedIndex &&
@@ -145,20 +138,16 @@ class LazyListDragDropState(
             val targetIndex = targetItem.index
             onMove(currentDraggedIndex, targetIndex)
             onSwap()
-            // Offset compensation to keep item stable under user's finger
             dragOffset += (currentItemInfo.offset - targetItem.offset)
             draggedIndex = targetIndex
         }
 
-        // Auto-scroll when dragging near viewport top/bottom edges
         val viewportStart = listState.layoutInfo.viewportStartOffset
         val viewportEnd = listState.layoutInfo.viewportEndOffset
         val threshold = 90
 
         if (currentItemCenter < viewportStart + threshold) {
-            // Dragged near top edge
         } else if (currentItemCenter > viewportEnd - threshold) {
-            // Dragged near bottom edge
         }
     }
 
@@ -173,11 +162,6 @@ class LazyListDragDropState(
     }
 }
 
-/**
- * Pixel Expressive / Material 3 Presets & Responses Full-Screen Page.
- * Dedicated edge-to-edge subpage with seamless fluid animations, clean back navigation,
- * tactile drag-and-drop reordering, quick replies, and audio preset management.
- */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PresetManagementScreen(
@@ -209,7 +193,6 @@ fun PresetManagementScreen(
 
     var activeTab by remember { mutableStateOf(PresetManagerTab.SOUNDBOARD_AUDIO) }
 
-    // LazyListStates and Drag-and-Drop managers
     val soundboardListState = rememberLazyListState()
     val quickRepliesListState = rememberLazyListState()
 
@@ -231,16 +214,14 @@ fun PresetManagementScreen(
         )
     }
 
-    // Dialog States
     var editingPreset by remember { mutableStateOf<AudioPreset?>(null) }
     var editingQuickReply by remember { mutableStateOf<QuickReply?>(null) }
     var isAddingQuickReply by remember { mutableStateOf(false) }
     var isAddingTextPreset by remember { mutableStateOf(false) }
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
-    var deleteConfirmationItem by remember { mutableStateOf<Pair<String, String>?>(null) } // id to title
+    var deleteConfirmationItem by remember { mutableStateOf<Pair<String, String>?>(null) }
     var isResetConfirmOpen by remember { mutableStateOf(false) }
 
-    // File picker for audio presets
     val audioPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -296,7 +277,6 @@ fun PresetManagementScreen(
                     .statusBarsPadding()
                     .navigationBarsPadding()
             ) {
-                // Pixel Expressive Header Bar: Left Arrow Back, Title, Subtitle (No Cross Icon)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -340,7 +320,6 @@ fun PresetManagementScreen(
                     }
                 }
 
-                // Minimal Pixel Segmented Tab Switcher
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -351,7 +330,6 @@ fun PresetManagementScreen(
                         .padding(4.dp)
                 ) {
                     Row(modifier = Modifier.fillMaxWidth()) {
-                        // Tab 1: Soundboard
                         val isSoundboard = activeTab == PresetManagerTab.SOUNDBOARD_AUDIO
                         Box(
                             modifier = Modifier
@@ -374,7 +352,6 @@ fun PresetManagementScreen(
                             )
                         }
 
-                        // Tab 2: Quick Replies
                         val isReplies = activeTab == PresetManagerTab.QUICK_REPLIES
                         Box(
                             modifier = Modifier
@@ -399,9 +376,7 @@ fun PresetManagementScreen(
                     }
                 }
 
-                // Content Section based on Tab
                 if (activeTab == PresetManagerTab.SOUNDBOARD_AUDIO) {
-                    // Action Bar: Import Audio & Add Speech
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -409,7 +384,6 @@ fun PresetManagementScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Button 1: Import Audio File
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -443,7 +417,6 @@ fun PresetManagementScreen(
                             }
                         }
 
-                        // Button 2: Add Speech Preset
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -478,7 +451,6 @@ fun PresetManagementScreen(
                         }
                     }
 
-                    // Subtle Drag Hint
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -500,7 +472,6 @@ fun PresetManagementScreen(
                         )
                     }
 
-                    // Presets List with Hold & Drag Reordering, Instant Move-to-Top & Up/Down Controls
                     LazyColumn(
                         state = soundboardListState,
                         modifier = Modifier
@@ -589,7 +560,6 @@ fun PresetManagementScreen(
                         }
                     }
                 } else {
-                    // Quick Replies Tab Action Bar
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -630,7 +600,6 @@ fun PresetManagementScreen(
                         }
                     }
 
-                    // Subtle Drag Hint
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -652,7 +621,6 @@ fun PresetManagementScreen(
                         )
                     }
 
-                    // Quick Replies List with Hold & Drag Reordering, Instant Move-to-Top & Up/Down Controls
                     LazyColumn(
                         state = quickRepliesListState,
                         modifier = Modifier
@@ -732,11 +700,6 @@ fun PresetManagementScreen(
         }
     }
 
-    // ==========================================
-    // PIXEL EXPRESSIVE DIALOGS
-    // ==========================================
-
-    // 1. Import Audio File Dialog
     pendingImportUri?.let { uri ->
         val defaultTitle = remember(uri) {
             getFileName(context, uri).substringBeforeLast(".")
@@ -825,7 +788,6 @@ fun PresetManagementScreen(
         )
     }
 
-    // 2. Add Speech Preset Dialog
     if (isAddingTextPreset) {
         var newTitle by remember { mutableStateOf("") }
         var newSpoken by remember { mutableStateOf("") }
@@ -922,7 +884,6 @@ fun PresetManagementScreen(
         )
     }
 
-    // 3. Edit Preset Dialog
     editingPreset?.let { preset ->
         var editTitle by remember { mutableStateOf(preset.title) }
         var editText by remember { mutableStateOf(if (preset.isAudioFile) "" else preset.textOrPath) }
@@ -1006,7 +967,6 @@ fun PresetManagementScreen(
         )
     }
 
-    // 4. Add Quick Reply Dialog
     if (isAddingQuickReply) {
         var replyTitle by remember { mutableStateOf("") }
         var replySpoken by remember { mutableStateOf("") }
@@ -1125,7 +1085,6 @@ fun PresetManagementScreen(
         )
     }
 
-    // 5. Edit Quick Reply Dialog
     editingQuickReply?.let { reply ->
         var editTitle by remember { mutableStateOf(reply.title) }
         var editSpoken by remember { mutableStateOf(reply.spokenText) }
@@ -1222,7 +1181,6 @@ fun PresetManagementScreen(
         )
     }
 
-    // 6. Delete Confirmation Dialog
     deleteConfirmationItem?.let { (id, title) ->
         AlertDialog(
             onDismissRequest = { deleteConfirmationItem = null },
@@ -1266,7 +1224,6 @@ fun PresetManagementScreen(
         )
     }
 
-    // 7. Reset to Defaults Confirmation
     if (isResetConfirmOpen) {
         AlertDialog(
             onDismissRequest = { isResetConfirmOpen = false },
@@ -1314,9 +1271,6 @@ fun PresetManagementScreen(
     }
 }
 
-/**
- * Soundboard Preset Row: Pixel Expressive Minimalist Card with Tactile Drag Handle, Category Badges & Clean Actions
- */
 @Composable
 fun SoundboardPresetItemRow(
     preset: AudioPreset,
@@ -1381,7 +1335,6 @@ fun SoundboardPresetItemRow(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Tactile Drag Indicator Grip Handle
             Box(
                 modifier = Modifier
                     .size(36.dp)
@@ -1418,7 +1371,6 @@ fun SoundboardPresetItemRow(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Minimal Index Badge
             Box(
                 modifier = Modifier
                     .widthIn(min = 22.dp)
@@ -1439,13 +1391,11 @@ fun SoundboardPresetItemRow(
 
             Spacer(modifier = Modifier.width(10.dp))
 
-            // Main Info: Title, Type/Category & Preview Text
             Column(modifier = Modifier.weight(1f)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    // Type Badge
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
@@ -1503,7 +1453,6 @@ fun SoundboardPresetItemRow(
 
             Spacer(modifier = Modifier.width(6.dp))
 
-            // Right Actions: Preview Play (if audio file), Edit & Delete
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -1575,9 +1524,6 @@ fun SoundboardPresetItemRow(
     }
 }
 
-/**
- * Quick Reply Row: Pixel Expressive Minimalist Card with Tactile Drag Handle, Language Badges & Clean Actions
- */
 @Composable
 fun QuickReplyItemRow(
     reply: QuickReply,
@@ -1639,7 +1585,6 @@ fun QuickReplyItemRow(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Tactile Drag Indicator Grip Handle
             Box(
                 modifier = Modifier
                     .size(36.dp)
@@ -1676,7 +1621,6 @@ fun QuickReplyItemRow(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Minimal Index Badge
             Box(
                 modifier = Modifier
                     .widthIn(min = 22.dp)
@@ -1697,7 +1641,6 @@ fun QuickReplyItemRow(
 
             Spacer(modifier = Modifier.width(10.dp))
 
-            // Main Info: Title, Language Badge & Spoken Text
             Column(modifier = Modifier.weight(1f)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -1750,7 +1693,6 @@ fun QuickReplyItemRow(
 
             Spacer(modifier = Modifier.width(6.dp))
 
-            // Right Actions: Edit & Delete
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)

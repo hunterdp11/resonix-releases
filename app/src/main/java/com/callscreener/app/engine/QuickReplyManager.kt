@@ -51,7 +51,6 @@ class QuickReplyManager(private val context: Context) {
                 Log.e(TAG, "Error parsing saved quick replies", e)
             }
         }
-        // First run or empty: default replies
         _quickReplies.value = QuickReply.DEFAULT_REPLIES
         saveQuickReplies(_quickReplies.value)
     }
@@ -171,4 +170,3 @@ class QuickReplyManager(private val context: Context) {
         private const val KEY_QUICK_REPLIES = "saved_quick_replies_json"
     }
 }
-

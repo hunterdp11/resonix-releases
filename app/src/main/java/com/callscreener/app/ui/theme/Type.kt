@@ -8,10 +8,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.callscreener.app.R
 
-/**
- * Official Google Sans font family with the iconic geometric rounded "G".
- * Bundled natively into res/font for 100% offline, fluid, zero-latency rendering across all devices.
- */
 val GoogleSans = FontFamily(
     Font(R.font.google_sans_regular, FontWeight.Normal),
     Font(R.font.google_sans_medium, FontWeight.Medium),
@@ -123,4 +119,3 @@ val AppTypography = Typography(
         letterSpacing = 0.5.sp
     )
 )
-

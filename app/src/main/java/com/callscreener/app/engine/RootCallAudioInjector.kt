@@ -77,10 +77,6 @@ class RootCallAudioInjector(private val context: Context) {
         val dataLength: Long
     )
 
-    /**
-     * Synthesizes text to a temporary audio file and injects the raw PCM data
-     * directly into the active telephony audio track with ZERO loudspeaker noise!
-     */
     suspend fun injectSpeech(
         text: String,
         textToSpeech: TextToSpeech?,
@@ -91,7 +87,6 @@ class RootCallAudioInjector(private val context: Context) {
             return@withContext
         }
 
-        // Use externalFilesDir so external TTS processes (Google TTS, Samsung TTS) have permission to write
         val baseDir = context.getExternalFilesDir(null) ?: context.cacheDir
         val ttsDir = File(baseDir, "tts_cache").apply { mkdirs() }
         val tempWavFile = File(ttsDir, "inject_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}.wav")
@@ -116,7 +111,6 @@ class RootCallAudioInjector(private val context: Context) {
                 return@withContext
             }
 
-            // Wait for file creation & completion (up to 2500ms)
             var waitMs = 0
             var lastSize = -1L
             var stableCount = 0
@@ -144,7 +138,6 @@ class RootCallAudioInjector(private val context: Context) {
                 return@withContext
             }
 
-            // Inject synthesized speech directly into active telephony call uplink with 48kHz HD quality
             injectAudioFile(tempWavFile) { success ->
                 try { tempWavFile.delete() } catch (_: Exception) {}
                 onComplete(success)
@@ -156,16 +149,6 @@ class RootCallAudioInjector(private val context: Context) {
         }
     }
 
-    /**
-     * Universally decodes any audio file (MP3, AAC, M4A, OGG, FLAC, WAV of any sample rate or channel layout)
-     * into uncompressed 16-bit Mono PCM resampled cleanly to targetSampleRate (default 48000 Hz for Fullband HD Voice).
-     *
-     * Guarantees:
-     * - ZERO white noise, static, or hash from compressed bitstream leakage.
-     * - Automatic stereo-to-mono downmixing.
-     * - High-fidelity linear interpolation resampling up to 48kHz.
-     * - Studio Dynamic Vocal Peak Normalization so quiet audio clips project loud and crystal-clear.
-     */
     fun decodeAudioFileToPcm16(file: File, targetSampleRate: Int = 48000): ByteArray? {
         val extractor = MediaExtractor()
         var codec: MediaCodec? = null
@@ -247,13 +230,11 @@ class RootCallAudioInjector(private val context: Context) {
             val rawDecodedBytes = pcmOutStream.toByteArray()
             if (rawDecodedBytes.isEmpty()) return null
 
-            // Convert raw PCM bytes to short array (16-bit little-endian)
             val shortCount = rawDecodedBytes.size / 2
             val shortBuffer = ByteBuffer.wrap(rawDecodedBytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
             val rawShorts = ShortArray(shortCount)
             shortBuffer.get(rawShorts)
 
-            // Step 1: Downmix channels to mono if needed
             val monoShorts: ShortArray = if (channelCount > 1) {
                 val monoCount = shortCount / channelCount
                 val mono = ShortArray(monoCount)
@@ -269,7 +250,6 @@ class RootCallAudioInjector(private val context: Context) {
                 rawShorts
             }
 
-            // Step 2: Resample to targetSampleRate (e.g. 48000Hz) if needed
             val resampledShorts: ShortArray = if (sampleRate != targetSampleRate && sampleRate > 0) {
                 val outLength = ((monoShorts.size.toLong() * targetSampleRate) / sampleRate).toInt()
                 val resampled = ShortArray(outLength)
@@ -287,9 +267,6 @@ class RootCallAudioInjector(private val context: Context) {
                 monoShorts
             }
 
-            // Step 3: Studio Dynamic Vocal Peak Normalization
-            // Many user voice recordings / soundboard clips are recorded at quiet volumes.
-            // Normalize peak to ~92% full scale (-0.7 dBFS) so it sounds punchy and crystal clear to the caller!
             var maxPeak = 0
             for (s in resampledShorts) {
                 val absVal = kotlin.math.abs(s.toInt())
@@ -307,7 +284,6 @@ class RootCallAudioInjector(private val context: Context) {
                 resampledShorts
             }
 
-            // Step 4: Convert back to ByteArray (PCM 16-bit Mono @ targetSampleRate)
             val finalBytes = ByteArray(finalShorts.size * 2)
             ByteBuffer.wrap(finalBytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(finalShorts)
             Log.i(TAG, "Decoded ${file.name} successfully: ${rawDecodedBytes.size} raw bytes -> ${finalBytes.size} mono ${targetSampleRate}Hz PCM bytes (peak=$maxPeak)")
@@ -322,11 +298,6 @@ class RootCallAudioInjector(private val context: Context) {
         }
     }
 
-    /**
-     * Injects an arbitrary audio file (preset, soundboard clip, MP3, AAC, WAV) directly
-     * into the telephony call uplink via root ALSA mixers / AudioTrack,
-     * muting the physical microphone during playback so ZERO ambient noise leaks into the call!
-     */
     suspend fun injectAudioFile(
         file: File,
         onComplete: (Boolean) -> Unit
@@ -336,7 +307,6 @@ class RootCallAudioInjector(private val context: Context) {
             return@withContext
         }
 
-        // Cleanly stop any existing injection before starting the new one (instant switch / no collision)
         stopInjection()
         kotlinx.coroutines.delay(20L)
         synchronized(pauseLock) {
@@ -346,10 +316,8 @@ class RootCallAudioInjector(private val context: Context) {
 
         var success = false
         try {
-            // Enable hardware ALSA in-call uplink mixer routing (unmuting Voice Tx so audio reaches caller)
             enableHardwareInCallMixers()
 
-            // 3. Decode audio file universally to clean 16-bit Mono PCM @ 48kHz (Fullband HD Voice)
             val preferredSampleRate = 48000
             val channelConfig = AudioFormat.CHANNEL_OUT_MONO
             val audioFormat = AudioFormat.ENCODING_PCM_16BIT
@@ -357,7 +325,6 @@ class RootCallAudioInjector(private val context: Context) {
             val targetSampleRate = if (testBuf > 0) preferredSampleRate else 16000
             var pcmBytes = decodeAudioFileToPcm16(file, targetSampleRate)
 
-            // If MediaCodec decoding fails, fall back to pure PCM WAV header parse
             if (pcmBytes == null) {
                 val wavInfo = parseWavHeader(file)
                 if (wavInfo != null && wavInfo.bitsPerSample == 16 && wavInfo.channels == 1 && wavInfo.sampleRate == targetSampleRate) {
@@ -417,7 +384,6 @@ class RootCallAudioInjector(private val context: Context) {
                 val chunkSize = 4096
                 var offset = 0
                 while (offset < pcmBytes.size && !isStopped) {
-                    // Check if paused and wait until resumed or stopped
                     synchronized(pauseLock) {
                         while (isPaused && !isStopped) {
                             try {
@@ -472,7 +438,6 @@ class RootCallAudioInjector(private val context: Context) {
                 val header = ByteArray(44)
                 if (fis.read(header) < 44) return null
 
-                // Verify "RIFF" and "WAVE"
                 if (header[0] != 'R'.code.toByte() || header[1] != 'I'.code.toByte() ||
                     header[2] != 'F'.code.toByte() || header[3] != 'F'.code.toByte() ||
                     header[8] != 'W'.code.toByte() || header[9] != 'A'.code.toByte() ||
@@ -504,9 +469,6 @@ class RootCallAudioInjector(private val context: Context) {
 
     private suspend fun enableHardwareInCallMixers() {
         try {
-            // Enable Qualcomm/MediaTek hardware ALSA in-call music / uplink mixing if root is present
-            // Ensure Voice Tx is completely unmuted so the caller hears the injected stream,
-            // while physical microphone remains unrouted from caller uplink.
             val mixerCommands = """
                 tinymix 'Voice Tx Mute' 0 2>/dev/null || true
                 tinymix 'Voice Tx Device Mute' 0 2>/dev/null || true

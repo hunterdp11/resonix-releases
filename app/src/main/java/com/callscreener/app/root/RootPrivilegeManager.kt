@@ -12,8 +12,8 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 
 enum class AppOperationMode {
-    STANDARD,      // Non-rooted OEM dialer & standard telephony
-    ROOT_ENHANCED  // Root-powered ALSA mixer, direct audio HAL injection, and dual-side recording
+    STANDARD,
+    ROOT_ENHANCED
 }
 
 object RootPrivilegeManager {
@@ -70,7 +70,6 @@ object RootPrivilegeManager {
         isWarmingUp = true
         executeAsync {
             try {
-                // Defer root initialization slightly so the first UI frames render at 120Hz without thread contention
                 kotlinx.coroutines.delay(800)
                 val root = isRootAvailable()
                 if (root) {
@@ -107,12 +106,6 @@ object RootPrivilegeManager {
         }
     }
 
-    /**
-     * Determines whether the app is genuinely running with privileged system app status.
-     * True priv-app status requires the privileged permission CAPTURE_AUDIO_OUTPUT (which normal user apps
-     * cannot obtain even with 'pm grant') or the APK executing from /system/priv-app/.
-     * NOTE: We never check MODIFY_PHONE_STATE here as root grants it to regular apps as well.
-     */
     fun isPrivilegedApp(context: Context, forceRefresh: Boolean = false): Boolean {
         if (!forceRefresh) {
             cachedPrivilegedApp?.let { return it }
@@ -136,9 +129,6 @@ object RootPrivilegeManager {
         }
     }
 
-    /**
-     * Checks whether valid Magisk / KernelSU / APatch module files physically exist on disk.
-     */
     fun hasModuleFilesOnDisk(): Boolean {
         return try {
             val script = "((test -d /data/adb/modules/resonix && test -f /data/adb/modules/resonix/module.prop && ! test -f /data/adb/modules/resonix/disable && ! test -f /data/adb/modules/resonix/remove) || (test -d /data/adb/modules/call_screener && test -f /data/adb/modules/call_screener/module.prop && ! test -f /data/adb/modules/call_screener/disable && ! test -f /data/adb/modules/call_screener/remove)) && echo 'yes' || echo 'no'"
@@ -152,18 +142,10 @@ object RootPrivilegeManager {
         }
     }
 
-    /**
-     * Accurately determines if the module is installed and active for THIS application install.
-     * - If the app is already running as a true system priv-app, returns true.
-     * - If the module was installed in this app session and is waiting for reboot, returns true.
-     * - If the app was freshly reinstalled and running from /data/app, old module files on disk are
-     *   marked as needing re-install, returning false so the user is properly prompted to install.
-     */
     fun isMagiskModuleInstalled(context: Context? = null, forceRefresh: Boolean = false): Boolean {
         if (!forceRefresh) {
             cachedModuleInstalled?.let { return it }
         }
-        // If already active as system priv-app:
         if (context != null && isPrivilegedApp(context, forceRefresh)) {
             cachedModuleInstalled = true
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -173,7 +155,6 @@ object RootPrivilegeManager {
             return true
         }
 
-        // Check if pending reboot after installation in this app session
         if (context != null) {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val pendingReboot = prefs.getBoolean(KEY_MODULE_PENDING_REBOOT, false)
@@ -220,10 +201,6 @@ object RootPrivilegeManager {
         }
     }
 
-    /**
-     * Creates a seamless Magisk / KernelSU / APatch module that mounts Resonix into
-     * /system/priv-app with full system audio routing and capture permissions!
-     */
     suspend fun installSystemModule(context: Context): Pair<Boolean, String> = withContext(Dispatchers.IO) {
         val apkPath = context.packageCodePath
         val packageName = context.packageName
@@ -232,7 +209,7 @@ object RootPrivilegeManager {
             MODULE_DIR="/data/adb/modules/resonix"
             mkdir -p "${'$'}MODULE_DIR/system/priv-app/Resonix"
             mkdir -p "${'$'}MODULE_DIR/system/etc/permissions"
-            
+
             # 1. Copy active APK into system priv-app
             cp "$apkPath" "${'$'}MODULE_DIR/system/priv-app/Resonix/Resonix.apk"
             chmod 755 "${'$'}MODULE_DIR"
@@ -240,7 +217,7 @@ object RootPrivilegeManager {
             chmod 755 "${'$'}MODULE_DIR/system/priv-app"
             chmod 755 "${'$'}MODULE_DIR/system/priv-app/Resonix"
             chmod 644 "${'$'}MODULE_DIR/system/priv-app/Resonix/Resonix.apk"
-            
+
             # 2. Write privapp-permissions whitelist for Android system_server
             cat << 'EOF' > "${'$'}MODULE_DIR/system/etc/permissions/privapp-permissions-$packageName.xml"
 <?xml version="1.0" encoding="utf-8"?>
@@ -256,7 +233,7 @@ EOF
             chmod 755 "${'$'}MODULE_DIR/system/etc"
             chmod 755 "${'$'}MODULE_DIR/system/etc/permissions"
             chmod 644 "${'$'}MODULE_DIR/system/etc/permissions/privapp-permissions-$packageName.xml"
-            
+
             # 3. Create standard Magisk/KernelSU module metadata
             cat << 'EOF' > "${'$'}MODULE_DIR/module.prop"
 id=resonix
@@ -269,10 +246,10 @@ EOF
             chmod 644 "${'$'}MODULE_DIR/module.prop"
             rm -f "${'$'}MODULE_DIR/disable"
             rm -f "${'$'}MODULE_DIR/remove"
-            
+
             # 4. Set SELinux Contexts so system_server can read the priv-app without permission denial
             chcon -R u:object_r:system_file:s0 "${'$'}MODULE_DIR/system"
-            
+
             echo "Installed Magisk/KernelSU module successfully."
         """.trimIndent()
 

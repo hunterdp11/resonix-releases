@@ -7,7 +7,6 @@ data class QuickReply(
     val isHindi: Boolean = false
 ) {
     companion object {
-        // Industry-Ready Native Hindi & Hinglish Quick Replies
         val HINDI_REPLIES = listOf(
             QuickReply(
                 id = "hi_who",
@@ -59,7 +58,6 @@ data class QuickReply(
             )
         )
 
-        // Standard Professional English Quick Replies
         val ENGLISH_REPLIES = listOf(
             QuickReply(
                 id = "who",

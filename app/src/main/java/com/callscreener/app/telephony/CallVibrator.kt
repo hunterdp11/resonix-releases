@@ -10,14 +10,6 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.util.Log
 
-/**
- * Dedicated, resilient Call Vibration Controller.
- * Handles:
- *  1. Incoming call repeating ringing vibration with proper AudioAttributes/VibrationAttributes.
- *  2. Outgoing / incoming call connected (answered) haptic pulse.
- *  3. Call ended / disconnected haptic double-pulse.
- *  4. Keypad DTMF tactile clicks.
- */
 object CallVibrator {
 
     private const val TAG = "CallVibrator"
@@ -41,11 +33,6 @@ object CallVibrator {
         }
     }
 
-    /**
-     * Start repeating vibration for incoming call.
-     * Uses USAGE_NOTIFICATION_RINGTONE / USAGE_RINGTONE so Android's VibratorService
-     * does not suppress the vibration during phone calls.
-     */
     @Synchronized
     fun startRingingVibration(context: Context) {
         if (isRingingVibrating) {
@@ -67,7 +54,6 @@ object CallVibrator {
                 return
             }
 
-            // Pattern: 0ms delay, 1000ms buzz, 1000ms pause, repeating from index 0
             val pattern = longArrayOf(0, 1000, 1000)
             val amplitudes = intArrayOf(0, VibrationEffect.DEFAULT_AMPLITUDE, 0)
 
@@ -102,9 +88,6 @@ object CallVibrator {
         }
     }
 
-    /**
-     * Stop repeating ringing vibration immediately.
-     */
     @Synchronized
     fun stopRingingVibration() {
         try {
@@ -117,9 +100,6 @@ object CallVibrator {
         Log.d(TAG, "Ringing vibration stopped")
     }
 
-    /**
-     * Tactile vibration pulse when call is connected / answered.
-     */
     @Synchronized
     fun vibrateCallConnected(context: Context) {
         val now = System.currentTimeMillis()
@@ -154,9 +134,6 @@ object CallVibrator {
         }
     }
 
-    /**
-     * Tactile double-pulse vibration when call is ended / disconnected.
-     */
     @Synchronized
     fun vibrateCallEnded(context: Context) {
         val now = System.currentTimeMillis()
@@ -191,9 +168,6 @@ object CallVibrator {
         }
     }
 
-    /**
-     * Tactile click vibration for in-call / keypad taps.
-     */
     fun vibrateClick(context: Context) {
         try {
             val vibrator = getVibrator(context) ?: return

@@ -171,7 +171,6 @@ class CallScreeningInCallService : InCallService() {
             val callerNumber = extractPhoneNumber(call)
             val networkCallerName = call.details.callerDisplayName
 
-            // Prioritize contact name saved on the phone; only use carrier network/owner name for unsaved contacts
             val savedContactName = DialerRepository.lookupContactName(applicationContext, callerNumber)
             val resolvedCallerName = if (!savedContactName.isNullOrBlank()) {
                 savedContactName
@@ -193,7 +192,6 @@ class CallScreeningInCallService : InCallService() {
             wasCallAnswered = (call.state == Call.STATE_ACTIVE)
             isCurrentCallBlocked = false
 
-            // Intercept blocked contact immediately with Zero-Ring Instant Telecom Drop
             if (isIncoming && handleBlockedCallIfApplicable(call, callerNumber)) {
                 return
             }
@@ -221,7 +219,6 @@ class CallScreeningInCallService : InCallService() {
                     startActivity(intent)
                 }
             } else {
-                // Outgoing call or already active call -> Launch full screen
                 val intent = Intent(this, ScreeningCallActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 }
@@ -258,7 +255,6 @@ class CallScreeningInCallService : InCallService() {
             }
         }
 
-        // Automatic Bluetooth preference: If Bluetooth buds/headset is connected and Telecom defaulted to earpiece, switch to Bluetooth
         if (audioState != null && (audioState.supportedRouteMask and CallAudioState.ROUTE_BLUETOOTH) != 0) {
             if (audioState.route == CallAudioState.ROUTE_EARPIECE) {
                 Log.i(TAG, "Connected Bluetooth headset detected; auto-routing Telecom audio to ROUTE_BLUETOOTH")
@@ -317,11 +313,6 @@ class CallScreeningInCallService : InCallService() {
             currentInstance?.setSpeakerRoute(on)
         }
 
-        /**
-         * Isolates physical microphone from the caller during AI Voice Relay or Screening mode.
-         * Keeps Android OS Telecom layer UNMUTED so SpeechRecognizer and AudioRecord work at 100%,
-         * and ensures modem Voice Tx is UNMUTED so synthesized AI persona voice streams directly to the caller.
-         */
         fun isolateMicForAiRelay(isolate: Boolean) {
             isTelecomMuted = false
             try {

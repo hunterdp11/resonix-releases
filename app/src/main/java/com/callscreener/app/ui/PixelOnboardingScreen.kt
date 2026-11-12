@@ -92,16 +92,6 @@ import com.callscreener.app.root.RootPrivilegeManager
 import com.callscreener.app.ui.theme.GoogleSans
 import kotlinx.coroutines.launch
 
-/**
- * Pixel Expressive / Material You Onboarding Flow
- * Displayed exclusively on initial app installation before entering MainDashboard.
- *
- * Flow Steps:
- * 0: Feature Showcase & Overview (Acoustic DAF Jammer, Lossless Uplink Audio, Echo/DSP, Intelligent Screening)
- * 1: Architecture Selection (Root-Enhanced vs Standard Non-Root with Live Root Detection)
- * 2: Magisk / KernelSU Module Installation (Shown if Root selected; prompt to flash module & reboot)
- * 3: Default Phone App Registration & Finalize
- */
 @Composable
 fun PixelOnboardingScreen(
     isDefaultDialer: Boolean,
@@ -133,12 +123,11 @@ fun PixelOnboardingScreen(
         mutableStateOf(RootPrivilegeManager.isMagiskModuleInstalled(context))
     }
 
-    // Handle back button to traverse backwards in onboarding steps
     BackHandler(enabled = currentStep > 0) {
         if (currentStep > 0) {
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             if (currentStep == 3 && selectedMode == AppOperationMode.STANDARD) {
-                currentStep = 1 // Skip module step when going back from standard
+                currentStep = 1
             } else {
                 currentStep--
             }
@@ -158,7 +147,6 @@ fun PixelOnboardingScreen(
             .fillMaxSize()
             .background(Color(0xFF0F1218))
     ) {
-        // Ambient background glow
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -180,7 +168,6 @@ fun PixelOnboardingScreen(
                 .navigationBarsPadding()
                 .padding(horizontal = 20.dp, vertical = 12.dp)
         ) {
-            // Header: Top Stepper Indicator & Nav Controls
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -214,7 +201,6 @@ fun PixelOnboardingScreen(
                     Spacer(modifier = Modifier.size(36.dp))
                 }
 
-                // Step Indicator Pills
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -238,7 +224,6 @@ fun PixelOnboardingScreen(
                     }
                 }
 
-                // Skip / Direct Option
                 if (currentStep == 0) {
                     Box(
                         modifier = Modifier
@@ -262,7 +247,6 @@ fun PixelOnboardingScreen(
                 }
             }
 
-            // Animated Screen Content
             AnimatedContent(
                 targetState = currentStep,
                 modifier = Modifier
@@ -322,11 +306,9 @@ fun PixelOnboardingScreen(
                 }
             }
 
-            // Bottom Floating Action Button Area
             Spacer(modifier = Modifier.height(14.dp))
 
             if (currentStep == 3 && !isDefaultDialer) {
-                // When on Default App step and not yet set as default
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -390,9 +372,6 @@ fun PixelOnboardingScreen(
     }
 }
 
-/**
- * STEP 0: FEATURES SHOWCASE
- */
 @Composable
 private fun OnboardingFeaturesStep(monetColors: ColorScheme) {
     Column(
@@ -404,7 +383,6 @@ private fun OnboardingFeaturesStep(monetColors: ColorScheme) {
     ) {
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Hero Brand Icon
         Box(
             modifier = Modifier
                 .size(76.dp)
@@ -442,7 +420,6 @@ private fun OnboardingFeaturesStep(monetColors: ColorScheme) {
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // 4 Feature Pillars
         OnboardingFeatureCard(
             icon = Icons.Rounded.GraphicEq,
             iconTint = Color(0xFF2EAA55),
@@ -479,9 +456,6 @@ private fun OnboardingFeaturesStep(monetColors: ColorScheme) {
     }
 }
 
-/**
- * STEP 1: ARCHITECTURE SELECTION (ROOTED vs STANDARD)
- */
 @Composable
 private fun OnboardingArchitectureStep(
     selectedMode: AppOperationMode,
@@ -515,7 +489,6 @@ private fun OnboardingArchitectureStep(
             lineHeight = 18.sp
         )
 
-        // Live Root Detection Banner
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -563,7 +536,6 @@ private fun OnboardingArchitectureStep(
             }
         }
 
-        // Mode Card A: Root-Enhanced
         OnboardingModeOptionCard(
             title = "Root-Enhanced Mode",
             badge = "HARDWARE HAL INJECTION",
@@ -577,7 +549,6 @@ private fun OnboardingArchitectureStep(
             }
         )
 
-        // Mode Card B: Standard Non-Root
         OnboardingModeOptionCard(
             title = "Standard Mode",
             badge = "EVERYDAY DIALER • NO ROOT",
@@ -595,9 +566,6 @@ private fun OnboardingArchitectureStep(
     }
 }
 
-/**
- * STEP 2: MAGISK / KERNELSU MODULE SETUP (Root users only)
- */
 @Composable
 private fun OnboardingModuleStep(
     isModuleInstalled: Boolean,
@@ -633,7 +601,6 @@ private fun OnboardingModuleStep(
             lineHeight = 18.sp
         )
 
-        // Installation State Card
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -738,7 +705,6 @@ private fun OnboardingModuleStep(
             }
         }
 
-        // Switch to Standard Mode fallback
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -762,9 +728,6 @@ private fun OnboardingModuleStep(
     }
 }
 
-/**
- * STEP 3: DEDICATED DEFAULT PHONE APP SETUP
- */
 @Composable
 private fun OnboardingPermissionsStep(
     isDefaultDialer: Boolean,
@@ -782,7 +745,6 @@ private fun OnboardingPermissionsStep(
     ) {
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Large Hero Phone Icon with Gradient Glow
         Box(
             modifier = Modifier
                 .size(80.dp)
@@ -829,7 +791,6 @@ private fun OnboardingPermissionsStep(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // 3 Key Benefit Cards
         OnboardingPermissionBenefitRow(
             icon = Icons.Rounded.Security,
             title = "Live Call Screening",
@@ -859,7 +820,6 @@ private fun OnboardingPermissionsStep(
         )
 
         if (!isDefaultDialer) {
-            // Interactive Prompt Banner
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -892,7 +852,6 @@ private fun OnboardingPermissionsStep(
                 }
             }
         } else {
-            // Verified Active Card
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -981,9 +940,6 @@ private fun OnboardingPermissionBenefitRow(
     }
 }
 
-/**
- * REUSABLE COMPONENTS
- */
 @Composable
 private fun OnboardingFeatureCard(
     icon: ImageVector,
@@ -1085,7 +1041,6 @@ private fun OnboardingModeOptionCard(
                     fontFamily = GoogleSans
                 )
 
-                // Radio Indicator
                 Box(
                     modifier = Modifier
                         .size(22.dp)
@@ -1186,4 +1141,3 @@ private fun OnboardingPrimaryButton(
         }
     }
 }
-

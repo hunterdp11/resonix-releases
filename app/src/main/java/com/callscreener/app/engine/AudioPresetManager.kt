@@ -69,7 +69,6 @@ class AudioPresetManager(private val context: Context) {
             }
         }
 
-        // Migrate legacy custom presets if any, placing custom files at the top by default!
         val legacyCustomJson = prefs.getString(KEY_CUSTOM_PRESETS, null)
         val legacyCustom = mutableListOf<AudioPreset>()
         if (!legacyCustomJson.isNullOrBlank()) {
@@ -92,7 +91,6 @@ class AudioPresetManager(private val context: Context) {
             } catch (_: Exception) {}
         }
 
-        // Put custom presets FIRST so user can access them right away, followed by default presets!
         val initialList = legacyCustom + AudioPreset.DEFAULT_PRESETS
         _presets.value = initialList
         saveAllPresets(initialList)
@@ -182,7 +180,7 @@ class AudioPresetManager(private val context: Context) {
 
             val currentList = _presets.value.toMutableList()
             if (insertAtTop) {
-                currentList.add(0, preset) // Insert at the very top!
+                currentList.add(0, preset)
             } else {
                 currentList.add(preset)
             }
@@ -258,15 +256,11 @@ class AudioPresetManager(private val context: Context) {
     }
 
     fun resetPresetsToDefault() {
-        // Keep custom audio files at the top, restore defaults underneath
         val customFiles = _presets.value.filter { it.isAudioFile }
         val restored = customFiles + AudioPreset.DEFAULT_PRESETS
         saveAllPresets(restored)
     }
 
-    /**
-     * Preview preset locally through phone speaker.
-     */
     fun previewPreset(preset: AudioPreset, onComplete: () -> Unit = {}) {
         stopPreview()
         _isPaused.value = false

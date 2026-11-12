@@ -16,7 +16,7 @@ import java.net.Socket
 
 enum class NetworkHealthStatus {
     CONNECTED,
-    RESTRICTED_BY_SYSTEM, // Crossed earth icon! (Data usage restricted by OEM/MIUI or Data Saver)
+    RESTRICTED_BY_SYSTEM,
     NO_INTERNET,
     NO_NETWORK
 }
@@ -25,10 +25,6 @@ object NetworkHealthHelper {
 
     private const val TAG = "NetworkHealthHelper"
 
-    /**
-     * Checks if this app is allowed to open network connections.
-     * Accurately detects when MIUI/HyperOS or OEM Data Saver displays the crossed-earth icon.
-     */
     suspend fun checkNetworkHealth(context: Context): NetworkHealthStatus = withContext(Dispatchers.IO) {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
             ?: return@withContext NetworkHealthStatus.NO_NETWORK
@@ -49,7 +45,6 @@ object NetworkHealthHelper {
             }
         }
 
-        // Live TCP Socket probe to detect if OEM firewall (MIUI crossed earth) is blocking this app's sockets
         val isSocketAllowed = try {
             Socket().use { socket ->
                 socket.connect(InetSocketAddress("8.8.8.8", 53), 1500)
@@ -67,10 +62,6 @@ object NetworkHealthHelper {
         NetworkHealthStatus.CONNECTED
     }
 
-    /**
-     * Attempts to unblock network restrictions automatically using root privileges.
-     * Fixes MIUI custom AppOps 10021 (WIFI) and 10022 (DATA), netpolicy whitelist, and iptables miui_firewall.
-     */
     suspend fun unblockViaRoot(context: Context): Boolean = withContext(Dispatchers.IO) {
         if (!RootPrivilegeManager.isRootAvailable()) return@withContext false
         try {
@@ -104,12 +95,7 @@ object NetworkHealthHelper {
         }
     }
 
-    /**
-     * Opens the system App Details / Data Usage page so the user can easily
-     * enable Wi-Fi, Mobile Data, or unrestrict background data for CallScreener.
-     */
     fun openDataUsageSettings(context: Context) {
-        // 1. Try MIUI specific PermissionsEditorActivity
         try {
             val miuiIntent = Intent("miui.intent.action.APP_PERM_EDITOR").apply {
                 setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity")
@@ -120,7 +106,6 @@ object NetworkHealthHelper {
             return
         } catch (_: Exception) {}
 
-        // 2. Try standard Android App Details (On Xiaomi, ColorOS, Samsung, etc. this directly exposes 'Restrict data usage')
         try {
             val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                 data = Uri.parse("package:${context.packageName}")
@@ -130,7 +115,6 @@ object NetworkHealthHelper {
             return
         } catch (_: Exception) {}
 
-        // 3. Fallback to Ignore Background Data Restrictions
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 val intent = Intent(Settings.ACTION_IGNORE_BACKGROUND_DATA_RESTRICTIONS_SETTINGS).apply {

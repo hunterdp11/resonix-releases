@@ -99,7 +99,6 @@ class CallTranscriptionManager(private val context: Context) : RecognitionListen
     override fun onError(error: Int) {
         isListening = false
         Log.w(TAG, "SpeechRecognizer error: $error")
-        // Don't auto-restart immediately to prevent audio HAL storms
     }
 
     override fun onResults(results: Bundle?) {

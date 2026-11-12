@@ -81,21 +81,6 @@ import com.callscreener.app.ui.getPixelMonetDarkColorScheme
 import com.callscreener.app.ui.theme.GoogleSans
 import kotlin.math.roundToInt
 
-/**
- * Ultra-Premium Pixel Expressive / Material You Dynamic Call Header Banner.
- * Appears non-intrusively at the top of the display when a call arrives while the phone is actively in use.
- *
- * Design & Interaction Highlights:
- * - Dynamic Monet surface palette with refractive titanium/monet specular rim border.
- * - Hero caller avatar with gallery photo / Monet initials + living breathing acoustic sonar ring.
- * - Google Sans typography with formatted number and HD Voice badge.
- * - 3 Precision Action Buttons with organic liquid squash & stretch and corner radius morphing physics:
- *   1. Decline (Ruby Red with CallEnd icon)
- *   2. Screen with AI (Radiant Google Assistant gradient with shimmer sweep)
- *   3. Answer (Emerald Green with Call icon)
- * - Swipe-up gesture to silence ringer and smoothly dismiss.
- * - Tap anywhere on banner body or swipe down to seamlessly expand into full-screen call view.
- */
 @Composable
 fun DynamicIncomingCallCapsule(
     callerNumber: String,
@@ -145,13 +130,11 @@ fun DynamicIncomingCallCapsule(
         "Incoming Call"
     }
 
-    // Custom contact photo from gallery or null
     val customPhotoPath = remember(cleanNumber) {
         CallerProfileManager.getCustomPhotoPath(context, cleanNumber)
     }
     val contactBitmap = rememberContactPhotoBitmap(customPhotoPath)
 
-    // Ambient pulsing ring for ringing status
     val infiniteTransition = rememberInfiniteTransition(label = "capsulePulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1.0f,
@@ -226,7 +209,6 @@ fun DynamicIncomingCallCapsule(
                     onExpand()
                 }
         ) {
-            // Main Pixel Expressive Capsule Body
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -260,7 +242,6 @@ fun DynamicIncomingCallCapsule(
                     ),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Subtle Top Dynamic Island Handle Pill
                 Box(
                     modifier = Modifier
                         .padding(top = 6.dp)
@@ -276,12 +257,10 @@ fun DynamicIncomingCallCapsule(
                         .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // 1. LEFT SECTION: Caller Avatar Disc with Ambient Sonar Halo & Live Dot
                     Box(
                         modifier = Modifier.size(50.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Pulsing breathing ring behind avatar
                         Box(
                             modifier = Modifier
                                 .size(46.dp)
@@ -293,7 +272,6 @@ fun DynamicIncomingCallCapsule(
                                 )
                         )
 
-                        // Avatar Disc
                         Box(
                             modifier = Modifier
                                 .size(44.dp)
@@ -323,7 +301,6 @@ fun DynamicIncomingCallCapsule(
                             }
                         }
 
-                        // Bottom-right live pulsing green dot
                         Box(
                             modifier = Modifier
                                 .size(11.dp)
@@ -336,7 +313,6 @@ fun DynamicIncomingCallCapsule(
 
                     Spacer(modifier = Modifier.width(10.dp))
 
-                    // 2. CENTER SECTION: Caller ID (Name + Formatted Number + Badges)
                     Column(
                         modifier = Modifier
                             .weight(1f)
@@ -371,7 +347,6 @@ fun DynamicIncomingCallCapsule(
 
                             Spacer(modifier = Modifier.width(6.dp))
 
-                            // Pixel Expressive HD Voice pill badge
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(4.dp))
@@ -392,12 +367,10 @@ fun DynamicIncomingCallCapsule(
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    // 3. RIGHT SECTION: Precision Action Buttons with Liquid Morph Physics
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Action 1: Decline Call (Saturated Ruby Red with Morph)
                         CapsuleLiquidActionButton(
                             icon = Icons.Default.CallEnd,
                             contentDescription = "Decline",
@@ -414,7 +387,6 @@ fun DynamicIncomingCallCapsule(
                             }
                         )
 
-                        // Action 2: Screen with AI (Google Assistant Gradient Sparkle with Specular Shimmer)
                         CapsuleAssistantButton(
                             monetColors = monetColors,
                             glintPhase = assistantGlintPhase,
@@ -426,7 +398,6 @@ fun DynamicIncomingCallCapsule(
                             }
                         )
 
-                        // Action 3: Answer Call Directly (Saturated Emerald Green with Morph)
                         CapsuleLiquidActionButton(
                             icon = Icons.Default.Call,
                             contentDescription = "Answer",
@@ -449,9 +420,6 @@ fun DynamicIncomingCallCapsule(
     }
 }
 
-/**
- * Precision Action Button with Liquid Morph Squash & Stretch Physics
- */
 @Composable
 private fun CapsuleLiquidActionButton(
     icon: ImageVector,
@@ -516,7 +484,6 @@ private fun CapsuleLiquidActionButton(
             ),
         contentAlignment = Alignment.Center
     ) {
-        // Specular top glass glint
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -546,9 +513,6 @@ private fun CapsuleLiquidActionButton(
     }
 }
 
-/**
- * Assistant Action Button with Google Radiant Blue / Monet gradient and specular shimmer sweep
- */
 @Composable
 private fun CapsuleAssistantButton(
     monetColors: ColorScheme,
@@ -591,9 +555,9 @@ private fun CapsuleAssistantButton(
             .background(
                 Brush.linearGradient(
                     listOf(
-                        Color(0xFF4285F4), // Google Blue
+                        Color(0xFF4285F4),
                         monetColors.primary,
-                        Color(0xFF34A853)  // Google Green accent
+                        Color(0xFF34A853)
                     )
                 )
             )
@@ -614,7 +578,6 @@ private fun CapsuleAssistantButton(
             ),
         contentAlignment = Alignment.Center
     ) {
-        // Specular glint sweep canvas
         Canvas(modifier = Modifier.fillMaxSize()) {
             val glintW = this.size.width * 0.45f
             val currentX = (this.size.width + glintW * 2) * glintPhase - glintW
@@ -631,7 +594,6 @@ private fun CapsuleAssistantButton(
             )
         }
 
-        // Top glass glint
         Box(
             modifier = Modifier
                 .fillMaxWidth()

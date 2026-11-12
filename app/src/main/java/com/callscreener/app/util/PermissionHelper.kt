@@ -8,10 +8,6 @@ import androidx.core.content.ContextCompat
 
 object PermissionHelper {
 
-    /**
-     * Complete list of required runtime permissions for Resonix telephony,
-     * call screening, recording, contacts, and speech jammer features.
-     */
     val REQUIRED_PERMISSIONS: Array<String>
         get() = buildList {
             add(Manifest.permission.READ_CONTACTS)
@@ -26,31 +22,21 @@ object PermissionHelper {
             }
         }.toTypedArray()
 
-    /**
-     * Returns true if all essential permissions are granted.
-     */
     fun hasAllPermissions(context: Context): Boolean {
         return REQUIRED_PERMISSIONS.all { perm ->
             ContextCompat.checkSelfPermission(context, perm) == PackageManager.PERMISSION_GRANTED
         }
     }
 
-    /**
-     * Returns true if contacts and call log permissions are granted.
-     */
     fun hasContactsAndCallLogPermissions(context: Context): Boolean {
         val contactsGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
         val logsGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALL_LOG) == PackageManager.PERMISSION_GRANTED
         return contactsGranted && logsGranted
     }
 
-    /**
-     * Returns the array of permissions that have not been granted yet.
-     */
     fun getUngrantedPermissions(context: Context): Array<String> {
         return REQUIRED_PERMISSIONS.filter { perm ->
             ContextCompat.checkSelfPermission(context, perm) != PackageManager.PERMISSION_GRANTED
         }.toTypedArray()
     }
 }
-

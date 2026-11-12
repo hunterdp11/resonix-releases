@@ -63,7 +63,7 @@ object NotificationHelper {
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "Notifications for incoming calls"
-                setSound(null, null) // InCallService / RingtonePlayer manages ringtone directly
+                setSound(null, null)
                 enableVibration(true)
                 vibrationPattern = longArrayOf(0, 1000, 1000)
                 setShowBadge(true)
@@ -86,9 +86,6 @@ object NotificationHelper {
         }
     }
 
-    /**
-     * Post a rich, interactive Missed Call Notification with 1-tap Call Back, Message & Screen with AI.
-     */
     fun postMissedCallNotification(
         context: Context,
         callerNumber: String,
@@ -109,7 +106,6 @@ object NotificationHelper {
         val timeString = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date())
         val notificationId = ("missed_" + cleanNumber).hashCode()
 
-        // Content Intent: Open MainActivity directly to Recents Tab
         val mainIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("OPEN_TAB", "RECENTS")
@@ -121,7 +117,6 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Action 1: Call Back Intent
         val callBackIntent = Intent(Intent.ACTION_CALL).apply {
             data = Uri.fromParts("tel", cleanNumber, null)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
@@ -133,7 +128,6 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Action 2: Send SMS / Message Intent
         val smsIntent = Intent(Intent.ACTION_SENDTO).apply {
             data = Uri.parse("smsto:$cleanNumber")
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
@@ -145,7 +139,6 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Action 3: Screen With AI (Direct launch)
         val screenIntent = Intent(context, ScreeningCallActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("EXTRA_CALLER_NUMBER", cleanNumber)
@@ -171,7 +164,7 @@ object NotificationHelper {
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_MISSED_CALL)
-            .setColor(0xFFE22B45.toInt()) // Pixel Expressive Vibrant Ruby Red
+            .setColor(0xFFE22B45.toInt())
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .addAction(
                 R.drawable.ic_notification_call_back,
@@ -193,13 +186,9 @@ object NotificationHelper {
             val notificationManager = NotificationManagerCompat.from(context)
             notificationManager.notify(notificationId, builder.build())
         } catch (e: SecurityException) {
-            // Notification permission missing or revoked on Android 13+
         } catch (_: Exception) {}
     }
 
-    /**
-     * Clear missed call notification for a given number.
-     */
     fun cancelMissedCallNotification(context: Context, callerNumber: String) {
         val notificationId = ("missed_" + callerNumber.trim()).hashCode()
         try {
@@ -207,13 +196,6 @@ object NotificationHelper {
         } catch (_: Exception) {}
     }
 
-    /**
-     * Post an authentic Google Dialer / Android 12+ CallStyle Heads-Up Notification for Incoming Calls.
-     * When the user is actively using the phone (interactive & keyguard unlocked), Android OS automatically
-     * displays the minimal heads-up call banner at the top of the screen with Decline and Answer buttons.
-     * When the phone is locked or screen is off, fullScreenIntent presents the full-screen caller screen.
-     * ZERO special overlay permissions (SYSTEM_ALERT_WINDOW) required.
-     */
     fun postIncomingCallNotification(
         context: Context,
         callerNumber: String,
@@ -233,7 +215,6 @@ object NotificationHelper {
             DialerRepository.formatPhoneNumber(cleanNumber)
         }
 
-        // Tap opens live screening activity
         val contentIntent = Intent(context, ScreeningCallActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
@@ -244,7 +225,6 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Action: Decline Call
         val declineIntent = Intent(context, CallNotificationReceiver::class.java).apply {
             action = CallNotificationReceiver.ACTION_DECLINE
         }
@@ -255,7 +235,6 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Action: Answer Call Directly
         val answerIntent = Intent(context, CallNotificationReceiver::class.java).apply {
             action = CallNotificationReceiver.ACTION_ANSWER
         }
@@ -266,7 +245,6 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Action: Screen Call with AI
         val screenIntent = Intent(context, CallNotificationReceiver::class.java).apply {
             action = CallNotificationReceiver.ACTION_SCREEN
         }
@@ -286,7 +264,6 @@ object NotificationHelper {
             .setImportant(true)
             .build()
 
-        // Authentic Google Dialer & OEM CallStyle banner
         val callStyle = NotificationCompat.CallStyle.forIncomingCall(
             person,
             declinePendingIntent,
@@ -305,7 +282,7 @@ object NotificationHelper {
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setVibrate(longArrayOf(0, 1000, 1000))
-            .setColor(0xFF1A73E8.toInt()) // Google Blue
+            .setColor(0xFF1A73E8.toInt())
             .addAction(
                 R.drawable.ic_notification_screen_ai,
                 "Screen with AI",
@@ -318,9 +295,6 @@ object NotificationHelper {
         } catch (_: Exception) {}
     }
 
-    /**
-     * Post ongoing notification while call is connected/active so user can easily return to the call or end it.
-     */
     fun postOngoingCallNotification(
         context: Context,
         callerNumber: String,
@@ -392,21 +366,14 @@ object NotificationHelper {
         } catch (_: Exception) {}
     }
 
-    /**
-     * Cancel the active or incoming call notification.
-     */
     fun cancelCallNotification(context: Context) {
         try {
             NotificationManagerCompat.from(context).cancel(NOTIFICATION_ID_CALL)
         } catch (_: Exception) {}
     }
 
-    /**
-     * Resolves the contact profile photo for a phone number if available.
-     */
     private fun getContactPhotoBitmap(context: Context, number: String): Bitmap? {
         if (number.isBlank()) return null
-        // 1. User-customized avatar profile photo
         try {
             val customPath = CallerProfileManager.getCustomPhotoPath(context, number)
             if (!customPath.isNullOrBlank()) {
@@ -418,7 +385,6 @@ object NotificationHelper {
             }
         } catch (_: Throwable) {}
 
-        // 2. Android system contacts provider photo
         try {
             val uri = Uri.withAppendedPath(
                 android.provider.ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
@@ -444,10 +410,6 @@ object NotificationHelper {
         return null
     }
 
-    /**
-     * Creates a high-DPI (192x192) Pixel Expressive circular notification avatar bitmap.
-     * Incorporates custom contact photo if available, or renders a dynamic Material You gradient disc.
-     */
     private fun createAvatarBitmap(
         context: Context,
         callerNumber: String,
@@ -482,15 +444,15 @@ object NotificationHelper {
                 shader = if (isMissed) {
                     android.graphics.LinearGradient(
                         0f, 0f, 0f, size.toFloat(),
-                        0xFFE22B45.toInt(), // Saturated Pixel Ruby Red
-                        0xFFBA1A30.toInt(), // Deep Carmine
+                        0xFFE22B45.toInt(),
+                        0xFFBA1A30.toInt(),
                         android.graphics.Shader.TileMode.CLAMP
                     )
                 } else {
                     android.graphics.LinearGradient(
                         0f, 0f, 0f, size.toFloat(),
-                        0xFF1A73E8.toInt(), // Google Blue
-                        0xFF1557B0.toInt(), // Deep Monet Blue
+                        0xFF1A73E8.toInt(),
+                        0xFF1557B0.toInt(),
                         android.graphics.Shader.TileMode.CLAMP
                     )
                 }

@@ -3,15 +3,14 @@ package com.callscreener.app.model
 data class AudioPreset(
     val id: String,
     val title: String,
-    val textOrPath: String,            // Spoken phrase (TTS) or absolute file path to a recorded/imported WAV/MP3
-    val isAudioFile: Boolean = false,  // true if points to an actual audio file on storage
+    val textOrPath: String,
+    val isAudioFile: Boolean = false,
     val iconEmoji: String = "",
-    val category: String = "Quick Response", // "Quick Response", "Hindi / देसी", "Urgent", "Prank / Voice", "Custom"
+    val category: String = "Quick Response",
     val durationSeconds: Int = 0
 ) {
     companion object {
         val DEFAULT_PRESETS = listOf(
-            // Hindi / देसी Presets
             AudioPreset(
                 id = "preset_hi_who",
                 title = "नमस्ते, कौन बोल रहे हैं?",
@@ -118,7 +117,6 @@ data class AudioPreset(
                 category = "Quick Response"
             ),
 
-            // Hindi Funny & Prank Presets
             AudioPreset(
                 id = "preset_hi_funny_pizza",
                 title = "पिज़्ज़ा नहीं मिलता भाई! (Funny)",
@@ -155,7 +153,6 @@ data class AudioPreset(
                 category = "Prank / Voice"
             ),
 
-            // English Presets (Professional & Everyday)
             AudioPreset(
                 id = "preset_en_meeting",
                 title = "In a Meeting, Text Me",
@@ -192,7 +189,6 @@ data class AudioPreset(
                 category = "English"
             ),
 
-            // English Funny & Prank Presets
             AudioPreset(
                 id = "preset_en_funny_alien",
                 title = "Alien Hotline (Prank)",

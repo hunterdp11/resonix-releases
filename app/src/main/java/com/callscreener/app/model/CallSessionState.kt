@@ -2,17 +2,17 @@ package com.callscreener.app.model
 
 enum class CallStatus {
     IDLE,
-    RINGING,           // Incoming call ringing
-    DIALING,           // Outgoing call dialing
-    SCREENING_ACTIVE,  // Type-to-Speak & Screening active
-    USER_TALKING,      // Direct voice call
+    RINGING,
+    DIALING,
+    SCREENING_ACTIVE,
+    USER_TALKING,
     ON_HOLD,
     ENDED
 }
 
 enum class AudioCallMode {
-    AI_TYPE_SPEAK,     // AI Voice speaks typed words & greetings
-    DIRECT_MIC         // Direct real mic (natural voice)
+    AI_TYPE_SPEAK,
+    DIRECT_MIC
 }
 
 data class CallSessionState(

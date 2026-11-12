@@ -3,7 +3,6 @@ package com.callscreener.app.ui.theme
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
-// Authentic Apple OLED Pitch Black & Liquid Glass Palette
 val GlassBackground = Color(0xFF000000)
 val GlassBackgroundGradient = Brush.verticalGradient(
     listOf(
@@ -13,13 +12,12 @@ val GlassBackgroundGradient = Brush.verticalGradient(
     )
 )
 
-val GlassSurface = Color(0x18FFFFFF) // 9% translucent liquid
-val GlassSurfaceSubtle = Color(0x0CFFFFFF) // 5% translucent liquid
-val GlassSurfaceElevated = Color(0x26FFFFFF) // 15% elevated liquid
-val GlassBorder = Color(0x30FFFFFF) // 19% crisp specular edge
-val GlassBorderSubtle = Color(0x18FFFFFF) // 9% subtle border
+val GlassSurface = Color(0x18FFFFFF)
+val GlassSurfaceSubtle = Color(0x0CFFFFFF)
+val GlassSurfaceElevated = Color(0x26FFFFFF)
+val GlassBorder = Color(0x30FFFFFF)
+val GlassBorderSubtle = Color(0x18FFFFFF)
 
-// Apple iOS Accent Tones
 val AppleBlue = Color(0xFF0A84FF)
 val AppleIndigo = Color(0xFF5E5CE6)
 val ApplePurple = Color(0xFFBF5AF2)
@@ -29,18 +27,15 @@ val AppleYellow = Color(0xFFFFD60A)
 val AppleAmber = Color(0xFFFF9F0A)
 val AppleRed = Color(0xFFFF453A)
 
-// Typography & Hierarchy
 val TextPrimary = Color(0xFFFFFFFF)
-val TextSecondary = Color(0xCCEBEBF5) // 80% opacity white
-val TextTertiary = Color(0x80EBEBF5) // 50% opacity white
-val TextMuted = Color(0x48EBEBF5) // 28% opacity white
+val TextSecondary = Color(0xCCEBEBF5)
+val TextTertiary = Color(0x80EBEBF5)
+val TextMuted = Color(0x48EBEBF5)
 
-// Chat & Audio Bubbles
 val CallerGlassBubble = Color(0x28FFFFFF)
 val UserGlassBubble = Color(0xFF0A84FF)
 val SystemGlassBubble = Color(0x14FFFFFF)
 
-// Legacy compatibility aliases
 val BgDark = GlassBackground
 val SurfaceDark = Color(0xFF0B101C)
 val SurfaceVariantDark = Color(0x18FFFFFF)
@@ -50,10 +45,9 @@ val GreenAccept = AppleGreen
 val RedHangup = AppleRed
 val AmberScreening = AppleAmber
 
-// Specular Liquid Glass Materials (iOS / VisionOS Style)
 val LiquidGlassFill = Brush.linearGradient(
     listOf(
-        Color(0x28FFFFFF), // Specular light dispersion top-left
+        Color(0x28FFFFFF),
         Color(0x14182234),
         Color(0x0A0D1520)
     )
@@ -77,17 +71,17 @@ val LiquidGlassFillSubtle = Brush.linearGradient(
 
 val LiquidGlassDockFill = Brush.verticalGradient(
     listOf(
-        Color(0x32FFFFFF), // Crystalline top refraction
-        Color(0x10FFFFFF), // Ultra-clear optical transmission body (wallpaper shines through vividly)
-        Color(0x1CFFFFFF)  // Curved base caustic return
+        Color(0x32FFFFFF),
+        Color(0x10FFFFFF),
+        Color(0x1CFFFFFF)
     )
 )
 
 val LiquidGlassBorder = Brush.verticalGradient(
     listOf(
-        Color(0x85FFFFFF), // Razor-sharp specular light catching top beveled rim
-        Color(0x30FFFFFF), // Translucent light refraction on sides
-        Color(0x12FFFFFF)  // Subtle bottom edge
+        Color(0x85FFFFFF),
+        Color(0x30FFFFFF),
+        Color(0x12FFFFFF)
     )
 )
 
@@ -101,10 +95,10 @@ val LiquidGlassBorderSubtle = Brush.verticalGradient(
 
 val LiquidGlassDockBorder = Brush.verticalGradient(
     listOf(
-        Color(0xE5FFFFFF), // Razor-sharp brilliant specular top highlight
-        Color(0x50FFFFFF), // Translucent prismatic refraction on sides
-        Color(0x20FFFFFF), // Mid transmission
-        Color(0x65FFFFFF)  // Bottom caustic refraction return rim
+        Color(0xE5FFFFFF),
+        Color(0x50FFFFFF),
+        Color(0x20FFFFFF),
+        Color(0x65FFFFFF)
     )
 )
 

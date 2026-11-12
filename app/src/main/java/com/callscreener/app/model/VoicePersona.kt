@@ -21,14 +21,14 @@ data class VoicePersona(
     val tag: String,
     val code: String,
     val gender: VoiceGender,
-    val pitch: Float = 1.0f, // Natural human pitch for TTS (1.0f = realistic female, no chipmunk effect)
+    val pitch: Float = 1.0f,
     val speed: Float = 1.0f,
     val effectType: VoiceEffectType = VoiceEffectType.NONE,
     val description: String,
     val emoji: String = "",
-    val dspPitchFactor: Float = 1.30f, // Live mic pitch shift factor for DSP
-    val voiceKeywords: List<String> = emptyList(), // Specific neural voice matching keywords
-    val isPureGirlVoice: Boolean = false, // Tag for the ultra-realistic pure girl voices
+    val dspPitchFactor: Float = 1.30f,
+    val voiceKeywords: List<String> = emptyList(),
+    val isPureGirlVoice: Boolean = false,
     val languageCode: String = "en",
     val countryCode: String = "US",
     val localeTag: String = "en-US",
@@ -37,7 +37,6 @@ data class VoicePersona(
     val locale: Locale get() = Locale(languageCode, countryCode)
 
     companion object {
-        // Industry-Ready Neural Hindi & Hinglish Voice Models (भारतीय हिंदी आवाज़ें)
         val HINDI_PERSONAS = listOf(
             VoicePersona(
                 id = "hindi_pooja",
@@ -129,7 +128,6 @@ data class VoicePersona(
             )
         )
 
-        // Dedicated Ultra-Realistic "Pure Girl" Personas (English)
         val PURE_GIRL_PERSONAS = listOf(
             VoicePersona(
                 id = "girl_chloe",
@@ -184,7 +182,6 @@ data class VoicePersona(
             )
         )
 
-        // Classic Personas
         val CLASSIC_PERSONAS = listOf(
             VoicePersona(
                 id = "female_assistant",
@@ -285,6 +282,6 @@ data class VoicePersona(
 
         val ALL_PERSONAS = HINDI_PERSONAS + PURE_GIRL_PERSONAS + CLASSIC_PERSONAS
 
-        val DEFAULT = HINDI_PERSONAS[0] // Default is Pooja (Real Hindi Girl)
+        val DEFAULT = HINDI_PERSONAS[0]
     }
 }

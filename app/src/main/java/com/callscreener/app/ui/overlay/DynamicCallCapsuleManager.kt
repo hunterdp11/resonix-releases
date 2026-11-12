@@ -30,15 +30,11 @@ object DynamicCallCapsuleManager {
     private var currentLifecycleOwner: OverlayLifecycleOwner? = null
     private var windowManager: WindowManager? = null
 
-    /**
-     * Checks if overlay can be drawn. If rooted, automatically attempts to grant SYSTEM_ALERT_WINDOW.
-     */
     fun canShowCapsule(context: Context): Boolean {
         if (Settings.canDrawOverlays(context)) {
             return true
         }
 
-        // Auto-grant via root if privileged or rooted
         try {
             if (RootPrivilegeManager.isRootAvailableCached() || RootPrivilegeManager.isPrivilegedAppCached(context)) {
                 val grantCmd = "cmd appops set ${context.packageName} SYSTEM_ALERT_WINDOW allow; appops set ${context.packageName} SYSTEM_ALERT_WINDOW allow; pm grant ${context.packageName} android.permission.SYSTEM_ALERT_WINDOW"
@@ -56,10 +52,6 @@ object DynamicCallCapsuleManager {
         return Settings.canDrawOverlays(context)
     }
 
-    /**
-     * Prompts the user to grant Overlay Permission (Display over other apps)
-     * so the sleek dynamic call capsule header can display above any active app.
-     */
     fun requestOverlayPermission(context: Context) {
         try {
             val intent = Intent(
@@ -81,14 +73,8 @@ object DynamicCallCapsuleManager {
         }
     }
 
-    /**
-     * Returns true if the dynamic call capsule is currently visible on screen.
-     */
     fun isCapsuleShowing(): Boolean = currentView != null
 
-    /**
-     * Display the compact floating Dynamic Capsule header at the top of the screen.
-     */
     fun showCapsule(
         context: Context,
         callerNumber: String,
@@ -101,7 +87,6 @@ object DynamicCallCapsuleManager {
                     return@post
                 }
 
-                // If already showing, dismiss previous view cleanly first
                 dismissCapsule()
 
                 val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -210,9 +195,6 @@ object DynamicCallCapsuleManager {
         }
     }
 
-    /**
-     * Dismiss and remove the capsule from the screen.
-     */
     fun dismissCapsule() {
         mainHandler.post {
             try {

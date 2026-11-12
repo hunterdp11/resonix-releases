@@ -22,24 +22,16 @@ import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 
-/**
- * Caller Profile Model:
- * Holds custom caller metadata, screening persona, screening notes, bypass rules,
- * and custom gallery contact photo path.
- */
 data class CallerProfile(
     val category: String = "None",
-    val note: String = "",                  // Custom caller context or instructions (e.g. "Ask if project related")
-    val assignedPersona: String = "",       // Voice persona name (e.g. "Samantha", "Jarvis")
-    val autoScreen: Boolean = false,        // Always auto-screen before ringing
-    val isVipBypass: Boolean = false,       // VIP: Skip screening and ring directly
-    val customPhotoPath: String? = null,    // Persistent local photo file path from gallery
-    val customName: String? = null          // Saved custom contact name or display nickname
+    val note: String = "",
+    val assignedPersona: String = "",
+    val autoScreen: Boolean = false,
+    val isVipBypass: Boolean = false,
+    val customPhotoPath: String? = null,
+    val customName: String? = null
 )
 
-/**
- * Fast LRU bitmap cache for zero-jank 120Hz contact avatar rendering.
- */
 object ContactPhotoCache {
     private val memoryCache = object : LruCache<String, Bitmap>(80) {}
 
@@ -58,11 +50,6 @@ object ContactPhotoCache {
     }
 }
 
-/**
- * Composable helper with zero-jank in-memory caching to asynchronously load and cache contact bitmaps.
- * Supports both local cached file paths and Android content:// provider URIs.
- * Reactively updates when any caller photo changes via [CallerProfileManager.photoVersionState].
- */
 @Composable
 fun rememberContactPhotoBitmap(photoPath: String?, reloadKey: Any? = null): ImageBitmap? {
     val photoVersion = CallerProfileManager.photoVersionState.intValue
@@ -104,17 +91,10 @@ fun rememberContactPhotoBitmap(photoPath: String?, reloadKey: Any? = null): Imag
     return bitmap
 }
 
-/**
- * Thread-safe persistent manager for manual caller profiles and custom contact photos.
- */
 object CallerProfileManager {
     private const val TAG = "CallerProfileManager"
     private const val PREFS_NAME = "call_screener_caller_profiles"
 
-    /**
-     * Observable version state that increments whenever a custom contact photo is updated or removed.
-     * UI components observing this will instantly and reactively recompose.
-     */
     val photoVersionState = mutableIntStateOf(0)
 
     fun notifyPhotoChanged() {
@@ -155,13 +135,11 @@ object CallerProfileManager {
         if (raw != null) {
             return parseProfileJson(raw)
         }
-        // Fallback 1: exact digits
         val digits = number.filter { it.isDigit() }
         if (digits.isNotBlank() && digits != key) {
             val rawDigits = prefs.getString(digits, null)
             if (rawDigits != null) return parseProfileJson(rawDigits)
         }
-        // Fallback 2: tail 7 match across stored keys
         if (digits.length >= 7) {
             val tail7 = digits.takeLast(7)
             for (entryKey in prefs.all.keys) {
@@ -224,19 +202,16 @@ object CallerProfileManager {
             val file = File(profile!!.customPhotoPath!!)
             if (file.exists() && file.length() > 0) return file.absolutePath
         }
-        // Check default file under normalized key
         if (key.isNotBlank()) {
             val defaultFile = getContactPhotoFile(context, number)
             if (defaultFile.exists() && defaultFile.length() > 0) return defaultFile.absolutePath
         }
-        // Check default file under full digits
         val digits = number.filter { it.isDigit() }
         if (digits.isNotBlank() && digits != key) {
             val dir = File(context.filesDir, "contact_photos")
             val digitsFile = File(dir, "avatar_${digits}.jpg")
             if (digitsFile.exists() && digitsFile.length() > 0) return digitsFile.absolutePath
         }
-        // Check tail 7 across contact_photos folder
         if (digits.length >= 7) {
             val tail7 = digits.takeLast(7)
             val dir = File(context.filesDir, "contact_photos")
@@ -296,7 +271,6 @@ object CallerProfileManager {
                         scaled.compress(Bitmap.CompressFormat.JPEG, 92, out)
                     }
 
-                    // Update memory cache immediately
                     ContactPhotoCache.put(targetFile.absolutePath, scaled)
 
                     if (square != original && square != scaled) square.recycle()

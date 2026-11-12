@@ -88,10 +88,6 @@ import com.callscreener.app.ui.theme.GoogleSans
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/**
- * Pixel Expressive / Material 3 Speech Jammer & Echo Chamber Full-Screen Screen.
- * Fully replaces the old dialog, rendering as a dedicated, fully-covering subpage.
- */
 @Composable
 fun SpeechJammerDialog(
     engine: SpeechJammerEngine,
@@ -173,12 +169,11 @@ fun SpeechJammerDialog(
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
-                ) {} // Intercept all touches so settings beneath cannot be tapped
+                ) {}
         ) {
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // 1. Pixel Expressive Top App Bar
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -233,7 +228,6 @@ fun SpeechJammerDialog(
                             }
                         }
 
-                        // Engine Status Badge Pill
                         Box(
                             modifier = Modifier
                                 .clip(CircleShape)
@@ -265,7 +259,6 @@ fun SpeechJammerDialog(
                     }
                 }
 
-                // 2. Scrollable Body
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -274,7 +267,6 @@ fun SpeechJammerDialog(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     contentPadding = PaddingValues(top = 8.dp, bottom = 28.dp)
                 ) {
-                    // Explanatory Scientific Banner
                     item {
                         Box(
                             modifier = Modifier
@@ -322,7 +314,6 @@ fun SpeechJammerDialog(
                         }
                     }
 
-                    // Section 1: Master Enable Toggle Card
                     item {
                         Box(
                             modifier = Modifier
@@ -392,7 +383,6 @@ fun SpeechJammerDialog(
                         }
                     }
 
-                    // Section 2: Acoustic Disruption Mode (DAF vs Infinite Echo Chamber)
                     item {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Row(
@@ -518,7 +508,6 @@ fun SpeechJammerDialog(
                         }
                     }
 
-                    // Section 3: Reverb Decay Duration (when Infinite Echo Chamber selected)
                     if (selectedMode == JammerMode.INFINITE_ECHO) {
                         item {
                             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -597,7 +586,6 @@ fun SpeechJammerDialog(
                         }
                     }
 
-                    // Section 4: Cognitive Disruption Delay Selector
                     item {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Row(
@@ -678,7 +666,6 @@ fun SpeechJammerDialog(
                         }
                     }
 
-                    // Section 5: Disruption Intensity Gain
                     item {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Row(
@@ -747,7 +734,6 @@ fun SpeechJammerDialog(
                         }
                     }
 
-                    // Section 6: Automated Call Interception Rules
                     item {
                         Box(
                             modifier = Modifier
@@ -757,7 +743,6 @@ fun SpeechJammerDialog(
                                 .padding(16.dp)
                         ) {
                             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                                // 1. Auto-Jam Unknown Callers
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -803,7 +788,6 @@ fun SpeechJammerDialog(
                                         .background(colors.outlineVariant.copy(alpha = 0.25f))
                                 )
 
-                                // 2. Echo My Voice (Two-Way Echo)
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -859,7 +843,6 @@ fun SpeechJammerDialog(
                         }
                     }
 
-                    // Section 7: Interactive Live Audio Test Lab
                     item {
                         Box(
                             modifier = Modifier
@@ -916,7 +899,6 @@ fun SpeechJammerDialog(
                                     lineHeight = 16.sp
                                 )
 
-                                // Real-Time VU Meter Bar
                                 if (isTestRunning) {
                                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                         Row(
@@ -965,7 +947,6 @@ fun SpeechJammerDialog(
                                     }
                                 }
 
-                                // Test Start / Stop Button
                                 Button(
                                     onClick = {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -1016,7 +997,6 @@ fun SpeechJammerDialog(
                         }
                     }
 
-                    // Spacer for gesture navigation bar
                     item {
                         Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
                         Spacer(modifier = Modifier.height(16.dp))

@@ -15,4 +15,3 @@ data class ChatMessage(
     val timestamp: Long = System.currentTimeMillis(),
     val isSpeaking: Boolean = false
 )
-

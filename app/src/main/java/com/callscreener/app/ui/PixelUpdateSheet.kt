@@ -87,7 +87,6 @@ fun PixelExpressiveUpdateDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Header Badge: Pixel Expressive Style
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(100.dp))
@@ -116,7 +115,6 @@ fun PixelExpressiveUpdateDialog(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Version Title
                     Text(
                         text = "Resonix ${updateInfo.versionName}",
                         fontSize = 24.sp,
@@ -126,7 +124,6 @@ fun PixelExpressiveUpdateDialog(
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    // Pills Row (Size, Date)
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -146,7 +143,6 @@ fun PixelExpressiveUpdateDialog(
 
                     Spacer(modifier = Modifier.height(18.dp))
 
-                    // Changelog Section
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -174,7 +170,6 @@ fun PixelExpressiveUpdateDialog(
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // Download Progress or Action Area
                     when (downloadStatus) {
                         is DownloadStatus.Downloading -> {
                             val animProgress by animateFloatAsState(
@@ -336,7 +331,6 @@ fun PixelExpressiveUpdateDialog(
                         }
 
                         DownloadStatus.Idle -> {
-                            // Primary Call to Action
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -402,4 +396,3 @@ private fun UpdateMetaChip(
         )
     }
 }
-

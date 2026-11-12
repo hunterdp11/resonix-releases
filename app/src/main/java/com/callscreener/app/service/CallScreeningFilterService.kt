@@ -16,8 +16,6 @@ class CallScreeningFilterService : CallScreeningService() {
         if (blockedContact != null) {
             Log.i(TAG, "BLOCKED CALL $phoneNumber screened at CallScreening layer (Mode: ${blockManager.blockMode.name})")
 
-            // Silently allow call to route to InCallService with ringtone suppressed,
-            // so InCallService can answer in 0ms, kill carrier ringback, and inject stealth audio/drop!
             val response = CallResponse.Builder()
                 .setDisallowCall(false)
                 .setRejectCall(false)
@@ -29,7 +27,6 @@ class CallScreeningFilterService : CallScreeningService() {
             return
         }
 
-        // Build default screening response (allows call to ring, InCallService takes over)
         val response = CallResponse.Builder()
             .setDisallowCall(false)
             .setRejectCall(false)
@@ -44,4 +41,3 @@ class CallScreeningFilterService : CallScreeningService() {
         private const val TAG = "CallScreenFilter"
     }
 }
-
