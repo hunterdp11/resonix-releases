@@ -123,6 +123,14 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material3.Surface
+import androidx.compose.material3.IconButton
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.rounded.PersonAdd
+import androidx.compose.material.icons.rounded.SwapCalls
+import androidx.compose.material.icons.automirrored.rounded.CallMerge
 import com.callscreener.app.engine.AudioPresetManager
 import com.callscreener.app.engine.QuickReplyManager
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -229,6 +237,9 @@ fun ScreeningCallScreen(
     onToggleSpeechJammer: () -> Unit = {},
     onToggleEchoUserVoice: () -> Unit = {},
     onDtmfDigit: (Char) -> Unit = {},
+    onAddCall: (String) -> Unit = {},
+    onMergeCalls: () -> Unit = {},
+    onSwapCalls: () -> Unit = {},
     presetManager: AudioPresetManager? = null,
     quickReplyManager: QuickReplyManager? = null
 ) {
@@ -359,6 +370,15 @@ fun ScreeningCallScreen(
                         onScreenWithAi = onStartScreening,
                         onDtmfDigit = onDtmfDigit,
                         onHangUp = onHangUp,
+                        hasSecondaryCall = state.hasSecondaryCall,
+                        secondaryCallerNumber = state.secondaryCallerNumber,
+                        secondaryCallerName = state.secondaryCallerName,
+                        isConference = state.isConference,
+                        canMergeCalls = state.canMergeCalls,
+                        canSwapCalls = state.canSwapCalls,
+                        onAddCall = onAddCall,
+                        onMergeCalls = onMergeCalls,
+                        onSwapCalls = onSwapCalls,
                         monetColors = monetColors,
                         isEndCallHandledExternally = true
                     )
@@ -3968,6 +3988,15 @@ fun StandardInCallScreen(
     onScreenWithAi: () -> Unit,
     onDtmfDigit: (Char) -> Unit,
     onHangUp: () -> Unit,
+    hasSecondaryCall: Boolean = false,
+    secondaryCallerNumber: String? = null,
+    secondaryCallerName: String? = null,
+    isConference: Boolean = false,
+    canMergeCalls: Boolean = false,
+    canSwapCalls: Boolean = false,
+    onAddCall: (String) -> Unit = {},
+    onMergeCalls: () -> Unit = {},
+    onSwapCalls: () -> Unit = {},
     monetColors: ColorScheme = getPixelMonetDarkColorScheme(),
     isEndCallHandledExternally: Boolean = false
 ) {
@@ -3975,8 +4004,12 @@ fun StandardInCallScreen(
     val haptic = LocalHapticFeedback.current
     var showKeypad by remember { mutableStateOf(false) }
     var dtmfDigits by remember { mutableStateOf("") }
+    var showAddCallSheet by remember { mutableStateOf(false) }
+    var addCallNumber by remember { mutableStateOf("") }
 
-    val displayCallerTitle = if (!callerName.isNullOrBlank() && callerName != "Unknown Caller") {
+    val displayCallerTitle = if (isConference) {
+        "Conference Call"
+    } else if (!callerName.isNullOrBlank() && callerName != "Unknown Caller") {
         callerName
     } else if (isNumberHidden) {
         "Private Caller"
@@ -3986,7 +4019,9 @@ fun StandardInCallScreen(
         "Unknown Caller"
     }
 
-    val displayCallerNumber = if (isNumberHidden) {
+    val displayCallerNumber = if (isConference) {
+        "Active multi-party conference"
+    } else if (isNumberHidden) {
         "Private / Hidden Number"
     } else {
         callerNumber
@@ -4172,6 +4207,86 @@ fun StandardInCallScreen(
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold
                             )
+                        }
+                    }
+                }
+            }
+
+            AnimatedVisibility(
+                visible = hasSecondaryCall,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = monetColors.surfaceContainerHigh.copy(alpha = 0.90f),
+                    border = BorderStroke(1.dp, monetColors.outlineVariant.copy(alpha = 0.35f)),
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Pause,
+                                contentDescription = "On Hold",
+                                tint = VibrantAmber,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = "On Hold",
+                                    color = VibrantAmber,
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.5.sp
+                                )
+                                Text(
+                                    text = secondaryCallerName ?: secondaryCallerNumber ?: "Call 2",
+                                    color = monetColors.onSurface,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(monetColors.primary.copy(alpha = 0.15f))
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onSwapCalls()
+                                }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.SwapCalls,
+                                    contentDescription = "Swap",
+                                    tint = monetColors.primary,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Text(
+                                    text = "Swap",
+                                    color = monetColors.primary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }
@@ -4573,18 +4688,31 @@ fun StandardInCallScreen(
                         }
 
                         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                            InCallActionButton(
-                                icon = Icons.Rounded.RecordVoiceOver,
-                                label = "Screen Call",
-                                isActive = false,
-                                isAssistantSpecial = true,
-                                activeColor = monetColors.primary,
-                                monetColors = monetColors,
-                                onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    onScreenWithAi()
-                                }
-                            )
+                            if (canMergeCalls) {
+                                InCallActionButton(
+                                    icon = Icons.AutoMirrored.Rounded.CallMerge,
+                                    label = "Merge",
+                                    isActive = true,
+                                    activeColor = monetColors.primary,
+                                    monetColors = monetColors,
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onMergeCalls()
+                                    }
+                                )
+                            } else {
+                                InCallActionButton(
+                                    icon = Icons.Rounded.PersonAdd,
+                                    label = "Add call",
+                                    isActive = false,
+                                    activeColor = monetColors.primary,
+                                    monetColors = monetColors,
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        showAddCallSheet = true
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -4767,6 +4895,279 @@ fun StandardInCallScreen(
             }
 
             Spacer(modifier = Modifier.height(24.dp))
+        }
+
+        AnimatedVisibility(
+            visible = showAddCallSheet,
+            enter = fadeIn(tween(200)) + slideInVertically(tween(300)) { it },
+            exit = fadeOut(tween(150)) + slideOutVertically(tween(250)) { it }
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0x80000000))
+                    .clickable { showAddCallSheet = false },
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = false) {}
+                        .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                        .background(monetColors.surfaceContainerHigh)
+                        .border(
+                            1.dp,
+                            monetColors.outlineVariant.copy(alpha = 0.35f),
+                            RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+                        )
+                        .navigationBarsPadding()
+                        .padding(20.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp, 4.dp)
+                                .clip(CircleShape)
+                                .background(monetColors.outlineVariant)
+                                .align(Alignment.CenterHorizontally)
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.PersonAdd,
+                                    contentDescription = null,
+                                    tint = monetColors.primary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Text(
+                                    text = "Add Call",
+                                    color = monetColors.onSurface,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            IconButton(
+                                onClick = { showAddCallSheet = false },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Close,
+                                    contentDescription = "Close",
+                                    tint = monetColors.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = monetColors.surfaceContainerHighest,
+                            border = BorderStroke(1.dp, monetColors.outlineVariant.copy(alpha = 0.30f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (addCallNumber.isBlank()) "Type number or pick contact…" else addCallNumber,
+                                    color = if (addCallNumber.isBlank()) monetColors.onSurfaceVariant.copy(alpha = 0.6f) else monetColors.onSurface,
+                                    fontSize = if (addCallNumber.isBlank()) 14.sp else 18.sp,
+                                    fontFamily = if (addCallNumber.isBlank()) FontFamily.Default else FontFamily.Monospace,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                if (addCallNumber.isNotBlank()) {
+                                    IconButton(
+                                        onClick = { addCallNumber = addCallNumber.dropLast(1) },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.Backspace,
+                                            contentDescription = "Backspace",
+                                            tint = monetColors.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        val allContacts = remember { DialerRepository.getCachedContacts(context) }
+                        val filteredContacts = remember(addCallNumber, allContacts) {
+                            if (addCallNumber.isBlank()) {
+                                allContacts.take(4)
+                            } else {
+                                val clean = addCallNumber.filter { it.isDigit() }
+                                allContacts.filter { c ->
+                                    c.name.contains(addCallNumber, ignoreCase = true) ||
+                                    c.number.replace(Regex("[^0-9]"), "").contains(clean)
+                                }.take(4)
+                            }
+                        }
+
+                        if (filteredContacts.isNotEmpty()) {
+                            Text(
+                                text = "Contacts",
+                                color = monetColors.onSurfaceVariant,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            LazyColumn(
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.heightIn(max = 140.dp)
+                            ) {
+                                items(filteredContacts) { contact ->
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = monetColors.surfaceContainerHighest.copy(alpha = 0.60f),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                onAddCall(contact.number)
+                                                showAddCallSheet = false
+                                            }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(32.dp)
+                                                    .clip(CircleShape)
+                                                    .background(monetColors.primary.copy(alpha = 0.20f)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = contact.name.take(1).uppercase(),
+                                                    color = monetColors.primary,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 13.sp
+                                                )
+                                            }
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = contact.name,
+                                                    color = monetColors.onSurface,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                                Text(
+                                                    text = contact.number,
+                                                    color = monetColors.onSurfaceVariant,
+                                                    fontSize = 11.sp
+                                                )
+                                            }
+                                            Icon(
+                                                imageVector = Icons.Filled.Call,
+                                                contentDescription = "Call",
+                                                tint = Color(0xFF34A853),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        val padRows = remember {
+                            listOf(
+                                listOf("1", "2", "3"),
+                                listOf("4", "5", "6"),
+                                listOf("7", "8", "9"),
+                                listOf("*", "0", "#")
+                            )
+                        }
+
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            padRows.forEach { row ->
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    row.forEach { digit ->
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = monetColors.surfaceContainerHighest,
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(42.dp)
+                                                .clickable {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    addCallNumber += digit
+                                                }
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text(
+                                                    text = digit,
+                                                    color = monetColors.onSurface,
+                                                    fontSize = 16.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Button(
+                            onClick = {
+                                if (addCallNumber.isNotBlank()) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onAddCall(addCallNumber)
+                                    showAddCallSheet = false
+                                }
+                            },
+                            enabled = addCallNumber.isNotBlank(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF34A853),
+                                contentColor = Color.White
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Call,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(
+                                    text = "Call & Put Active on Hold",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

@@ -44,6 +44,12 @@ class CallSessionManager private constructor(private val appContext: Context) {
 
     private val scope = CoroutineScope(Dispatchers.Default + Job())
     private var activeTelecomCall: Call? = null
+    private var secondaryTelecomCall: Call? = null
+
+    fun hasActiveCall(): Boolean = activeTelecomCall != null &&
+            _sessionState.value.status != CallStatus.ENDED &&
+            _sessionState.value.status != CallStatus.IDLE
+
     val currentCall: Call?
         get() = activeTelecomCall
     private var durationJob: Job? = null
@@ -114,6 +120,9 @@ class CallSessionManager private constructor(private val appContext: Context) {
                 stopLocalAudioMonitor()
                 aiVoiceRelayManager.isTtsCurrentlySpeaking = false
                 delay(300L)
+                if (!_sessionState.value.isSimulated) {
+                    setSpeakerphone(_sessionState.value.isSpeakerOn)
+                }
                 val inCall = _sessionState.value.status == CallStatus.SCREENING_ACTIVE ||
                              _sessionState.value.status == CallStatus.USER_TALKING ||
                              _sessionState.value.status == CallStatus.DIALING
@@ -154,7 +163,12 @@ class CallSessionManager private constructor(private val appContext: Context) {
     }
 
     fun attachCall(call: Call, callerNumber: String, callerName: String?, isIncoming: Boolean) {
+        if (hasActiveCall() && activeTelecomCall != call) {
+            attachSecondaryCall(call, callerNumber, callerName)
+            return
+        }
         activeTelecomCall = call
+        secondaryTelecomCall = null
         speechManager.isSimulatorMode = false
         val initialStatus = if (isIncoming) CallStatus.RINGING else CallStatus.DIALING
         val prev = _sessionState.value
@@ -185,6 +199,117 @@ class CallSessionManager private constructor(private val appContext: Context) {
                 operationMode = prev.operationMode,
                 currentPersona = prev.currentPersona
             )
+        }
+    }
+
+    private fun attachSecondaryCall(call: Call, callerNumber: String, callerName: String?) {
+        secondaryTelecomCall = activeTelecomCall
+        try {
+            secondaryTelecomCall?.hold()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed putting primary call on hold", e)
+        }
+
+        val secNumber = _sessionState.value.callerNumber
+        val secName = _sessionState.value.callerName
+
+        activeTelecomCall = call
+        val savedContactName = DialerRepository.lookupContactName(appContext, callerNumber)
+        val resolvedCallerName = if (!savedContactName.isNullOrBlank()) {
+            savedContactName
+        } else if (!callerName.isNullOrBlank()) {
+            callerName
+        } else {
+            null
+        }
+
+        _sessionState.update {
+            it.copy(
+                callerNumber = callerNumber,
+                callerName = resolvedCallerName,
+                status = CallStatus.DIALING,
+                hasSecondaryCall = true,
+                secondaryCallerNumber = secNumber,
+                secondaryCallerName = secName,
+                canMergeCalls = true,
+                canSwapCalls = true
+            )
+        }
+        Log.i(TAG, "Attached secondary call ($callerNumber), previous call placed on hold ($secNumber)")
+    }
+
+    fun addCall(number: String) {
+        val cleanNumber = number.filter { it.isDigit() || it == '+' || it == '*' || it == '#' }
+        if (cleanNumber.isBlank()) return
+        try {
+            activeTelecomCall?.hold()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error holding active call before addCall", e)
+        }
+        DialerRepository.placeCall(appContext, cleanNumber)
+    }
+
+    fun mergeConferenceCalls() {
+        try {
+            val call1 = activeTelecomCall
+            val call2 = secondaryTelecomCall
+            if (call1 != null && call2 != null) {
+                call1.conference(call2)
+                _sessionState.update {
+                    it.copy(
+                        isConference = true,
+                        canMergeCalls = false,
+                        canSwapCalls = false
+                    )
+                }
+                Log.i(TAG, "Merged calls into conference: $call1 and $call2")
+                return
+            }
+
+            val confList = call1?.conferenceableCalls
+            if (call1 != null && !confList.isNullOrEmpty()) {
+                call1.conference(confList[0])
+                _sessionState.update {
+                    it.copy(
+                        isConference = true,
+                        canMergeCalls = false,
+                        canSwapCalls = false
+                    )
+                }
+                Log.i(TAG, "Merged conference via conferenceableCalls")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error merging conference calls", e)
+        }
+    }
+
+    fun swapCalls() {
+        val primary = activeTelecomCall ?: return
+        val secondary = secondaryTelecomCall ?: return
+        try {
+            primary.hold()
+            secondary.unhold()
+
+            activeTelecomCall = secondary
+            secondaryTelecomCall = primary
+
+            val curNumber = _sessionState.value.callerNumber
+            val curName = _sessionState.value.callerName
+            val secNumber = _sessionState.value.secondaryCallerNumber ?: ""
+            val secName = _sessionState.value.secondaryCallerName
+
+            _sessionState.update {
+                it.copy(
+                    callerNumber = secNumber,
+                    callerName = secName,
+                    secondaryCallerNumber = curNumber,
+                    secondaryCallerName = curName,
+                    status = CallStatus.USER_TALKING
+                )
+            }
+            Log.i(TAG, "Swapped calls successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error swapping calls", e)
         }
     }
 
@@ -534,10 +659,8 @@ class CallSessionManager private constructor(private val appContext: Context) {
         val isPrivileged = (RootPrivilegeManager.isPrivilegedApp(appContext) || RootPrivilegeManager.isRootAvailable()) && !isSim
         speechManager.useDirectRootInjection = isPrivileged
 
-        if (!isPrivileged && !isSim) {
-            setSpeakerphone(true)
-        } else if (!isSim) {
-            setSpeakerphone(false)
+        if (!isSim) {
+            setSpeakerphone(_sessionState.value.isSpeakerOn)
         }
 
         addMessage(MessageSender.USER_TTS, text)
@@ -557,7 +680,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
             localMonitorPlayer = MediaPlayer().apply {
                 setAudioAttributes(
                     AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                         .build()
                 )
@@ -649,6 +772,9 @@ class CallSessionManager private constructor(private val appContext: Context) {
                             stopLocalAudioMonitor()
                             Log.i(TAG, "Audio preset injected into call: $success")
                             onCustomAudioFinished(preset.id)
+                            if (!_sessionState.value.isSimulated) {
+                                setSpeakerphone(_sessionState.value.isSpeakerOn)
+                            }
                             if (_sessionState.value.status == CallStatus.SCREENING_ACTIVE &&
                                 _sessionState.value.audioCallMode == AudioCallMode.AI_TYPE_SPEAK &&
                                 _sessionState.value.isAutoRelayEnabled
@@ -722,6 +848,9 @@ class CallSessionManager private constructor(private val appContext: Context) {
                 )
             }
             customAudioJob = null
+            if (!_sessionState.value.isSimulated) {
+                setSpeakerphone(_sessionState.value.isSpeakerOn)
+            }
         }
     }
 
@@ -774,13 +903,54 @@ class CallSessionManager private constructor(private val appContext: Context) {
 
         try {
             activeTelecomCall?.disconnect()
+            secondaryTelecomCall?.disconnect()
         } catch (e: Exception) {
-            Log.e(TAG, "Error disconnecting call", e)
+            Log.e(TAG, "Error disconnecting calls", e)
         }
         activeTelecomCall = null
+        secondaryTelecomCall = null
 
         _sessionState.update { it.copy(status = CallStatus.ENDED) }
         resetAudioMode()
+    }
+
+    fun onCallRemoved(call: Call) {
+        if (call == secondaryTelecomCall) {
+            secondaryTelecomCall = null
+            _sessionState.update {
+                it.copy(
+                    hasSecondaryCall = false,
+                    secondaryCallerNumber = null,
+                    secondaryCallerName = null,
+                    canMergeCalls = false,
+                    canSwapCalls = false
+                )
+            }
+            Log.i(TAG, "Secondary call disconnected; maintaining active primary call")
+        } else if (call == activeTelecomCall && secondaryTelecomCall != null) {
+            activeTelecomCall = secondaryTelecomCall
+            secondaryTelecomCall = null
+            val promotedNum = _sessionState.value.secondaryCallerNumber ?: ""
+            val promotedName = _sessionState.value.secondaryCallerName
+            try {
+                activeTelecomCall?.unhold()
+            } catch (_: Exception) {}
+            _sessionState.update {
+                it.copy(
+                    callerNumber = promotedNum,
+                    callerName = promotedName,
+                    hasSecondaryCall = false,
+                    secondaryCallerNumber = null,
+                    secondaryCallerName = null,
+                    canMergeCalls = false,
+                    canSwapCalls = false,
+                    status = CallStatus.USER_TALKING
+                )
+            }
+            Log.i(TAG, "Primary call disconnected; unheld and promoted secondary call to active")
+        } else {
+            onCallEnded()
+        }
     }
 
     fun onCallEnded() {
@@ -804,6 +974,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
         stopLocalAudioMonitor()
         durationJob?.cancel()
         activeTelecomCall = null
+        secondaryTelecomCall = null
         _sessionState.update { it.copy(status = CallStatus.ENDED) }
         resetAudioMode()
     }

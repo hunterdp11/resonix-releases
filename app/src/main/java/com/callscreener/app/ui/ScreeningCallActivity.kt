@@ -39,6 +39,17 @@ class ScreeningCallActivity : ComponentActivity() {
         sessionManager = CallSessionManager.getInstance(this)
         com.callscreener.app.ui.overlay.DynamicCallCapsuleManager.dismissCapsule()
 
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                val state = sessionManager.sessionState.value
+                if (state.status != CallStatus.ENDED) {
+                    moveTaskToBack(true)
+                } else {
+                    finish()
+                }
+            }
+        })
+
         configureLockScreenDisplay()
 
         if (Build.VERSION.SDK_INT >= 34) {
@@ -85,6 +96,9 @@ class ScreeningCallActivity : ComponentActivity() {
                     onToggleSpeechJammer = { sessionManager.toggleSpeechJammer() },
                     onToggleEchoUserVoice = { sessionManager.toggleEchoUserVoice() },
                     onDtmfDigit = { digit -> sessionManager.playDtmf(digit) },
+                    onAddCall = { number -> sessionManager.addCall(number) },
+                    onMergeCalls = { sessionManager.mergeConferenceCalls() },
+                    onSwapCalls = { sessionManager.swapCalls() },
                     presetManager = sessionManager.presetManager,
                     quickReplyManager = sessionManager.quickReplyManager
                 )

@@ -34,8 +34,8 @@ object NotificationHelper {
     const val CHANNEL_INCOMING_CALLS = "incoming_calls_channel"
     private const val CHANNEL_INCOMING_NAME = "Incoming Calls"
 
-    const val CHANNEL_ONGOING_CALLS = "ongoing_calls_channel"
-    private const val CHANNEL_ONGOING_NAME = "Active Call"
+    const val CHANNEL_ONGOING_CALLS = "ongoing_calls_channel_v2"
+    private const val CHANNEL_ONGOING_NAME = "Ongoing Calls"
 
     const val NOTIFICATION_ID_CALL = 20001
 
@@ -43,6 +43,10 @@ object NotificationHelper {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
                 ?: return
+
+            try {
+                notificationManager.deleteNotificationChannel("ongoing_calls_channel")
+            } catch (_: Exception) {}
 
             val missedCallChannel = NotificationChannel(
                 CHANNEL_MISSED_CALLS,
@@ -73,12 +77,12 @@ object NotificationHelper {
             val ongoingCallChannel = NotificationChannel(
                 CHANNEL_ONGOING_CALLS,
                 CHANNEL_ONGOING_NAME,
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "Status of active in-progress phone call"
+                description = "Status of active in-progress or outgoing phone call"
                 setSound(null, null)
                 enableVibration(false)
-                setShowBadge(false)
+                setShowBadge(true)
                 lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
             }
 
@@ -299,7 +303,9 @@ object NotificationHelper {
         context: Context,
         callerNumber: String,
         callerName: String? = null,
-        isScreening: Boolean = false
+        isScreening: Boolean = false,
+        statusOverride: String? = null,
+        baseTimeMillis: Long? = null
     ) {
         initNotificationChannels(context)
 
@@ -333,7 +339,7 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val statusText = if (isScreening) "AI Screening in progress..." else "Active phone call"
+        val statusText = statusOverride ?: if (isScreening) "AI Screening in progress..." else "Active phone call"
         val largeAvatar = createAvatarBitmap(context, cleanNumber, displayName, isMissed = false)
 
         val person = Person.Builder()
@@ -355,10 +361,23 @@ object NotificationHelper {
             .setStyle(callStyle)
             .setContentIntent(contentPendingIntent)
             .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setColor(0xFF1A73E8.toInt())
+            .addAction(
+                R.drawable.ic_notification_hangup,
+                "Hang Up",
+                hangupPendingIntent
+            )
+
+        if (baseTimeMillis != null && baseTimeMillis > 0L) {
+            builder.setWhen(baseTimeMillis)
+            builder.setUsesChronometer(true)
+        } else {
+            builder.setShowWhen(false)
+        }
 
         try {
             val notificationManager = NotificationManagerCompat.from(context)

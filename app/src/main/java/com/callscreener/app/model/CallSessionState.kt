@@ -45,5 +45,11 @@ data class CallSessionState(
     val playingAudioPresetTitle: String? = null,
     val isAudioPresetPlaying: Boolean = false,
     val isAudioPresetPaused: Boolean = false,
-    val isSimulated: Boolean = false
+    val isSimulated: Boolean = false,
+    val hasSecondaryCall: Boolean = false,
+    val secondaryCallerNumber: String? = null,
+    val secondaryCallerName: String? = null,
+    val isConference: Boolean = false,
+    val canMergeCalls: Boolean = false,
+    val canSwapCalls: Boolean = false
 )

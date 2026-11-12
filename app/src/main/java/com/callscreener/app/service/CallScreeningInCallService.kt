@@ -102,8 +102,23 @@ class CallScreeningInCallService : InCallService() {
                         }
                         CallSessionManager.getInstance(applicationContext).onCallRinging()
                     }
-                    Call.STATE_DIALING, Call.STATE_CONNECTING -> {
+                    Call.STATE_DIALING -> {
                         CallSessionManager.getInstance(applicationContext).onCallDialing()
+                        NotificationHelper.postOngoingCallNotification(
+                            context = applicationContext,
+                            callerNumber = currentCallerNumber ?: extractPhoneNumber(call),
+                            callerName = currentCallerName,
+                            statusOverride = "Calling..."
+                        )
+                    }
+                    Call.STATE_CONNECTING -> {
+                        CallSessionManager.getInstance(applicationContext).onCallDialing()
+                        NotificationHelper.postOngoingCallNotification(
+                            context = applicationContext,
+                            callerNumber = currentCallerNumber ?: extractPhoneNumber(call),
+                            callerName = currentCallerName,
+                            statusOverride = "Connecting..."
+                        )
                     }
                     Call.STATE_ACTIVE -> {
                         Log.i(TAG, "Call is now ACTIVE")
@@ -114,13 +129,24 @@ class CallScreeningInCallService : InCallService() {
                         currentCallerNumber?.let {
                             NotificationHelper.cancelMissedCallNotification(applicationContext, it)
                         }
+                        val isScreening = CallSessionManager.getInstance(applicationContext).sessionState.value.status == CallStatus.SCREENING_ACTIVE
                         NotificationHelper.postOngoingCallNotification(
-                            applicationContext,
-                            currentCallerNumber ?: extractPhoneNumber(call),
-                            currentCallerName,
-                            CallSessionManager.getInstance(applicationContext).sessionState.value.status == CallStatus.SCREENING_ACTIVE
+                            context = applicationContext,
+                            callerNumber = currentCallerNumber ?: extractPhoneNumber(call),
+                            callerName = currentCallerName,
+                            isScreening = isScreening,
+                            baseTimeMillis = System.currentTimeMillis()
                         )
                         CallSessionManager.getInstance(applicationContext).onCallConnected()
+                    }
+                    Call.STATE_HOLDING -> {
+                        Log.i(TAG, "Call on HOLD")
+                        NotificationHelper.postOngoingCallNotification(
+                            context = applicationContext,
+                            callerNumber = currentCallerNumber ?: extractPhoneNumber(call),
+                            callerName = currentCallerName,
+                            statusOverride = "Call on hold"
+                        )
                     }
                     Call.STATE_DISCONNECTED -> {
                         Log.i(TAG, "Call DISCONNECTED")
@@ -219,6 +245,12 @@ class CallScreeningInCallService : InCallService() {
                     startActivity(intent)
                 }
             } else {
+                NotificationHelper.postOngoingCallNotification(
+                    context = applicationContext,
+                    callerNumber = callerNumber,
+                    callerName = resolvedCallerName,
+                    statusOverride = if (call.state == Call.STATE_ACTIVE) "Active phone call" else "Calling..."
+                )
                 val intent = Intent(this, ScreeningCallActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 }
@@ -233,11 +265,13 @@ class CallScreeningInCallService : InCallService() {
         try {
             super.onCallRemoved(call)
             Log.d(TAG, "onCallRemoved: $call")
-            RingtonePlayer.stop(applicationContext)
-            DynamicCallCapsuleManager.dismissCapsule()
-            NotificationHelper.cancelCallNotification(applicationContext)
             call.unregisterCallback(callback)
-            CallSessionManager.getInstance(applicationContext).onCallEnded()
+            CallSessionManager.getInstance(applicationContext).onCallRemoved(call)
+            if (calls.isEmpty()) {
+                RingtonePlayer.stop(applicationContext)
+                DynamicCallCapsuleManager.dismissCapsule()
+                NotificationHelper.cancelCallNotification(applicationContext)
+            }
         } catch (t: Throwable) {
             Log.e(TAG, "Exception inside onCallRemoved", t)
         }
