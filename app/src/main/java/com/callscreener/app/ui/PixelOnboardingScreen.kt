@@ -47,6 +47,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Contacts
 import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Headphones
@@ -364,7 +365,7 @@ fun PixelOnboardingScreen(
                         0 -> "Get Started"
                         1 -> if (selectedMode == AppOperationMode.ROOT_ENHANCED) "Proceed to Root Setup" else "Continue to Default App"
                         2 -> if (isModuleInstalled) "Reboot Later & Continue" else "Skip to Next Step"
-                        else -> "Start Using CallScreener"
+                        else -> "Start Using Resonix"
                     },
                     monetColors = monetColors,
                     onClick = {
@@ -850,6 +851,13 @@ private fun OnboardingPermissionsStep(
             monetColors = monetColors
         )
 
+        OnboardingPermissionBenefitRow(
+            icon = Icons.Rounded.Contacts,
+            title = "Contacts, Recents & Mic",
+            description = "Resonix accesses contacts, logs, and microphone so caller ID, recents, and live voice calls work instantly.",
+            monetColors = monetColors
+        )
+
         if (!isDefaultDialer) {
             // Interactive Prompt Banner
             Box(
@@ -875,7 +883,7 @@ private fun OnboardingPermissionsStep(
                         modifier = Modifier.size(20.dp)
                     )
                     Text(
-                        text = "Tap below to open the Android system default app dialog and select CallScreener.",
+                        text = "Tap below to open the Android system default app dialog and select Resonix.",
                         fontSize = 12.sp,
                         color = Color.White,
                         fontFamily = GoogleSans,
@@ -904,7 +912,7 @@ private fun OnboardingPermissionsStep(
                         modifier = Modifier.size(22.dp)
                     )
                     Text(
-                        text = "Verified: CallScreener is active as your default phone app.",
+                        text = "Verified: Resonix is active as your default phone app.",
                         fontSize = 12.5.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White,

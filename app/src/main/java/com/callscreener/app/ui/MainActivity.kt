@@ -180,6 +180,7 @@ import com.callscreener.app.ota.OtaUpdateManager
 import com.callscreener.app.ota.UpdateCheckStatus
 import com.callscreener.app.ota.DownloadStatus
 import com.callscreener.app.ota.UpdateInfo
+import com.callscreener.app.util.PermissionHelper
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -281,6 +282,7 @@ import kotlinx.coroutines.withContext
 class MainActivity : ComponentActivity() {
 
     private val isDefaultDialerState = mutableStateOf(false)
+    private val resumeCounter = mutableIntStateOf(0)
 
     private val roleRequestLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -315,9 +317,26 @@ class MainActivity : ComponentActivity() {
         setContent {
             CallScreenerTheme {
                 val isDefault by isDefaultDialerState
+                val resumeCount by resumeCounter
                 val onboardingPrefs = remember { getSharedPreferences("call_screener_onboarding", Context.MODE_PRIVATE) }
                 var isOnboardingCompleted by remember {
                     mutableStateOf(onboardingPrefs.getBoolean("onboarding_completed", false))
+                }
+                val coroutineScope = rememberCoroutineScope()
+
+                // Immediate permission launcher invoked right after welcome screens/setup
+                val onboardingPermissionLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestMultiplePermissions()
+                ) { _ ->
+                    // Prewarm and load contacts & call logs immediately so dashboard lands pre-loaded
+                    coroutineScope.launch(Dispatchers.IO) {
+                        val freshContacts = DialerRepository.loadContacts(this@MainActivity)
+                        DialerRepository.loadCallLogs(this@MainActivity, freshContacts)
+                        withContext(Dispatchers.Main) {
+                            onboardingPrefs.edit().putBoolean("onboarding_completed", true).apply()
+                            isOnboardingCompleted = true
+                        }
+                    }
                 }
 
                 if (!isOnboardingCompleted) {
@@ -325,13 +344,26 @@ class MainActivity : ComponentActivity() {
                         isDefaultDialer = isDefault,
                         onRequestDefaultDialer = { requestDefaultDialer() },
                         onComplete = {
-                            isOnboardingCompleted = true
+                            val ungranted = PermissionHelper.getUngrantedPermissions(this@MainActivity)
+                            if (ungranted.isNotEmpty()) {
+                                onboardingPermissionLauncher.launch(ungranted)
+                            } else {
+                                coroutineScope.launch(Dispatchers.IO) {
+                                    val freshContacts = DialerRepository.loadContacts(this@MainActivity)
+                                    DialerRepository.loadCallLogs(this@MainActivity, freshContacts)
+                                    withContext(Dispatchers.Main) {
+                                        onboardingPrefs.edit().putBoolean("onboarding_completed", true).apply()
+                                        isOnboardingCompleted = true
+                                    }
+                                }
+                            }
                         }
                     )
                 } else {
                     MainDashboard(
                         isDefaultDialer = isDefault,
                         onRequestDefaultDialer = { requestDefaultDialer() },
+                        resumeTrigger = resumeCount,
                         onStartSimulation = {
                             val sessionManager = CallSessionManager.getInstance(this)
                             sessionManager.startSimulatedCall()
@@ -346,6 +378,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         isDefaultDialerState.value = isDefaultDialer()
+        resumeCounter.intValue++
     }
 
     private fun isDefaultDialer(): Boolean {
@@ -458,6 +491,7 @@ private fun getCallDateGroup(timestamp: Long): String {
 fun MainDashboard(
     isDefaultDialer: Boolean,
     onRequestDefaultDialer: () -> Unit,
+    resumeTrigger: Int = 0,
     onStartSimulation: () -> Unit
 ) {
     val context = LocalContext.current
@@ -496,7 +530,7 @@ fun MainDashboard(
     var callLogs by remember { mutableStateOf(DialerRepository.getCachedCallLogs(context)) }
     var isLoadingContacts by remember { mutableStateOf(false) }
     var isLoadingLogs by remember { mutableStateOf(false) }
-    var permissionTrigger by remember { mutableStateOf(0) }
+    var permissionTrigger by remember { mutableIntStateOf(0) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -504,32 +538,26 @@ fun MainDashboard(
         permissionTrigger++
     }
 
+    // Verify all permissions on dashboard entry
     LaunchedEffect(Unit) {
-        val requiredPerms = mutableListOf(
-            Manifest.permission.RECORD_AUDIO,
-            Manifest.permission.READ_PHONE_STATE,
-            Manifest.permission.READ_CONTACTS,
-            Manifest.permission.READ_CALL_LOG,
-            Manifest.permission.CALL_PHONE
-        )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            requiredPerms.add(Manifest.permission.POST_NOTIFICATIONS)
-        }
-        val allGranted = requiredPerms.all {
-            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-        }
-        if (!allGranted) {
-            permissionLauncher.launch(requiredPerms.toTypedArray())
+        val ungranted = PermissionHelper.getUngrantedPermissions(context)
+        if (ungranted.isNotEmpty()) {
+            permissionLauncher.launch(ungranted)
+        } else {
+            permissionTrigger++
         }
     }
 
-    LaunchedEffect(permissionTrigger) {
-        withContext(Dispatchers.IO) {
-            val freshContacts = DialerRepository.loadContacts(context)
-            val freshLogs = DialerRepository.loadCallLogs(context, freshContacts)
-            withContext(Dispatchers.Main) {
-                contacts = freshContacts
-                callLogs = freshLogs
+    // Refresh contacts and call logs whenever permissions are updated or app is resumed
+    LaunchedEffect(permissionTrigger, resumeTrigger) {
+        if (PermissionHelper.hasContactsAndCallLogPermissions(context)) {
+            withContext(Dispatchers.IO) {
+                val freshContacts = DialerRepository.loadContacts(context)
+                val freshLogs = DialerRepository.loadCallLogs(context, freshContacts)
+                withContext(Dispatchers.Main) {
+                    contacts = freshContacts
+                    callLogs = freshLogs
+                }
             }
         }
     }
