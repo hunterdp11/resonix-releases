@@ -30,7 +30,6 @@
 }
 -keep class androidx.compose.runtime.** { *; }
 
--keep class dev.chrisbanes.haze.** { *; }
 
 -keepclassmembers class kotlinx.coroutines.** { *; }
 

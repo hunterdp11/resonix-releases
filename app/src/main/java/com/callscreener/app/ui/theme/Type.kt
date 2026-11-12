@@ -9,11 +9,11 @@ import androidx.compose.ui.unit.sp
 import com.callscreener.app.R
 
 val AppFont = FontFamily(
-    Font(R.font.google_sans_regular, FontWeight.Normal),
-    Font(R.font.google_sans_medium, FontWeight.Medium),
-    Font(R.font.google_sans_medium, FontWeight.SemiBold),
-    Font(R.font.google_sans_bold, FontWeight.Bold),
-    Font(R.font.google_sans_bold, FontWeight.ExtraBold)
+    Font(R.font.app_font_regular, FontWeight.Normal),
+    Font(R.font.app_font_medium, FontWeight.Medium),
+    Font(R.font.app_font_medium, FontWeight.SemiBold),
+    Font(R.font.app_font_bold, FontWeight.Bold),
+    Font(R.font.app_font_bold, FontWeight.ExtraBold)
 )
 
 val AppFontFamily = AppFont

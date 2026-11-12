@@ -173,10 +173,6 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeStyle
-import dev.chrisbanes.haze.haze
-import dev.chrisbanes.haze.hazeChild
 import com.callscreener.app.data.T9Helper
 import com.callscreener.app.ota.OtaUpdateManager
 import com.callscreener.app.ota.UpdateCheckStatus

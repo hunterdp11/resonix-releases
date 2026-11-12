@@ -17,6 +17,8 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        resourceConfigurations += listOf("en")
     }
 
     buildTypes {
@@ -77,8 +79,6 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-
-    implementation("dev.chrisbanes.haze:haze:0.6.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
