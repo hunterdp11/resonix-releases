@@ -3703,7 +3703,7 @@ fun ContactsScreen(
                 },
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
-                    .padding(top = statusBarTop + 130.dp, bottom = 120.dp, end = 4.dp)
+                    .padding(top = statusBarTop + 126.dp, bottom = 120.dp, end = 2.dp)
             )
         }
 
@@ -3889,28 +3889,68 @@ fun ContactsAlphabetScroller(
 ) {
     val density = LocalDensity.current
 
-    Box(
+    val animatedY by animateFloatAsState(
+        targetValue = indicatorY,
+        animationSpec = spring(
+            dampingRatio = 0.72f,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "scrollerBubbleY"
+    )
+
+    val railBgAlpha by animateFloatAsState(
+        targetValue = if (isScrubbing) 0.35f else 0.0f,
+        animationSpec = tween(180),
+        label = "railBgAlpha"
+    )
+
+    val railBorderAlpha by animateFloatAsState(
+        targetValue = if (isScrubbing) 0.22f else 0.0f,
+        animationSpec = tween(180),
+        label = "railBorderAlpha"
+    )
+
+    BoxWithConstraints(
         modifier = modifier.fillMaxHeight(),
         contentAlignment = Alignment.CenterEnd
     ) {
-        if (isScrubbing && selectedLetter != null) {
+        val totalHeightPx = with(density) { maxHeight.toPx() }
+
+        AnimatedVisibility(
+            visible = isScrubbing && selectedLetter != null,
+            enter = fadeIn(tween(110)) + scaleIn(spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow)),
+            exit = fadeOut(tween(140)) + scaleOut(spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMedium)),
+            modifier = Modifier.align(Alignment.TopEnd)
+        ) {
             val bubbleOffsetY = with(density) {
-                (indicatorY - 24.dp.toPx()).coerceAtLeast(0f).toDp()
+                (animatedY - 24.dp.toPx()).coerceIn(0f, (totalHeightPx - 48.dp.toPx()).coerceAtLeast(0f)).toDp()
             }
             Box(
                 modifier = Modifier
-                    .offset(x = (-38).dp, y = bubbleOffsetY)
-                    .size(46.dp)
-                    .shadow(elevation = 8.dp, shape = CircleShape, spotColor = Color(0x60000000))
+                    .offset(x = (-44).dp, y = bubbleOffsetY)
+                    .size(48.dp)
+                    .shadow(
+                        elevation = 12.dp,
+                        shape = CircleShape,
+                        spotColor = monetColors.primary.copy(alpha = 0.45f),
+                        ambientColor = Color.Black.copy(alpha = 0.35f)
+                    )
                     .clip(CircleShape)
-                    .background(monetColors.primary)
-                    .border(1.dp, monetColors.onPrimary.copy(alpha = 0.25f), CircleShape),
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                monetColors.primary,
+                                monetColors.primary.copy(alpha = 0.90f)
+                            )
+                        )
+                    )
+                    .border(1.2.dp, monetColors.onPrimary.copy(alpha = 0.35f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = selectedLetter,
+                    text = selectedLetter ?: "",
                     color = monetColors.onPrimary,
-                    fontSize = 20.sp,
+                    fontSize = 22.sp,
                     fontFamily = AppFont,
                     fontWeight = FontWeight.Bold
                 )
@@ -3920,20 +3960,21 @@ fun ContactsAlphabetScroller(
         Box(
             modifier = Modifier
                 .fillMaxHeight()
-                .clip(RoundedCornerShape(12.dp))
-                .background(monetColors.surfaceContainerHigh.copy(alpha = 0.55f))
-                .border(0.6.dp, monetColors.outlineVariant.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                .padding(vertical = 4.dp, horizontal = 2.dp)
+                .width(26.dp)
+                .clip(RoundedCornerShape(100.dp))
+                .background(monetColors.surfaceContainerHighest.copy(alpha = railBgAlpha))
+                .border(0.8.dp, monetColors.outlineVariant.copy(alpha = railBorderAlpha), RoundedCornerShape(100.dp))
+                .padding(vertical = 6.dp)
                 .pointerInput(alphabet) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
                         onScrubStart()
-                        val totalH = size.height
+                        val totalH = size.height.toFloat()
                         fun handlePosition(y: Float) {
                             val fraction = (y / totalH).coerceIn(0f, 0.999f)
                             val idx = (fraction * alphabet.size).toInt().coerceIn(0, alphabet.lastIndex)
                             val letter = alphabet[idx]
-                            onLetterHover(letter, y)
+                            onLetterHover(letter, y.coerceIn(0f, totalH))
                         }
                         handlePosition(down.position.y)
                         try {
@@ -3951,30 +3992,37 @@ fun ContactsAlphabetScroller(
                             onScrubEnd()
                         }
                     }
-                }
+                },
+            contentAlignment = Alignment.Center
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .width(18.dp),
+                    .fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 alphabet.forEach { letter ->
                     val hasContacts = letter in activeLetters
                     val isSelected = letter == selectedLetter
+                    val scale by animateFloatAsState(
+                        targetValue = if (isSelected) 1.35f else 1.0f,
+                        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium),
+                        label = "letterScale"
+                    )
                     Text(
                         text = letter,
                         color = when {
                             isSelected -> monetColors.primary
                             hasContacts -> monetColors.onSurface.copy(alpha = 0.85f)
-                            else -> monetColors.onSurfaceVariant.copy(alpha = 0.25f)
+                            else -> monetColors.onSurfaceVariant.copy(alpha = 0.22f)
                         },
-                        fontSize = 9.sp,
+                        fontSize = if (isSelected) 9.5.sp else 8.5.sp,
                         fontFamily = AppFont,
-                        fontWeight = if (isSelected || hasContacts) FontWeight.Bold else FontWeight.Normal,
-                        lineHeight = 10.sp,
-                        textAlign = TextAlign.Center
+                        fontWeight = if (isSelected) FontWeight.ExtraBold else if (hasContacts) FontWeight.SemiBold else FontWeight.Normal,
+                        lineHeight = 9.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.scale(scale)
                     )
                 }
             }
