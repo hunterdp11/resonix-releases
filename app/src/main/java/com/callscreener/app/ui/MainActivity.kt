@@ -9710,20 +9710,12 @@ fun SavedRecordingsDialog(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .shadow(
-                                            elevation = if (isPlaying) 6.dp else 2.dp,
-                                            shape = RoundedCornerShape(22.dp),
-                                            spotColor = if (isPlaying) monetColors.primary.copy(alpha = 0.25f) else Color.Transparent
-                                        )
                                         .clip(RoundedCornerShape(22.dp))
-                                        .background(
-                                            if (isPlaying) monetColors.primaryContainer.copy(alpha = 0.32f)
-                                            else monetColors.surfaceContainerHigh
-                                        )
+                                        .background(monetColors.surfaceContainerHigh)
                                         .border(
-                                            width = if (isPlaying) 1.5.dp else 0.8.dp,
-                                            color = if (isPlaying) monetColors.primary.copy(alpha = 0.70f)
-                                            else monetColors.outlineVariant.copy(alpha = 0.35f),
+                                            width = 1.dp,
+                                            color = if (isPlaying) monetColors.primary.copy(alpha = 0.65f)
+                                            else monetColors.outlineVariant.copy(alpha = 0.30f),
                                             shape = RoundedCornerShape(22.dp)
                                         )
                                         .padding(16.dp)
@@ -9739,10 +9731,7 @@ fun SavedRecordingsDialog(
                                                 modifier = Modifier
                                                     .size(42.dp)
                                                     .clip(CircleShape)
-                                                    .background(
-                                                        if (isPlaying) monetColors.primary.copy(alpha = 0.25f)
-                                                        else monetColors.surfaceContainerHighest
-                                                    ),
+                                                    .background(monetColors.surfaceContainerHighest),
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Icon(
@@ -9794,10 +9783,7 @@ fun SavedRecordingsDialog(
                                                 Box(
                                                     modifier = Modifier
                                                         .clip(RoundedCornerShape(8.dp))
-                                                        .background(
-                                                            if (isPlaying) monetColors.primary.copy(alpha = 0.20f)
-                                                            else monetColors.surfaceContainerHighest
-                                                        )
+                                                        .background(monetColors.surfaceContainerHighest)
                                                         .padding(horizontal = 8.dp, vertical = 3.dp)
                                                 ) {
                                                     Text(

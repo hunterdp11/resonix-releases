@@ -6,15 +6,14 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.NoiseSuppressor
 import android.os.Environment
 import android.os.Process
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.callscreener.app.root.RootPrivilegeManager
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -34,7 +33,6 @@ data class RecordedCallItem(
 
 class CallRecordingEngine(private val context: Context) {
 
-    private val scope = CoroutineScope(Dispatchers.IO + Job())
     private var audioRecord: AudioRecord? = null
     private var recordingThread: Thread? = null
     private var currentFile: File? = null
@@ -68,9 +66,7 @@ class CallRecordingEngine(private val context: Context) {
             val wavFile = File(recordingsDir, "Call_${cleanNumber}_${timestamp}.wav")
             currentFile = wavFile
 
-            scope.launch {
-                unmaskRootAudioMixer(isSimulated)
-            }
+            unmaskRootAudioMixer(isSimulated)
 
             val pair = createAudioRecord()
             if (pair == null) {
@@ -96,6 +92,21 @@ class CallRecordingEngine(private val context: Context) {
                 audioRecord = null
                 return null
             }
+
+            try {
+                if (AcousticEchoCanceler.isAvailable()) {
+                    val aec = AcousticEchoCanceler.create(record.audioSessionId)
+                    aec?.enabled = false
+                    Log.i(TAG, "Disabled AcousticEchoCanceler on session ${record.audioSessionId}")
+                }
+            } catch (_: Exception) {}
+
+            try {
+                if (NoiseSuppressor.isAvailable()) {
+                    val ns = NoiseSuppressor.create(record.audioSessionId)
+                    ns?.enabled = false
+                }
+            } catch (_: Exception) {}
 
             isRecording = true
             Log.i(TAG, "Call recording started -> ${wavFile.name} at ${rate}Hz")
@@ -152,16 +163,17 @@ class CallRecordingEngine(private val context: Context) {
         val sampleRates = intArrayOf(44100, 16000, 48000, 8000)
         val audioSources = if (RootPrivilegeManager.isRootAvailable()) {
             intArrayOf(
-                MediaRecorder.AudioSource.VOICE_COMMUNICATION,
-                MediaRecorder.AudioSource.MIC,
+                MediaRecorder.AudioSource.VOICE_CALL,
+                MediaRecorder.AudioSource.VOICE_DOWNLINK,
                 MediaRecorder.AudioSource.VOICE_RECOGNITION,
-                MediaRecorder.AudioSource.VOICE_CALL
+                MediaRecorder.AudioSource.VOICE_COMMUNICATION,
+                MediaRecorder.AudioSource.MIC
             )
         } else {
             intArrayOf(
+                MediaRecorder.AudioSource.VOICE_RECOGNITION,
                 MediaRecorder.AudioSource.VOICE_COMMUNICATION,
-                MediaRecorder.AudioSource.MIC,
-                MediaRecorder.AudioSource.VOICE_RECOGNITION
+                MediaRecorder.AudioSource.MIC
             )
         }
 
@@ -207,18 +219,48 @@ class CallRecordingEngine(private val context: Context) {
         return null
     }
 
-    private suspend fun unmaskRootAudioMixer(isSimulated: Boolean) {
+    private fun unmaskRootAudioMixer(isSimulated: Boolean) {
         if (isSimulated) return
-        if (!RootPrivilegeManager.isRootAvailable() && !RootPrivilegeManager.isPrivilegedApp(context)) return
+        if (RootPrivilegeManager.isRootAvailable()) {
+            try {
+                val pkg = context.packageName
+                val script = """
+                    pm grant $pkg android.permission.CAPTURE_AUDIO_OUTPUT 2>/dev/null
+                    pm grant $pkg android.permission.MODIFY_AUDIO_ROUTING 2>/dev/null
+                    pm grant $pkg android.permission.CONTROL_INCALL_EXPERIENCE 2>/dev/null
+                    pm grant $pkg android.permission.RECORD_AUDIO 2>/dev/null
+                    cmd appops set $pkg RECORD_AUDIO allow 2>/dev/null
+                    cmd appops set $pkg CAPTURE_AUDIO_OUTPUT allow 2>/dev/null
+                    cmd appops set $pkg 27 allow 2>/dev/null
+                    setprop vendor.audio.voicecall.rec true 2>/dev/null
+                    setprop persist.vendor.audio.voicecall.rec true 2>/dev/null
+                    setprop persist.audio.voicecall.rec true 2>/dev/null
+                    setprop vendor.audio.record.multiple.mic true 2>/dev/null
+                    setprop persist.vendor.audio.fluence.voicecall false 2>/dev/null
+                    service call audio 7 s16 "audio_capability=call_recording=1" 2>/dev/null
+                    service call audio 7 s16 "incall_music_enable=true" 2>/dev/null
+                    service call audio 7 s16 "voice_call_recording=1" 2>/dev/null
+                """.trimIndent()
+                val process = Runtime.getRuntime().exec("su")
+                process.outputStream.bufferedWriter().use { writer ->
+                    writer.write(script)
+                    writer.newLine()
+                    writer.write("exit\n")
+                    writer.flush()
+                }
+                process.waitFor()
+                Log.i(TAG, "Root dual-side audio mixer and privileges configured via SU")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed applying root audio script", e)
+            }
+        }
 
         try {
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
             audioManager?.setParameters("audio_capability=call_recording=1")
             audioManager?.setParameters("incall_music_enable=true")
-            Log.i(TAG, "Root dual-side audio parameters configured")
-        } catch (e: Exception) {
-            Log.w(TAG, "Could not set root audio recording parameters", e)
-        }
+            audioManager?.setParameters("voice_call_recording=1")
+        } catch (_: Exception) {}
     }
 
     private fun writeWavAudioStream(wavFile: File, record: AudioRecord, sampleRate: Int) {
