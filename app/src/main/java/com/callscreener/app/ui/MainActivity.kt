@@ -43,11 +43,13 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
@@ -1289,44 +1291,86 @@ fun RecentsScreen(
         map
     }
 
-    val filteredLogs = remember(callLogs, selectedFilter, searchQuery) {
-        val base = if (selectedFilter == "Missed") {
-            callLogs.filter { it.type == CallLog.Calls.MISSED_TYPE || it.type == CallLog.Calls.REJECTED_TYPE }
-        } else {
-            callLogs
-        }
-        if (searchQuery.isBlank()) {
-            base
-        } else {
-            val q = searchQuery.trim().lowercase()
-            val digits = q.filter { it.isDigit() || it == '+' }
-            base.filter { log ->
-                val nameMatch = log.name?.lowercase()?.contains(q) == true
-                val numMatch = log.number.lowercase().contains(q) ||
-                        (digits.isNotEmpty() && log.number.filter { it.isDigit() || it == '+' }.contains(digits))
-                nameMatch || numMatch
-            }
-        }
-    }
-
-    val groupedLogs = remember(filteredLogs) {
-        filteredLogs.groupBy { getCallDateGroup(it.timestamp) }
-    }
-
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     Box(modifier = Modifier.fillMaxSize()) {
-        if (isLoading && callLogs.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    text = "Loading call history...",
-                    color = monetColors.onSurfaceVariant,
-                    fontSize = 15.sp,
-                    fontFamily = GoogleSans,
-                    fontWeight = FontWeight.Medium
-                )
+        AnimatedContent(
+            targetState = selectedFilter,
+            transitionSpec = {
+                if (targetState == "Missed") {
+                    // Fluid slide from right with gentle spring bounce + crossfade
+                    (slideInHorizontally(
+                        animationSpec = spring(
+                            dampingRatio = 0.82f,
+                            stiffness = Spring.StiffnessMediumLow
+                        ),
+                        initialOffsetX = { fullWidth -> (fullWidth * 0.22f).toInt() }
+                    ) + fadeIn(animationSpec = tween(220, easing = LinearOutSlowInEasing))).togetherWith(
+                        slideOutHorizontally(
+                            animationSpec = spring(
+                                dampingRatio = 0.85f,
+                                stiffness = Spring.StiffnessMediumLow
+                            ),
+                            targetOffsetX = { fullWidth -> (-fullWidth * 0.22f).toInt() }
+                        ) + fadeOut(animationSpec = tween(160, easing = FastOutLinearInEasing))
+                    )
+                } else {
+                    // Fluid slide from left with gentle spring bounce + crossfade
+                    (slideInHorizontally(
+                        animationSpec = spring(
+                            dampingRatio = 0.82f,
+                            stiffness = Spring.StiffnessMediumLow
+                        ),
+                        initialOffsetX = { fullWidth -> (-fullWidth * 0.22f).toInt() }
+                    ) + fadeIn(animationSpec = tween(220, easing = LinearOutSlowInEasing))).togetherWith(
+                        slideOutHorizontally(
+                            animationSpec = spring(
+                                dampingRatio = 0.85f,
+                                stiffness = Spring.StiffnessMediumLow
+                            ),
+                            targetOffsetX = { fullWidth -> (fullWidth * 0.22f).toInt() }
+                        ) + fadeOut(animationSpec = tween(160, easing = FastOutLinearInEasing))
+                    )
+                }
+            },
+            label = "recentsFilterSwitch",
+            modifier = Modifier.fillMaxSize()
+        ) { currentFilter ->
+            val currentFilteredLogs = remember(callLogs, currentFilter, searchQuery) {
+                val base = if (currentFilter == "Missed") {
+                    callLogs.filter { it.type == CallLog.Calls.MISSED_TYPE || it.type == CallLog.Calls.REJECTED_TYPE }
+                } else {
+                    callLogs
+                }
+                if (searchQuery.isBlank()) {
+                    base
+                } else {
+                    val q = searchQuery.trim().lowercase()
+                    val digits = q.filter { it.isDigit() || it == '+' }
+                    base.filter { log ->
+                        val nameMatch = log.name?.lowercase()?.contains(q) == true
+                        val numMatch = log.number.lowercase().contains(q) ||
+                                (digits.isNotEmpty() && log.number.filter { it.isDigit() || it == '+' }.contains(digits))
+                        nameMatch || numMatch
+                    }
+                }
             }
-        } else if (filteredLogs.isEmpty()) {
+
+            val currentGroupedLogs = remember(currentFilteredLogs) {
+                currentFilteredLogs.groupBy { getCallDateGroup(it.timestamp) }
+            }
+
+            if (isLoading && callLogs.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "Loading call history...",
+                        color = monetColors.onSurfaceVariant,
+                        fontSize = 15.sp,
+                        fontFamily = GoogleSans,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            } else if (currentFilteredLogs.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1377,8 +1421,8 @@ fun RecentsScreen(
                 contentPadding = PaddingValues(top = statusBarTop + 162.dp, bottom = 120.dp, start = 18.dp, end = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                groupedLogs.forEach { (dateGroup, logsInGroup) ->
-                    item(key = "header_$dateGroup") {
+                currentGroupedLogs.forEach { (dateGroup, logsInGroup) ->
+                    item(key = "header_${currentFilter}_$dateGroup") {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1419,7 +1463,7 @@ fun RecentsScreen(
                         }
                     }
 
-                    itemsIndexed(logsInGroup, key = { index, log -> "log_${dateGroup}_${log.id}_${log.timestamp}_$index" }) { _, log ->
+                    itemsIndexed(logsInGroup, key = { index, log -> "log_${currentFilter}_${dateGroup}_${log.id}_${log.timestamp}_$index" }) { _, log ->
                         val isMissed = log.type == CallLog.Calls.MISSED_TYPE || log.type == CallLog.Calls.REJECTED_TYPE
                         val isOutgoing = log.type == CallLog.Calls.OUTGOING_TYPE
                         val callerName = log.name ?: log.number
@@ -1631,9 +1675,10 @@ fun RecentsScreen(
                     }
                 }
             }
-        }
+        } // Close else
+    } // Close AnimatedContent
 
-        // Pinned Top Header with Pixel Search Bar & Segmented Filter
+    // Pinned Top Header with Pixel Search Bar & Segmented Filter
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1676,17 +1721,29 @@ fun RecentsScreen(
                         .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(18.dp))
                         .padding(3.dp)
                 ) {
-                    Row {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         listOf("All", "Missed").forEach { filter ->
                             val isSel = selectedFilter == filter
                             val pillBg by animateColorAsState(
-                                targetValue = if (isSel) monetColors.primaryContainer else Color.Transparent,
-                                animationSpec = tween(150),
+                                targetValue = if (isSel) {
+                                    if (filter == "Missed") Color(0xFFFF5252).copy(alpha = 0.22f)
+                                    else monetColors.primaryContainer
+                                } else Color.Transparent,
+                                animationSpec = spring(
+                                    dampingRatio = 0.8f,
+                                    stiffness = Spring.StiffnessMediumLow
+                                ),
                                 label = "filterPillBg"
                             )
                             val pillFg by animateColorAsState(
-                                targetValue = if (isSel) monetColors.onPrimaryContainer else monetColors.onSurfaceVariant,
-                                animationSpec = tween(150),
+                                targetValue = if (isSel) {
+                                    if (filter == "Missed") Color(0xFFFF6E6E)
+                                    else monetColors.onPrimaryContainer
+                                } else monetColors.onSurfaceVariant,
+                                animationSpec = spring(
+                                    dampingRatio = 0.8f,
+                                    stiffness = Spring.StiffnessMediumLow
+                                ),
                                 label = "filterPillFg"
                             )
 
@@ -1698,15 +1755,45 @@ fun RecentsScreen(
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         selectedFilter = filter
                                     }
-                                    .padding(horizontal = 13.dp, vertical = 5.dp)
+                                    .padding(horizontal = 13.dp, vertical = 6.dp),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = filter,
-                                    color = pillFg,
-                                    fontSize = 12.5.sp,
-                                    fontFamily = GoogleSans,
-                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    if (filter == "Missed") {
+                                        AnimatedVisibility(
+                                            visible = isSel,
+                                            enter = fadeIn(tween(150)) + expandHorizontally(
+                                                animationSpec = spring(
+                                                    dampingRatio = 0.8f,
+                                                    stiffness = Spring.StiffnessMediumLow
+                                                )
+                                            ),
+                                            exit = fadeOut(tween(120)) + shrinkHorizontally(
+                                                animationSpec = spring(
+                                                    dampingRatio = 0.8f,
+                                                    stiffness = Spring.StiffnessMediumLow
+                                                )
+                                            )
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.CallMissed,
+                                                contentDescription = null,
+                                                tint = pillFg,
+                                                modifier = Modifier.size(13.dp)
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        text = filter,
+                                        color = pillFg,
+                                        fontSize = 12.5.sp,
+                                        fontFamily = GoogleSans,
+                                        fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                }
                             }
                         }
                     }
