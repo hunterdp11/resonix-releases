@@ -1,7 +1,7 @@
 {
-  "latest_version": "1.0.1",
-  "min_version": "1.0.1",
-  "force_update": true,
-  "download_url": "https://github.com/hunterdp11/resonix-releases/releases/download/v1.0.1/Resonix-v1.0.1-release.apk",
-  "release_notes": "• Alphabetical quick-scroller on Contacts screen\n• Fluid spring animation when toggling All and Missed calls\n• Cleaned UI and background performance optimizations"
+  "latest_version": "1.0.0",
+  "min_version": "1.0.0",
+  "force_update": false,
+  "download_url": "https://github.com/hunterdp11/resonix-releases/releases/download/v1.0.0/Resonix-v1.0.0-release.apk",
+  "release_notes": "• Initial public release of Resonix\n• Material You expressive Pixel dialer & smart call screening\n• Alphabetical quick-scroller & contacts management\n• Direct OTA update system with root 1-tap silent install support"
 }
