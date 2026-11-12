@@ -167,24 +167,24 @@ import com.callscreener.app.model.MessageSender
 import com.callscreener.app.model.QuickReply
 import com.callscreener.app.model.VoicePersona
 import com.callscreener.app.root.AppOperationMode
-import com.callscreener.app.ui.theme.AppleAmber
-import com.callscreener.app.ui.theme.AppleAmberGlassFill
-import com.callscreener.app.ui.theme.AppleBlue
-import com.callscreener.app.ui.theme.AppleBlueGlassFill
-import com.callscreener.app.ui.theme.AppleGreen
-import com.callscreener.app.ui.theme.AppleGreenGlassFill
-import com.callscreener.app.ui.theme.AppleIndigo
-import com.callscreener.app.ui.theme.ApplePurple
-import com.callscreener.app.ui.theme.AppleRed
-import com.callscreener.app.ui.theme.AppleRedGlassFill
-import com.callscreener.app.ui.theme.AppleTeal
+import com.callscreener.app.ui.theme.VibrantAmber
+import com.callscreener.app.ui.theme.VibrantAmberGlassFill
+import com.callscreener.app.ui.theme.VibrantBlue
+import com.callscreener.app.ui.theme.VibrantBlueGlassFill
+import com.callscreener.app.ui.theme.VibrantGreen
+import com.callscreener.app.ui.theme.VibrantGreenGlassFill
+import com.callscreener.app.ui.theme.VibrantIndigo
+import com.callscreener.app.ui.theme.VibrantPurple
+import com.callscreener.app.ui.theme.VibrantRed
+import com.callscreener.app.ui.theme.VibrantRedGlassFill
+import com.callscreener.app.ui.theme.VibrantTeal
 import com.callscreener.app.ui.theme.GlassBackgroundGradient
-import com.callscreener.app.ui.theme.GoogleSans
-import com.callscreener.app.ui.theme.LiquidGlassBorder
-import com.callscreener.app.ui.theme.LiquidGlassBorderSubtle
-import com.callscreener.app.ui.theme.LiquidGlassFill
-import com.callscreener.app.ui.theme.LiquidGlassFillElevated
-import com.callscreener.app.ui.theme.LiquidGlassFillSubtle
+import com.callscreener.app.ui.theme.AppFont
+import com.callscreener.app.ui.theme.FrostedGlassBorder
+import com.callscreener.app.ui.theme.FrostedGlassBorderSubtle
+import com.callscreener.app.ui.theme.FrostedGlassFill
+import com.callscreener.app.ui.theme.FrostedGlassFillElevated
+import com.callscreener.app.ui.theme.FrostedGlassFillSubtle
 import com.callscreener.app.model.AudioPreset
 import com.callscreener.app.ui.theme.TextMuted
 import com.callscreener.app.ui.theme.TextPrimary
@@ -1590,12 +1590,12 @@ private fun ScreeningResponsesAndAudioSection(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
                     .background(
-                        if (isAudioPresetPaused) AppleAmber.copy(alpha = 0.18f)
+                        if (isAudioPresetPaused) VibrantAmber.copy(alpha = 0.18f)
                         else monetColors.primaryContainer.copy(alpha = 0.40f)
                     )
                     .border(
                         0.8.dp,
-                        if (isAudioPresetPaused) AppleAmber.copy(alpha = 0.55f)
+                        if (isAudioPresetPaused) VibrantAmber.copy(alpha = 0.55f)
                         else monetColors.primary.copy(alpha = 0.45f),
                         RoundedCornerShape(16.dp)
                     )
@@ -1618,13 +1618,13 @@ private fun ScreeningResponsesAndAudioSection(
                                 modifier = Modifier
                                     .size(20.dp)
                                     .clip(CircleShape)
-                                    .background(AppleAmber.copy(alpha = 0.25f)),
+                                    .background(VibrantAmber.copy(alpha = 0.25f)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.Pause,
                                     contentDescription = null,
-                                    tint = AppleAmber,
+                                    tint = VibrantAmber,
                                     modifier = Modifier.size(13.dp)
                                 )
                             }
@@ -1632,7 +1632,7 @@ private fun ScreeningResponsesAndAudioSection(
                         Column {
                             Text(
                                 text = if (isAudioPresetPaused) "PAUSED" else "PLAYING CUSTOM AUDIO",
-                                color = if (isAudioPresetPaused) AppleAmber else monetColors.primary,
+                                color = if (isAudioPresetPaused) VibrantAmber else monetColors.primary,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace,
@@ -1657,7 +1657,7 @@ private fun ScreeningResponsesAndAudioSection(
                             modifier = Modifier
                                 .height(28.dp)
                                 .clip(RoundedCornerShape(14.dp))
-                                .background(if (isAudioPresetPaused) AppleAmber else monetColors.primary)
+                                .background(if (isAudioPresetPaused) VibrantAmber else monetColors.primary)
                                 .clickable {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     if (isAudioPresetPaused) onResumeCustomAudio() else onPauseCustomAudio()
@@ -1759,13 +1759,13 @@ private fun ScreeningResponsesAndAudioSection(
                             .clip(CircleShape)
                             .background(
                                 if (isPlayingThis) monetColors.primaryContainer
-                                else if (isPausedThis) AppleAmber.copy(alpha = 0.20f)
+                                else if (isPausedThis) VibrantAmber.copy(alpha = 0.20f)
                                 else monetColors.surfaceContainerHigh
                             )
                             .border(
                                 width = if (isPlayingThis || isPausedThis) 1.2.dp else 1.dp,
                                 color = if (isPlayingThis) monetColors.primary
-                                else if (isPausedThis) AppleAmber
+                                else if (isPausedThis) VibrantAmber
                                 else monetColors.primary.copy(alpha = 0.35f),
                                 shape = CircleShape
                             )
@@ -1786,7 +1786,7 @@ private fun ScreeningResponsesAndAudioSection(
                                     .clip(CircleShape)
                                     .background(
                                         if (isPlayingThis) monetColors.primary
-                                        else if (isPausedThis) AppleAmber
+                                        else if (isPausedThis) VibrantAmber
                                         else monetColors.primaryContainer
                                     ),
                                 contentAlignment = Alignment.Center
@@ -1800,7 +1800,7 @@ private fun ScreeningResponsesAndAudioSection(
                             }
                             Text(
                                 text = if (isPausedThis) "${preset.title} (Paused)" else preset.title,
-                                color = if (isPausedThis) AppleAmber else monetColors.onSurface,
+                                color = if (isPausedThis) VibrantAmber else monetColors.onSurface,
                                 fontSize = 12.5.sp,
                                 fontWeight = if (isPlayingThis || isPausedThis) FontWeight.Bold else FontWeight.Medium,
                                 letterSpacing = (-0.1).sp
@@ -1936,7 +1936,7 @@ private fun ScreeningTypeToSpeakBar(
                 .fillMaxHeight(),
             singleLine = true,
             textStyle = TextStyle(
-                fontFamily = GoogleSans,
+                fontFamily = AppFont,
                 color = monetColors.onSurface,
                 fontSize = 14.5.sp,
                 fontWeight = FontWeight.Normal,
@@ -2614,13 +2614,13 @@ private fun ScreeningToolsBottomSheet(
                                         .clip(RoundedCornerShape(12.dp))
                                         .background(
                                             if (isPlayingThis) monetColors.primaryContainer
-                                            else if (isPausedThis) AppleAmber.copy(alpha = 0.20f)
+                                            else if (isPausedThis) VibrantAmber.copy(alpha = 0.20f)
                                             else monetColors.surfaceContainer
                                         )
                                         .border(
                                             width = if (isPlayingThis || isPausedThis) 1.2.dp else 0.8.dp,
                                             color = if (isPlayingThis) monetColors.primary
-                                            else if (isPausedThis) AppleAmber
+                                            else if (isPausedThis) VibrantAmber
                                             else monetColors.outlineVariant.copy(alpha = 0.3f),
                                             shape = RoundedCornerShape(12.dp)
                                         )
@@ -2641,14 +2641,14 @@ private fun ScreeningToolsBottomSheet(
                                             else Icons.AutoMirrored.Filled.VolumeUp,
                                             contentDescription = null,
                                             tint = if (isPlayingThis) monetColors.primary
-                                            else if (isPausedThis) AppleAmber
-                                            else if (preset.isAudioFile) AppleAmber
+                                            else if (isPausedThis) VibrantAmber
+                                            else if (preset.isAudioFile) VibrantAmber
                                             else monetColors.primary,
                                             modifier = Modifier.size(14.dp)
                                         )
                                         Text(
                                             text = if (isPausedThis) "${preset.title} (Paused)" else preset.title,
-                                            color = if (isPausedThis) AppleAmber else monetColors.onSurface,
+                                            color = if (isPausedThis) VibrantAmber else monetColors.onSurface,
                                             fontSize = 12.sp,
                                             fontWeight = if (isPlayingThis || isPausedThis) FontWeight.Bold else FontWeight.Medium
                                         )
@@ -2677,10 +2677,10 @@ private fun ScreeningToolsBottomSheet(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(20.dp))
-                                .background(if (isRecording) AppleRed.copy(alpha = 0.22f) else monetColors.surfaceContainer)
+                                .background(if (isRecording) VibrantRed.copy(alpha = 0.22f) else monetColors.surfaceContainer)
                                 .border(
                                     0.8.dp,
-                                    if (isRecording) AppleRed else monetColors.outlineVariant.copy(alpha = 0.35f),
+                                    if (isRecording) VibrantRed else monetColors.outlineVariant.copy(alpha = 0.35f),
                                     RoundedCornerShape(20.dp)
                                 )
                                 .clickable {
@@ -2698,11 +2698,11 @@ private fun ScreeningToolsBottomSheet(
                                     modifier = Modifier
                                         .size(7.dp)
                                         .clip(CircleShape)
-                                        .background(if (isRecording) AppleRed else monetColors.onSurfaceVariant)
+                                        .background(if (isRecording) VibrantRed else monetColors.onSurfaceVariant)
                                 )
                                 Text(
                                     text = if (isRecording) "REC ${formatDuration(recordingDurationSeconds)}" else "Record Call",
-                                    color = if (isRecording) AppleRed else monetColors.onSurface,
+                                    color = if (isRecording) VibrantRed else monetColors.onSurface,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -2795,7 +2795,7 @@ fun SmartJammerControl(
                     color = if (isActive) Color.White else monetColors.onSurface,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
-                    fontFamily = GoogleSans,
+                    fontFamily = AppFont,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -2816,7 +2816,7 @@ fun SmartJammerControl(
                 },
                 color = if (isActive) Color.White.copy(alpha = 0.80f) else monetColors.onSurfaceVariant,
                 fontSize = 10.5.sp,
-                fontFamily = GoogleSans,
+                fontFamily = AppFont,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -4082,7 +4082,7 @@ fun StandardInCallScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     val dotColor = when (status) {
-                        CallStatus.ON_HOLD -> AppleAmber
+                        CallStatus.ON_HOLD -> VibrantAmber
                         CallStatus.DIALING -> monetColors.primary
                         else -> Color(0xFF34A853)
                     }
@@ -4112,7 +4112,7 @@ fun StandardInCallScreen(
                             else -> formatDuration(durationSeconds)
                         },
                         color = when (status) {
-                            CallStatus.ON_HOLD -> AppleAmber
+                            CallStatus.ON_HOLD -> VibrantAmber
                             CallStatus.DIALING -> monetColors.primary
                             else -> monetColors.onSurface
                         },
@@ -4163,11 +4163,11 @@ fun StandardInCallScreen(
                                 modifier = Modifier
                                     .size(6.dp)
                                     .clip(CircleShape)
-                                    .background(AppleRed)
+                                    .background(VibrantRed)
                             )
                             Text(
                                 text = "REC " + formatDuration(recordingDurationSeconds),
-                                color = AppleRed,
+                                color = VibrantRed,
                                 fontSize = 11.sp,
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold
@@ -4290,7 +4290,7 @@ fun StandardInCallScreen(
                 color = monetColors.onSurface,
                 fontSize = animatedTitleFontSize.sp,
                 fontWeight = FontWeight.SemiBold,
-                fontFamily = GoogleSans,
+                fontFamily = AppFont,
                 letterSpacing = (-0.3).sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -4312,7 +4312,7 @@ fun StandardInCallScreen(
                             text = displayCallerNumber,
                             color = monetColors.onSurfaceVariant,
                             fontSize = 14.5.sp,
-                            fontFamily = GoogleSans,
+                            fontFamily = AppFont,
                             fontWeight = FontWeight.Normal,
                             letterSpacing = 0.25.sp
                         )
@@ -4496,7 +4496,7 @@ fun StandardInCallScreen(
                             icon = if (isMuted) Icons.Filled.MicOff else Icons.Filled.Mic,
                             label = if (isMuted) "Unmute" else "Mute",
                             isActive = isMuted,
-                            activeColor = AppleRed,
+                            activeColor = VibrantRed,
                             monetColors = monetColors,
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -4549,7 +4549,7 @@ fun StandardInCallScreen(
                                 icon = Icons.Rounded.GraphicEq,
                                 label = if (isRecording) "Recording" else "Record",
                                 isActive = isRecording,
-                                activeColor = AppleRed,
+                                activeColor = VibrantRed,
                                 monetColors = monetColors,
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -4563,7 +4563,7 @@ fun StandardInCallScreen(
                                 icon = if (status == CallStatus.ON_HOLD) Icons.Filled.PlayArrow else Icons.Filled.Pause,
                                 label = if (status == CallStatus.ON_HOLD) "Unhold" else "Hold",
                                 isActive = status == CallStatus.ON_HOLD,
-                                activeColor = AppleAmber,
+                                activeColor = VibrantAmber,
                                 monetColors = monetColors,
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -4800,8 +4800,8 @@ fun InCallActionButton(
 
     val animatedBg by animateColorAsState(
         targetValue = when {
-            isActive && activeColor == AppleRed -> Color(0xFF4A1018)
-            isActive && activeColor == AppleAmber -> Color(0xFF422800)
+            isActive && activeColor == VibrantRed -> Color(0xFF4A1018)
+            isActive && activeColor == VibrantAmber -> Color(0xFF422800)
             isActive -> monetColors.primaryContainer
             isAssistantSpecial -> monetColors.surfaceContainerHighest
             else -> monetColors.surfaceContainerHigh
@@ -4812,8 +4812,8 @@ fun InCallActionButton(
 
     val animatedBorderColor by animateColorAsState(
         targetValue = when {
-            isActive && activeColor == AppleRed -> Color(0xFFFF5466).copy(alpha = 0.85f)
-            isActive && activeColor == AppleAmber -> AppleAmber.copy(alpha = 0.85f)
+            isActive && activeColor == VibrantRed -> Color(0xFFFF5466).copy(alpha = 0.85f)
+            isActive && activeColor == VibrantAmber -> VibrantAmber.copy(alpha = 0.85f)
             isActive -> monetColors.primary.copy(alpha = 0.85f)
             isAssistantSpecial -> monetColors.primary.copy(alpha = 0.50f)
             else -> monetColors.outlineVariant.copy(alpha = 0.28f)
@@ -4824,8 +4824,8 @@ fun InCallActionButton(
 
     val animatedTint by animateColorAsState(
         targetValue = when {
-            isActive && activeColor == AppleRed -> Color(0xFFFF5466)
-            isActive && activeColor == AppleAmber -> AppleAmber
+            isActive && activeColor == VibrantRed -> Color(0xFFFF5466)
+            isActive && activeColor == VibrantAmber -> VibrantAmber
             isActive -> monetColors.onPrimaryContainer
             isAssistantSpecial -> monetColors.primary
             else -> monetColors.onSurface
@@ -4889,7 +4889,7 @@ fun InCallActionButton(
             text = label,
             color = if (isActive) monetColors.onSurface else monetColors.onSurfaceVariant,
             fontSize = 12.5.sp,
-            fontFamily = GoogleSans,
+            fontFamily = AppFont,
             fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Medium,
             letterSpacing = 0.15.sp,
             maxLines = 1,
@@ -4961,7 +4961,7 @@ fun InCallDtmfKey(
                 color = if (isPressed) monetColors.onPrimaryContainer else monetColors.onSurface,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.SemiBold,
-                fontFamily = GoogleSans,
+                fontFamily = AppFont,
                 lineHeight = 26.sp
             )
             if (letters.isNotBlank()) {
@@ -4970,7 +4970,7 @@ fun InCallDtmfKey(
                     color = if (isPressed) monetColors.onPrimaryContainer.copy(alpha = 0.85f) else monetColors.onSurfaceVariant.copy(alpha = 0.75f),
                     fontSize = 9.5.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = GoogleSans,
+                    fontFamily = AppFont,
                     letterSpacing = 0.8.sp,
                     lineHeight = 11.sp
                 )

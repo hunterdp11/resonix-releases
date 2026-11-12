@@ -10,7 +10,5 @@
         <domain includeSubdomains="true">generativelanguage.googleapis.com</domain>
         <domain includeSubdomains="true">googleapis.com</domain>
         <domain includeSubdomains="true">google.com</domain>
-        <domain includeSubdomains="true">api.openai.com</domain>
-        <domain includeSubdomains="true">api.groq.com</domain>
     </domain-config>
 </network-security-config>

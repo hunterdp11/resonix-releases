@@ -18,14 +18,14 @@ val GlassSurfaceElevated = Color(0x26FFFFFF)
 val GlassBorder = Color(0x30FFFFFF)
 val GlassBorderSubtle = Color(0x18FFFFFF)
 
-val AppleBlue = Color(0xFF0A84FF)
-val AppleIndigo = Color(0xFF5E5CE6)
-val ApplePurple = Color(0xFFBF5AF2)
-val AppleTeal = Color(0xFF64D2FF)
-val AppleGreen = Color(0xFF30D158)
-val AppleYellow = Color(0xFFFFD60A)
-val AppleAmber = Color(0xFFFF9F0A)
-val AppleRed = Color(0xFFFF453A)
+val VibrantBlue = Color(0xFF0A84FF)
+val VibrantIndigo = Color(0xFF5E5CE6)
+val VibrantPurple = Color(0xFFBF5AF2)
+val VibrantTeal = Color(0xFF64D2FF)
+val VibrantGreen = Color(0xFF30D158)
+val VibrantYellow = Color(0xFFFFD60A)
+val VibrantAmber = Color(0xFFFF9F0A)
+val VibrantRed = Color(0xFFFF453A)
 
 val TextPrimary = Color(0xFFFFFFFF)
 val TextSecondary = Color(0xCCEBEBF5)
@@ -39,13 +39,13 @@ val SystemGlassBubble = Color(0x14FFFFFF)
 val BgDark = GlassBackground
 val SurfaceDark = Color(0xFF0B101C)
 val SurfaceVariantDark = Color(0x18FFFFFF)
-val PrimaryIndigo = AppleBlue
-val PrimaryIndigoLight = AppleTeal
-val GreenAccept = AppleGreen
-val RedHangup = AppleRed
-val AmberScreening = AppleAmber
+val PrimaryIndigo = VibrantBlue
+val PrimaryIndigoLight = VibrantTeal
+val GreenAccept = VibrantGreen
+val RedHangup = VibrantRed
+val AmberScreening = VibrantAmber
 
-val LiquidGlassFill = Brush.linearGradient(
+val FrostedGlassFill = Brush.linearGradient(
     listOf(
         Color(0x28FFFFFF),
         Color(0x14182234),
@@ -53,7 +53,7 @@ val LiquidGlassFill = Brush.linearGradient(
     )
 )
 
-val LiquidGlassFillElevated = Brush.linearGradient(
+val FrostedGlassFillElevated = Brush.linearGradient(
     listOf(
         Color(0x34FFFFFF),
         Color(0x1A203046),
@@ -61,7 +61,7 @@ val LiquidGlassFillElevated = Brush.linearGradient(
     )
 )
 
-val LiquidGlassFillSubtle = Brush.linearGradient(
+val FrostedGlassFillSubtle = Brush.linearGradient(
     listOf(
         Color(0x16FFFFFF),
         Color(0x0A121C28),
@@ -69,7 +69,7 @@ val LiquidGlassFillSubtle = Brush.linearGradient(
     )
 )
 
-val LiquidGlassDockFill = Brush.verticalGradient(
+val FrostedGlassDockFill = Brush.verticalGradient(
     listOf(
         Color(0x32FFFFFF),
         Color(0x10FFFFFF),
@@ -77,7 +77,7 @@ val LiquidGlassDockFill = Brush.verticalGradient(
     )
 )
 
-val LiquidGlassBorder = Brush.verticalGradient(
+val FrostedGlassBorder = Brush.verticalGradient(
     listOf(
         Color(0x85FFFFFF),
         Color(0x30FFFFFF),
@@ -85,7 +85,7 @@ val LiquidGlassBorder = Brush.verticalGradient(
     )
 )
 
-val LiquidGlassBorderSubtle = Brush.verticalGradient(
+val FrostedGlassBorderSubtle = Brush.verticalGradient(
     listOf(
         Color(0x40FFFFFF),
         Color(0x18FFFFFF),
@@ -93,7 +93,7 @@ val LiquidGlassBorderSubtle = Brush.verticalGradient(
     )
 )
 
-val LiquidGlassDockBorder = Brush.verticalGradient(
+val FrostedGlassDockBorder = Brush.verticalGradient(
     listOf(
         Color(0xE5FFFFFF),
         Color(0x50FFFFFF),
@@ -102,28 +102,28 @@ val LiquidGlassDockBorder = Brush.verticalGradient(
     )
 )
 
-val AppleBlueGlassFill = Brush.linearGradient(
+val VibrantBlueGlassFill = Brush.linearGradient(
     listOf(
         Color(0xF00A84FF),
         Color(0xD00055D6)
     )
 )
 
-val AppleGreenGlassFill = Brush.linearGradient(
+val VibrantGreenGlassFill = Brush.linearGradient(
     listOf(
         Color(0xF030D158),
         Color(0xD0189B37)
     )
 )
 
-val AppleAmberGlassFill = Brush.linearGradient(
+val VibrantAmberGlassFill = Brush.linearGradient(
     listOf(
         Color(0xF0FF9F0A),
         Color(0xD0C87300)
     )
 )
 
-val AppleRedGlassFill = Brush.linearGradient(
+val VibrantRedGlassFill = Brush.linearGradient(
     listOf(
         Color(0xF0FF453A),
         Color(0xD0B8251C)

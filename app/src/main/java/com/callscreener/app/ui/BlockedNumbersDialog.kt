@@ -88,7 +88,7 @@ import com.callscreener.app.data.rememberContactPhotoBitmap
 import com.callscreener.app.data.DialerRepository
 import com.callscreener.app.engine.BlockedContact
 import com.callscreener.app.engine.CallBlockManager
-import com.callscreener.app.ui.theme.GoogleSans
+import com.callscreener.app.ui.theme.AppFont
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -189,7 +189,7 @@ fun PixelBlockedNumbersScreen(
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
-                        fontFamily = GoogleSans
+                        fontFamily = AppFont
                     )
                 }
 
@@ -222,14 +222,14 @@ fun PixelBlockedNumbersScreen(
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = Color.White,
-                                        fontFamily = GoogleSans
+                                        fontFamily = AppFont
                                     )
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
                                         text = "Block calls from unidentified callers",
                                         fontSize = 12.5.sp,
                                         color = monetColors.onSurfaceVariant,
-                                        fontFamily = GoogleSans
+                                        fontFamily = AppFont
                                     )
                                 }
 
@@ -289,13 +289,13 @@ fun PixelBlockedNumbersScreen(
                                         fontSize = 14.5.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = Color.White,
-                                        fontFamily = GoogleSans
+                                        fontFamily = AppFont
                                     )
                                     Text(
                                         text = "Type any carrier number to block",
                                         fontSize = 12.sp,
                                         color = monetColors.onSurfaceVariant,
-                                        fontFamily = GoogleSans
+                                        fontFamily = AppFont
                                     )
                                 }
 
@@ -347,13 +347,13 @@ fun PixelBlockedNumbersScreen(
                                         fontSize = 14.5.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = Color.White,
-                                        fontFamily = GoogleSans
+                                        fontFamily = AppFont
                                     )
                                     Text(
                                         text = "Select an existing contact to block",
                                         fontSize = 12.sp,
                                         color = monetColors.onSurfaceVariant,
-                                        fontFamily = GoogleSans
+                                        fontFamily = AppFont
                                     )
                                 }
 
@@ -378,7 +378,7 @@ fun PixelBlockedNumbersScreen(
                             Text(
                                 text = "BLOCKED CALLERS (${blockedList.size})",
                                 fontSize = 11.5.sp,
-                                fontFamily = GoogleSans,
+                                fontFamily = AppFont,
                                 fontWeight = FontWeight.Bold,
                                 color = monetColors.primary,
                                 letterSpacing = 0.8.sp
@@ -388,7 +388,7 @@ fun PixelBlockedNumbersScreen(
                                     text = "Tap X to unblock",
                                     fontSize = 10.5.sp,
                                     color = monetColors.onSurfaceVariant,
-                                    fontFamily = GoogleSans
+                                    fontFamily = AppFont
                                 )
                             }
                         }
@@ -428,7 +428,7 @@ fun PixelBlockedNumbersScreen(
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White,
-                                    fontFamily = GoogleSans
+                                    fontFamily = AppFont
                                 )
 
                                 Spacer(modifier = Modifier.height(4.dp))
@@ -439,7 +439,7 @@ fun PixelBlockedNumbersScreen(
                                     color = monetColors.onSurfaceVariant,
                                     textAlign = TextAlign.Center,
                                     lineHeight = 17.sp,
-                                    fontFamily = GoogleSans
+                                    fontFamily = AppFont
                                 )
                             }
                         }
@@ -580,7 +580,7 @@ private fun BlockedContactRow(
                         fontSize = 14.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
-                        fontFamily = GoogleSans,
+                        fontFamily = AppFont,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -592,7 +592,7 @@ private fun BlockedContactRow(
                             "Blocked Number",
                         fontSize = 12.sp,
                         color = monetColors.onSurfaceVariant,
-                        fontFamily = GoogleSans,
+                        fontFamily = AppFont,
                         maxLines = 1
                     )
                 }
@@ -641,22 +641,22 @@ private fun AddManualBlockDialog(
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
-                    fontFamily = GoogleSans
+                    fontFamily = AppFont
                 )
 
                 Text(
                     text = "Calls from this phone number will be silently dropped or answered with SIT dead-tone audio.",
                     fontSize = 12.5.sp,
                     color = monetColors.onSurfaceVariant,
-                    fontFamily = GoogleSans,
+                    fontFamily = AppFont,
                     lineHeight = 16.sp
                 )
 
                 OutlinedTextField(
                     value = numberText,
                     onValueChange = { numberText = it },
-                    label = { Text("Phone number", fontFamily = GoogleSans, fontSize = 13.sp) },
-                    placeholder = { Text("e.g. +1 555 123 4567", fontFamily = GoogleSans, fontSize = 13.sp) },
+                    label = { Text("Phone number", fontFamily = AppFont, fontSize = 13.sp) },
+                    placeholder = { Text("e.g. +1 555 123 4567", fontFamily = AppFont, fontSize = 13.sp) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
@@ -672,8 +672,8 @@ private fun AddManualBlockDialog(
                 OutlinedTextField(
                     value = nameText,
                     onValueChange = { nameText = it },
-                    label = { Text("Name (optional)", fontFamily = GoogleSans, fontSize = 13.sp) },
-                    placeholder = { Text("e.g. Telemarketer", fontFamily = GoogleSans, fontSize = 13.sp) },
+                    label = { Text("Name (optional)", fontFamily = AppFont, fontSize = 13.sp) },
+                    placeholder = { Text("e.g. Telemarketer", fontFamily = AppFont, fontSize = 13.sp) },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = monetColors.primary,
@@ -695,7 +695,7 @@ private fun AddManualBlockDialog(
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = monetColors.onSurfaceVariant)
                     ) {
-                        Text("Cancel", fontFamily = GoogleSans, fontSize = 13.sp)
+                        Text("Cancel", fontFamily = AppFont, fontSize = 13.sp)
                     }
 
                     Spacer(modifier = Modifier.width(10.dp))
@@ -712,7 +712,7 @@ private fun AddManualBlockDialog(
                             contentColor = Color.White
                         )
                     ) {
-                        Text("Block", fontFamily = GoogleSans, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("Block", fontFamily = AppFont, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -774,7 +774,7 @@ private fun BlockContactPickerModal(
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
-                        fontFamily = GoogleSans
+                        fontFamily = AppFont
                     )
                 }
 
@@ -805,7 +805,7 @@ private fun BlockContactPickerModal(
                             textStyle = TextStyle(
                                 color = Color.White,
                                 fontSize = 14.sp,
-                                fontFamily = GoogleSans
+                                fontFamily = AppFont
                             ),
                             cursorBrush = SolidColor(monetColors.primary),
                             singleLine = true,
@@ -816,7 +816,7 @@ private fun BlockContactPickerModal(
                                         text = "Search contacts...",
                                         color = monetColors.onSurfaceVariant.copy(alpha = 0.6f),
                                         fontSize = 14.sp,
-                                        fontFamily = GoogleSans
+                                        fontFamily = AppFont
                                     )
                                 }
                                 inner()
@@ -886,7 +886,7 @@ private fun BlockContactPickerModal(
                                         color = monetColors.primary,
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold,
-                                        fontFamily = GoogleSans
+                                        fontFamily = AppFont
                                     )
                                 }
                             }
@@ -897,7 +897,7 @@ private fun BlockContactPickerModal(
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = Color.White,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -905,7 +905,7 @@ private fun BlockContactPickerModal(
                                     text = DialerRepository.formatPhoneNumber(contact.number),
                                     fontSize = 12.sp,
                                     color = monetColors.onSurfaceVariant,
-                                    fontFamily = GoogleSans
+                                    fontFamily = AppFont
                                 )
                             }
 
@@ -914,7 +914,7 @@ private fun BlockContactPickerModal(
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFFFF5252),
-                                fontFamily = GoogleSans
+                                fontFamily = AppFont
                             )
                         }
                     }

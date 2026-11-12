@@ -89,7 +89,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.callscreener.app.root.AppOperationMode
 import com.callscreener.app.root.RootPrivilegeManager
-import com.callscreener.app.ui.theme.GoogleSans
+import com.callscreener.app.ui.theme.AppFont
 import kotlinx.coroutines.launch
 
 @Composable
@@ -238,7 +238,7 @@ fun PixelOnboardingScreen(
                             text = "Skip",
                             color = monetColors.onSurfaceVariant,
                             fontSize = 13.sp,
-                            fontFamily = GoogleSans,
+                            fontFamily = AppFont,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -336,7 +336,7 @@ fun PixelOnboardingScreen(
                             text = "Skip for now & enter app",
                             color = monetColors.onSurfaceVariant,
                             fontSize = 12.5.sp,
-                            fontFamily = GoogleSans,
+                            fontFamily = AppFont,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -404,7 +404,7 @@ private fun OnboardingFeaturesStep(monetColors: ColorScheme) {
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             color = Color.White,
-            fontFamily = GoogleSans,
+            fontFamily = AppFont,
             textAlign = TextAlign.Center
         )
 
@@ -412,7 +412,7 @@ private fun OnboardingFeaturesStep(monetColors: ColorScheme) {
             text = "Hardware-grade call protection, acoustic speech jamming, and lossless internal audio routing.",
             fontSize = 13.5.sp,
             color = monetColors.onSurfaceVariant,
-            fontFamily = GoogleSans,
+            fontFamily = AppFont,
             textAlign = TextAlign.Center,
             lineHeight = 18.sp,
             modifier = Modifier.padding(horizontal = 12.dp)
@@ -478,14 +478,14 @@ private fun OnboardingArchitectureStep(
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             color = Color.White,
-            fontFamily = GoogleSans
+            fontFamily = AppFont
         )
 
         Text(
             text = "Select an operating architecture based on your device privileges. CallScreener can run as a standard dialer or as a root-powered hardware engine.",
             fontSize = 13.5.sp,
             color = monetColors.onSurfaceVariant,
-            fontFamily = GoogleSans,
+            fontFamily = AppFont,
             lineHeight = 18.sp
         )
 
@@ -521,7 +521,7 @@ private fun OnboardingArchitectureStep(
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
-                        fontFamily = GoogleSans
+                        fontFamily = AppFont
                     )
                     Text(
                         text = if (isDeviceRooted)
@@ -530,7 +530,7 @@ private fun OnboardingArchitectureStep(
                             "No su binary found. Standard Mode is recommended for everyday use.",
                         fontSize = 11.5.sp,
                         color = monetColors.onSurfaceVariant,
-                        fontFamily = GoogleSans
+                        fontFamily = AppFont
                     )
                 }
             }
@@ -590,14 +590,14 @@ private fun OnboardingModuleStep(
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             color = Color.White,
-            fontFamily = GoogleSans
+            fontFamily = AppFont
         )
 
         Text(
             text = "To bypass Android's restricted in-call audio sandbox without speakerphone leakage, CallScreener creates a system priv-app module.",
             fontSize = 13.5.sp,
             color = monetColors.onSurfaceVariant,
-            fontFamily = GoogleSans,
+            fontFamily = AppFont,
             lineHeight = 18.sp
         )
 
@@ -643,7 +643,7 @@ private fun OnboardingModuleStep(
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
-                            fontFamily = GoogleSans
+                            fontFamily = AppFont
                         )
                         Text(
                             text = if (isModuleInstalled)
@@ -652,7 +652,7 @@ private fun OnboardingModuleStep(
                                 "Generates system/priv-app/Resonix and XML permissions whitelist.",
                             fontSize = 12.sp,
                             color = monetColors.onSurfaceVariant,
-                            fontFamily = GoogleSans
+                            fontFamily = AppFont
                         )
                     }
                 }
@@ -677,9 +677,9 @@ private fun OnboardingModuleStep(
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Flashing Module...", fontSize = 13.5.sp, fontFamily = GoogleSans)
+                            Text("Flashing Module...", fontSize = 13.5.sp, fontFamily = AppFont)
                         } else {
-                            Text("Install System Module", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
+                            Text("Install System Module", fontSize = 13.5.sp, fontWeight = FontWeight.Bold, fontFamily = AppFont)
                         }
                     }
                 } else {
@@ -698,7 +698,7 @@ private fun OnboardingModuleStep(
                                 .weight(1f)
                                 .height(44.dp)
                         ) {
-                            Text("Reboot Device", fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
+                            Text("Reboot Device", fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = AppFont)
                         }
                     }
                 }
@@ -720,7 +720,7 @@ private fun OnboardingModuleStep(
                 text = "Don't want to install module? Use Standard Mode instead",
                 color = monetColors.onSurfaceVariant,
                 fontSize = 12.sp,
-                fontFamily = GoogleSans
+                fontFamily = AppFont
             )
         }
 
@@ -772,7 +772,7 @@ private fun OnboardingPermissionsStep(
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             color = Color.White,
-            fontFamily = GoogleSans,
+            fontFamily = AppFont,
             textAlign = TextAlign.Center
         )
 
@@ -783,7 +783,7 @@ private fun OnboardingPermissionsStep(
                 "To intercept incoming calls, screen telemarketers, and manage phone audio, Android requires Resonix to be your default dialer.",
             fontSize = 13.5.sp,
             color = monetColors.onSurfaceVariant,
-            fontFamily = GoogleSans,
+            fontFamily = AppFont,
             textAlign = TextAlign.Center,
             lineHeight = 18.sp,
             modifier = Modifier.padding(horizontal = 10.dp)
@@ -846,7 +846,7 @@ private fun OnboardingPermissionsStep(
                         text = "Tap below to open the Android system default app dialog and select Resonix.",
                         fontSize = 12.sp,
                         color = Color.White,
-                        fontFamily = GoogleSans,
+                        fontFamily = AppFont,
                         lineHeight = 16.sp
                     )
                 }
@@ -875,7 +875,7 @@ private fun OnboardingPermissionsStep(
                         fontSize = 12.5.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White,
-                        fontFamily = GoogleSans
+                        fontFamily = AppFont
                     )
                 }
             }
@@ -925,7 +925,7 @@ private fun OnboardingPermissionBenefitRow(
                     fontSize = 13.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
-                    fontFamily = GoogleSans
+                    fontFamily = AppFont
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
@@ -933,7 +933,7 @@ private fun OnboardingPermissionBenefitRow(
                     fontSize = 11.5.sp,
                     color = monetColors.onSurfaceVariant,
                     lineHeight = 15.sp,
-                    fontFamily = GoogleSans
+                    fontFamily = AppFont
                 )
             }
         }
@@ -981,7 +981,7 @@ private fun OnboardingFeatureCard(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
-                    fontFamily = GoogleSans
+                    fontFamily = AppFont
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
@@ -989,7 +989,7 @@ private fun OnboardingFeatureCard(
                     fontSize = 11.5.sp,
                     color = monetColors.onSurfaceVariant,
                     lineHeight = 15.sp,
-                    fontFamily = GoogleSans
+                    fontFamily = AppFont
                 )
             }
         }
@@ -1038,7 +1038,7 @@ private fun OnboardingModeOptionCard(
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
-                    fontFamily = GoogleSans
+                    fontFamily = AppFont
                 )
 
                 Box(
@@ -1086,7 +1086,7 @@ private fun OnboardingModeOptionCard(
                 fontSize = 12.sp,
                 color = monetColors.onSurfaceVariant,
                 lineHeight = 16.sp,
-                fontFamily = GoogleSans
+                fontFamily = AppFont
             )
         }
     }
@@ -1131,7 +1131,7 @@ private fun OnboardingPrimaryButton(
                 text = text,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
-                fontFamily = GoogleSans
+                fontFamily = AppFont
             )
             Icon(
                 imageVector = Icons.Rounded.ChevronRight,

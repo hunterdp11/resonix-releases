@@ -98,7 +98,7 @@ import com.callscreener.app.engine.AudioPresetManager
 import com.callscreener.app.engine.QuickReplyManager
 import com.callscreener.app.model.AudioPreset
 import com.callscreener.app.model.QuickReply
-import com.callscreener.app.ui.theme.GoogleSans
+import com.callscreener.app.ui.theme.AppFont
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -308,14 +308,14 @@ fun PresetManagementScreen(
                             color = colors.onSurface,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = GoogleSans,
+                            fontFamily = AppFont,
                             letterSpacing = (-0.3).sp
                         )
                         Text(
                             text = "Soundboard & in-call responses",
                             color = colors.onSurfaceVariant,
                             fontSize = 12.sp,
-                            fontFamily = GoogleSans
+                            fontFamily = AppFont
                         )
                     }
                 }
@@ -348,7 +348,7 @@ fun PresetManagementScreen(
                                 color = if (isSoundboard) colors.onSurface else colors.onSurfaceVariant,
                                 fontSize = 12.5.sp,
                                 fontWeight = if (isSoundboard) FontWeight.Bold else FontWeight.Medium,
-                                fontFamily = GoogleSans
+                                fontFamily = AppFont
                             )
                         }
 
@@ -370,7 +370,7 @@ fun PresetManagementScreen(
                                 color = if (isReplies) colors.onSurface else colors.onSurfaceVariant,
                                 fontSize = 12.5.sp,
                                 fontWeight = if (isReplies) FontWeight.Bold else FontWeight.Medium,
-                                fontFamily = GoogleSans
+                                fontFamily = AppFont
                             )
                         }
                     }
@@ -412,7 +412,7 @@ fun PresetManagementScreen(
                                     color = colors.onPrimaryContainer,
                                     fontSize = 12.5.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    fontFamily = GoogleSans
+                                    fontFamily = AppFont
                                 )
                             }
                         }
@@ -445,7 +445,7 @@ fun PresetManagementScreen(
                                     color = colors.onSurface,
                                     fontSize = 12.5.sp,
                                     fontWeight = FontWeight.Medium,
-                                    fontFamily = GoogleSans
+                                    fontFamily = AppFont
                                 )
                             }
                         }
@@ -468,7 +468,7 @@ fun PresetManagementScreen(
                             text = "Hold & drag ⠿ to reorder presets",
                             color = colors.onSurfaceVariant.copy(alpha = 0.6f),
                             fontSize = 11.5.sp,
-                            fontFamily = GoogleSans
+                            fontFamily = AppFont
                         )
                     }
 
@@ -553,7 +553,7 @@ fun PresetManagementScreen(
                                     text = "Reset Soundboard to Default Presets",
                                     color = colors.onSurfaceVariant.copy(alpha = 0.7f),
                                     fontSize = 12.sp,
-                                    fontFamily = GoogleSans
+                                    fontFamily = AppFont
                                 )
                             }
                             Spacer(modifier = Modifier.height(20.dp))
@@ -594,7 +594,7 @@ fun PresetManagementScreen(
                                     color = colors.onPrimaryContainer,
                                     fontSize = 12.5.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    fontFamily = GoogleSans
+                                    fontFamily = AppFont
                                 )
                             }
                         }
@@ -617,7 +617,7 @@ fun PresetManagementScreen(
                             text = "Hold & drag ⠿ to reorder presets",
                             color = colors.onSurfaceVariant.copy(alpha = 0.6f),
                             fontSize = 11.5.sp,
-                            fontFamily = GoogleSans
+                            fontFamily = AppFont
                         )
                     }
 
@@ -689,7 +689,7 @@ fun PresetManagementScreen(
                                     text = "Reset Quick Replies to Default",
                                     color = colors.onSurfaceVariant.copy(alpha = 0.7f),
                                     fontSize = 12.sp,
-                                    fontFamily = GoogleSans
+                                    fontFamily = AppFont
                                 )
                             }
                             Spacer(modifier = Modifier.height(20.dp))
@@ -716,7 +716,7 @@ fun PresetManagementScreen(
                     text = "Import Audio Preset",
                     color = colors.onSurface,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = GoogleSans
+                    fontFamily = AppFont
                 )
             },
             text = {
@@ -725,7 +725,7 @@ fun PresetManagementScreen(
                         text = "Enter a display name for this custom audio track in the in-call soundboard:",
                         color = colors.onSurfaceVariant,
                         fontSize = 13.sp,
-                        fontFamily = GoogleSans
+                        fontFamily = AppFont
                     )
                     OutlinedTextField(
                         value = importTitle,
@@ -757,7 +757,7 @@ fun PresetManagementScreen(
                             text = "Place at Top of Soundboard",
                             color = colors.onSurface,
                             fontSize = 12.5.sp,
-                            fontFamily = GoogleSans
+                            fontFamily = AppFont
                         )
                     }
                 }
@@ -777,12 +777,12 @@ fun PresetManagementScreen(
                         }
                     }
                 ) {
-                    Text("Import", color = colors.primary, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
+                    Text("Import", color = colors.primary, fontWeight = FontWeight.Bold, fontFamily = AppFont)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { pendingImportUri = null }) {
-                    Text("Cancel", color = colors.onSurfaceVariant, fontFamily = GoogleSans)
+                    Text("Cancel", color = colors.onSurfaceVariant, fontFamily = AppFont)
                 }
             }
         )
@@ -802,7 +802,7 @@ fun PresetManagementScreen(
                     text = "Add Speech Preset",
                     color = colors.onSurface,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = GoogleSans
+                    fontFamily = AppFont
                 )
             },
             text = {
@@ -855,7 +855,7 @@ fun PresetManagementScreen(
                             text = "Place at Top of Soundboard",
                             color = colors.onSurface,
                             fontSize = 12.5.sp,
-                            fontFamily = GoogleSans
+                            fontFamily = AppFont
                         )
                     }
                 }
@@ -873,12 +873,12 @@ fun PresetManagementScreen(
                         }
                     }
                 ) {
-                    Text("Add", color = colors.primary, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
+                    Text("Add", color = colors.primary, fontWeight = FontWeight.Bold, fontFamily = AppFont)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { isAddingTextPreset = false }) {
-                    Text("Cancel", color = colors.onSurfaceVariant, fontFamily = GoogleSans)
+                    Text("Cancel", color = colors.onSurfaceVariant, fontFamily = AppFont)
                 }
             }
         )
@@ -897,7 +897,7 @@ fun PresetManagementScreen(
                     text = "Edit Preset",
                     color = colors.onSurface,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = GoogleSans
+                    fontFamily = AppFont
                 )
             },
             text = {
@@ -956,12 +956,12 @@ fun PresetManagementScreen(
                         editingPreset = null
                     }
                 ) {
-                    Text("Save", color = colors.primary, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
+                    Text("Save", color = colors.primary, fontWeight = FontWeight.Bold, fontFamily = AppFont)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { editingPreset = null }) {
-                    Text("Cancel", color = colors.onSurfaceVariant, fontFamily = GoogleSans)
+                    Text("Cancel", color = colors.onSurfaceVariant, fontFamily = AppFont)
                 }
             }
         )
@@ -982,7 +982,7 @@ fun PresetManagementScreen(
                     text = "Add Quick Reply",
                     color = colors.onSurface,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = GoogleSans
+                    fontFamily = AppFont
                 )
             },
             text = {
@@ -1030,7 +1030,7 @@ fun PresetManagementScreen(
                             text = "Hindi / Hinglish Mode",
                             color = colors.onSurface,
                             fontSize = 13.sp,
-                            fontFamily = GoogleSans
+                            fontFamily = AppFont
                         )
                         Switch(
                             checked = isHindi,
@@ -1055,7 +1055,7 @@ fun PresetManagementScreen(
                             text = "Place at Front of Ribbon (First in Call Screen)",
                             color = colors.onSurface,
                             fontSize = 12.sp,
-                            fontFamily = GoogleSans
+                            fontFamily = AppFont
                         )
                     }
                 }
@@ -1074,12 +1074,12 @@ fun PresetManagementScreen(
                         }
                     }
                 ) {
-                    Text("Add", color = colors.primary, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
+                    Text("Add", color = colors.primary, fontWeight = FontWeight.Bold, fontFamily = AppFont)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { isAddingQuickReply = false }) {
-                    Text("Cancel", color = colors.onSurfaceVariant, fontFamily = GoogleSans)
+                    Text("Cancel", color = colors.onSurfaceVariant, fontFamily = AppFont)
                 }
             }
         )
@@ -1099,7 +1099,7 @@ fun PresetManagementScreen(
                     text = "Edit Quick Reply",
                     color = colors.onSurface,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = GoogleSans
+                    fontFamily = AppFont
                 )
             },
             text = {
@@ -1145,7 +1145,7 @@ fun PresetManagementScreen(
                             text = "Hindi Mode",
                             color = colors.onSurface,
                             fontSize = 13.sp,
-                            fontFamily = GoogleSans
+                            fontFamily = AppFont
                         )
                         Switch(
                             checked = isHindi,
@@ -1170,12 +1170,12 @@ fun PresetManagementScreen(
                         editingQuickReply = null
                     }
                 ) {
-                    Text("Save", color = colors.primary, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
+                    Text("Save", color = colors.primary, fontWeight = FontWeight.Bold, fontFamily = AppFont)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { editingQuickReply = null }) {
-                    Text("Cancel", color = colors.onSurfaceVariant, fontFamily = GoogleSans)
+                    Text("Cancel", color = colors.onSurfaceVariant, fontFamily = AppFont)
                 }
             }
         )
@@ -1191,7 +1191,7 @@ fun PresetManagementScreen(
                     text = "Delete Preset?",
                     color = colors.onSurface,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = GoogleSans
+                    fontFamily = AppFont
                 )
             },
             text = {
@@ -1199,7 +1199,7 @@ fun PresetManagementScreen(
                     text = "Are you sure you want to remove \"$title\"? It will no longer appear in the in-call ribbon.",
                     color = colors.onSurfaceVariant,
                     fontSize = 13.5.sp,
-                    fontFamily = GoogleSans
+                    fontFamily = AppFont
                 )
             },
             confirmButton = {
@@ -1213,12 +1213,12 @@ fun PresetManagementScreen(
                         deleteConfirmationItem = null
                     }
                 ) {
-                    Text("Delete", color = colors.error, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
+                    Text("Delete", color = colors.error, fontWeight = FontWeight.Bold, fontFamily = AppFont)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { deleteConfirmationItem = null }) {
-                    Text("Cancel", color = colors.onSurfaceVariant, fontFamily = GoogleSans)
+                    Text("Cancel", color = colors.onSurfaceVariant, fontFamily = AppFont)
                 }
             }
         )
@@ -1234,7 +1234,7 @@ fun PresetManagementScreen(
                     text = "Reset to Default?",
                     color = colors.onSurface,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = GoogleSans
+                    fontFamily = AppFont
                 )
             },
             text = {
@@ -1245,7 +1245,7 @@ fun PresetManagementScreen(
                         "This will reset all Quick Replies to factory defaults.",
                     color = colors.onSurfaceVariant,
                     fontSize = 13.5.sp,
-                    fontFamily = GoogleSans
+                    fontFamily = AppFont
                 )
             },
             confirmButton = {
@@ -1259,12 +1259,12 @@ fun PresetManagementScreen(
                         isResetConfirmOpen = false
                     }
                 ) {
-                    Text("Reset", color = colors.primary, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
+                    Text("Reset", color = colors.primary, fontWeight = FontWeight.Bold, fontFamily = AppFont)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { isResetConfirmOpen = false }) {
-                    Text("Cancel", color = colors.onSurfaceVariant, fontFamily = GoogleSans)
+                    Text("Cancel", color = colors.onSurfaceVariant, fontFamily = AppFont)
                 }
             }
         )
@@ -1420,7 +1420,7 @@ fun SoundboardPresetItemRow(
                             text = preset.category,
                             color = colors.onSurfaceVariant.copy(alpha = 0.6f),
                             fontSize = 10.5.sp,
-                            fontFamily = GoogleSans,
+                            fontFamily = AppFont,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -1433,7 +1433,7 @@ fun SoundboardPresetItemRow(
                     color = colors.onSurface,
                     fontSize = 13.5.sp,
                     fontWeight = FontWeight.SemiBold,
-                    fontFamily = GoogleSans,
+                    fontFamily = AppFont,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1444,7 +1444,7 @@ fun SoundboardPresetItemRow(
                         text = preset.textOrPath,
                         color = colors.onSurfaceVariant,
                         fontSize = 11.5.sp,
-                        fontFamily = GoogleSans,
+                        fontFamily = AppFont,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -1673,7 +1673,7 @@ fun QuickReplyItemRow(
                     color = colors.onSurface,
                     fontSize = 13.5.sp,
                     fontWeight = FontWeight.SemiBold,
-                    fontFamily = GoogleSans,
+                    fontFamily = AppFont,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1684,7 +1684,7 @@ fun QuickReplyItemRow(
                         text = reply.spokenText,
                         color = colors.onSurfaceVariant,
                         fontSize = 11.5.sp,
-                        fontFamily = GoogleSans,
+                        fontFamily = AppFont,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )

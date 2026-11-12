@@ -84,7 +84,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.callscreener.app.engine.JammerMode
 import com.callscreener.app.engine.SpeechJammerEngine
-import com.callscreener.app.ui.theme.GoogleSans
+import com.callscreener.app.ui.theme.AppFont
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -214,7 +214,7 @@ fun SpeechJammerDialog(
                                     text = "Echo Chamber & Jammer",
                                     color = colors.onSurface,
                                     fontSize = 19.sp,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = (-0.3).sp
                                 )
@@ -222,7 +222,7 @@ fun SpeechJammerDialog(
                                     text = "Delayed Auditory Feedback (DAF)",
                                     color = colors.onSurfaceVariant,
                                     fontSize = 12.sp,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     fontWeight = FontWeight.Normal
                                 )
                             }
@@ -251,7 +251,7 @@ fun SpeechJammerDialog(
                                     text = if (isEnabled) "ACTIVE" else "OFF",
                                     color = if (isEnabled) Color(0xFF2EAA55) else colors.onSurfaceVariant,
                                     fontSize = 11.sp,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -298,7 +298,7 @@ fun SpeechJammerDialog(
                                         text = "HOW ACOUSTIC DISRUPTION WORKS",
                                         color = colors.primary,
                                         fontSize = 11.sp,
-                                        fontFamily = GoogleSans,
+                                        fontFamily = AppFont,
                                         fontWeight = FontWeight.Bold,
                                         letterSpacing = 0.8.sp
                                     )
@@ -307,7 +307,7 @@ fun SpeechJammerDialog(
                                     text = "Human speech requires auditory feedback to monitor cadence. By reflecting the caller's voice back with a ~200ms delay, their brain experiences a timing collision—inducing immediate stuttering, slurred speech, and total verbal confusion.",
                                     color = colors.onSurfaceVariant,
                                     fontSize = 12.5.sp,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     lineHeight = 17.sp
                                 )
                             }
@@ -352,7 +352,7 @@ fun SpeechJammerDialog(
                                             text = "Acoustic Disruption Engine",
                                             color = colors.onSurface,
                                             fontSize = 15.sp,
-                                            fontFamily = GoogleSans,
+                                            fontFamily = AppFont,
                                             fontWeight = FontWeight.SemiBold
                                         )
                                         Spacer(modifier = Modifier.height(2.dp))
@@ -360,7 +360,7 @@ fun SpeechJammerDialog(
                                             text = if (isEnabled) "Active in calls • Quick toggle on call screen" else "Engine disabled • Controls hidden",
                                             color = colors.onSurfaceVariant,
                                             fontSize = 12.sp,
-                                            fontFamily = GoogleSans
+                                            fontFamily = AppFont
                                         )
                                     }
                                 }
@@ -399,7 +399,7 @@ fun SpeechJammerDialog(
                                     text = "ACOUSTIC DISRUPTION MODE",
                                     color = colors.primary,
                                     fontSize = 11.sp,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 0.8.sp
                                 )
@@ -471,7 +471,7 @@ fun SpeechJammerDialog(
                                                         text = details.first,
                                                         color = colors.onSurface,
                                                         fontSize = 14.sp,
-                                                        fontFamily = GoogleSans,
+                                                        fontFamily = AppFont,
                                                         fontWeight = FontWeight.SemiBold
                                                     )
                                                     Spacer(modifier = Modifier.height(2.dp))
@@ -479,7 +479,7 @@ fun SpeechJammerDialog(
                                                         text = details.second,
                                                         color = colors.onSurfaceVariant,
                                                         fontSize = 11.5.sp,
-                                                        fontFamily = GoogleSans,
+                                                        fontFamily = AppFont,
                                                         lineHeight = 15.sp
                                                     )
                                                 }
@@ -525,7 +525,7 @@ fun SpeechJammerDialog(
                                         text = "ACOUSTIC REVERB DECAY",
                                         color = colors.primary,
                                         fontSize = 11.sp,
-                                        fontFamily = GoogleSans,
+                                        fontFamily = AppFont,
                                         fontWeight = FontWeight.Bold,
                                         letterSpacing = 0.8.sp
                                     )
@@ -568,7 +568,7 @@ fun SpeechJammerDialog(
                                                 text = label,
                                                 color = if (isSelected) colors.onPrimaryContainer else colors.onSurfaceVariant,
                                                 fontSize = 12.sp,
-                                                fontFamily = GoogleSans,
+                                                fontFamily = AppFont,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                             )
                                         }
@@ -579,7 +579,7 @@ fun SpeechJammerDialog(
                                     text = "Dynamic noise-gate squelch cuts background room noise so silence produces clean reflections without amplifier hiss.",
                                     color = colors.onSurfaceVariant.copy(alpha = 0.70f),
                                     fontSize = 11.5.sp,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     modifier = Modifier.padding(start = 2.dp)
                                 )
                             }
@@ -602,7 +602,7 @@ fun SpeechJammerDialog(
                                     text = "DISRUPTION DELAY CADENCE",
                                     color = colors.primary,
                                     fontSize = 11.sp,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 0.8.sp
                                 )
@@ -647,7 +647,7 @@ fun SpeechJammerDialog(
                                                 text = label,
                                                 color = if (isSelected) colors.onSurface else colors.onSurfaceVariant,
                                                 fontSize = 13.5.sp,
-                                                fontFamily = GoogleSans,
+                                                fontFamily = AppFont,
                                                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                                             )
                                             if (isSelected) {
@@ -655,7 +655,7 @@ fun SpeechJammerDialog(
                                                     text = "ACTIVE",
                                                     color = colors.primary,
                                                     fontSize = 10.sp,
-                                                    fontFamily = GoogleSans,
+                                                    fontFamily = AppFont,
                                                     fontWeight = FontWeight.Bold
                                                 )
                                             }
@@ -682,7 +682,7 @@ fun SpeechJammerDialog(
                                     text = "DISRUPTION INTENSITY (ECHO GAIN)",
                                     color = colors.primary,
                                     fontSize = 11.sp,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 0.8.sp
                                 )
@@ -725,7 +725,7 @@ fun SpeechJammerDialog(
                                             text = label,
                                             color = if (isSelected) colors.onPrimaryContainer else colors.onSurfaceVariant,
                                             fontSize = 12.sp,
-                                            fontFamily = GoogleSans,
+                                            fontFamily = AppFont,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                         )
                                     }
@@ -753,7 +753,7 @@ fun SpeechJammerDialog(
                                             text = "Auto-Jam Unknown Callers",
                                             color = colors.onSurface,
                                             fontSize = 14.sp,
-                                            fontFamily = GoogleSans,
+                                            fontFamily = AppFont,
                                             fontWeight = FontWeight.Medium
                                         )
                                         Spacer(modifier = Modifier.height(2.dp))
@@ -761,7 +761,7 @@ fun SpeechJammerDialog(
                                             text = "Engages acoustic DAF immediately when non-contacts speak",
                                             color = colors.onSurfaceVariant,
                                             fontSize = 11.5.sp,
-                                            fontFamily = GoogleSans
+                                            fontFamily = AppFont
                                         )
                                     }
 
@@ -808,7 +808,7 @@ fun SpeechJammerDialog(
                                                 text = "Echo My Voice (Two-Way)",
                                                 color = colors.onSurface,
                                                 fontSize = 14.sp,
-                                                fontFamily = GoogleSans,
+                                                fontFamily = AppFont,
                                                 fontWeight = FontWeight.Medium
                                             )
                                         }
@@ -817,7 +817,7 @@ fun SpeechJammerDialog(
                                             text = "Your mic auto-unmutes and your voice echoes to the caller in the same chamber",
                                             color = colors.onSurfaceVariant,
                                             fontSize = 11.5.sp,
-                                            fontFamily = GoogleSans
+                                            fontFamily = AppFont
                                         )
                                     }
 
@@ -876,14 +876,14 @@ fun SpeechJammerDialog(
                                             text = if (selectedMode == JammerMode.INFINITE_ECHO) "Live Echo Chamber Test Lab" else "Live DAF Jammer Test Lab",
                                             color = colors.onSurface,
                                             fontSize = 14.5.sp,
-                                            fontFamily = GoogleSans,
+                                            fontFamily = AppFont,
                                             fontWeight = FontWeight.SemiBold
                                         )
                                         Text(
                                             text = "Interactive Local Microphone Feedback",
                                             color = colors.onSurfaceVariant,
                                             fontSize = 11.5.sp,
-                                            fontFamily = GoogleSans
+                                            fontFamily = AppFont
                                         )
                                     }
                                 }
@@ -895,7 +895,7 @@ fun SpeechJammerDialog(
                                         "Put on headphones or hold phone to ear. Speak aloud while testing to feel how your brain struggles to maintain speech rhythm under delayed feedback!",
                                     color = colors.onSurfaceVariant,
                                     fontSize = 12.sp,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     lineHeight = 16.sp
                                 )
 
@@ -909,7 +909,7 @@ fun SpeechJammerDialog(
                                                 text = "FEEDBACK DISRUPTION LEVEL",
                                                 color = colors.primary,
                                                 fontSize = 10.sp,
-                                                fontFamily = GoogleSans,
+                                                fontFamily = AppFont,
                                                 fontWeight = FontWeight.Bold,
                                                 letterSpacing = 0.5.sp
                                             )
@@ -917,7 +917,7 @@ fun SpeechJammerDialog(
                                                 text = "${(liveDisruptionLevel * 100).toInt()}%",
                                                 color = colors.primary,
                                                 fontSize = 10.sp,
-                                                fontFamily = GoogleSans,
+                                                fontFamily = AppFont,
                                                 fontWeight = FontWeight.Bold
                                             )
                                         }
@@ -988,7 +988,7 @@ fun SpeechJammerDialog(
                                     }
                                     Text(
                                         text = btnText,
-                                        fontFamily = GoogleSans,
+                                        fontFamily = AppFont,
                                         fontWeight = FontWeight.SemiBold,
                                         fontSize = 14.sp
                                     )

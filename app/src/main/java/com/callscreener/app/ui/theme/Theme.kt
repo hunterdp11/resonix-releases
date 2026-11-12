@@ -24,13 +24,13 @@ private val AppShapes = Shapes(
 )
 
 private val DarkColorScheme = darkColorScheme(
-    primary = AppleBlue,
+    primary = VibrantBlue,
     onPrimary = TextPrimary,
     primaryContainer = GlassSurface,
     onPrimaryContainer = TextPrimary,
-    secondary = AppleGreen,
+    secondary = VibrantGreen,
     onSecondary = TextPrimary,
-    error = AppleRed,
+    error = VibrantRed,
     onError = TextPrimary,
     background = GlassBackground,
     onBackground = TextPrimary,
@@ -63,7 +63,7 @@ fun CallScreenerTheme(content: @Composable () -> Unit) {
         typography = AppTypography
     ) {
         CompositionLocalProvider(
-            LocalTextStyle provides TextStyle(fontFamily = GoogleSans)
+            LocalTextStyle provides TextStyle(fontFamily = AppFont)
         ) {
             content()
         }

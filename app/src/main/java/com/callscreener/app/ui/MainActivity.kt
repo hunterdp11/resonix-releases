@@ -241,32 +241,32 @@ import com.callscreener.app.model.VoicePersona
 import com.callscreener.app.root.AppOperationMode
 import com.callscreener.app.root.RootPrivilegeManager
 import com.callscreener.app.session.CallSessionManager
-import com.callscreener.app.ui.theme.AppleAmber
-import com.callscreener.app.ui.theme.AppleAmberGlassFill
-import com.callscreener.app.ui.theme.AppleBlue
-import com.callscreener.app.ui.theme.AppleBlueGlassFill
-import com.callscreener.app.ui.theme.AppleGreen
-import com.callscreener.app.ui.theme.AppleGreenGlassFill
-import com.callscreener.app.ui.theme.AppleIndigo
-import com.callscreener.app.ui.theme.ApplePurple
-import com.callscreener.app.ui.theme.AppleRed
-import com.callscreener.app.ui.theme.AppleRedGlassFill
-import com.callscreener.app.ui.theme.AppleTeal
+import com.callscreener.app.ui.theme.VibrantAmber
+import com.callscreener.app.ui.theme.VibrantAmberGlassFill
+import com.callscreener.app.ui.theme.VibrantBlue
+import com.callscreener.app.ui.theme.VibrantBlueGlassFill
+import com.callscreener.app.ui.theme.VibrantGreen
+import com.callscreener.app.ui.theme.VibrantGreenGlassFill
+import com.callscreener.app.ui.theme.VibrantIndigo
+import com.callscreener.app.ui.theme.VibrantPurple
+import com.callscreener.app.ui.theme.VibrantRed
+import com.callscreener.app.ui.theme.VibrantRedGlassFill
+import com.callscreener.app.ui.theme.VibrantTeal
 import com.callscreener.app.ui.theme.CallScreenerTheme
 import com.callscreener.app.ui.theme.GlassBackgroundGradient
-import com.callscreener.app.ui.theme.LiquidGlassBorder
-import com.callscreener.app.ui.theme.LiquidGlassBorderSubtle
-import com.callscreener.app.ui.theme.LiquidGlassDockBorder
-import com.callscreener.app.ui.theme.LiquidGlassDockFill
-import com.callscreener.app.ui.theme.LiquidGlassFill
-import com.callscreener.app.ui.theme.LiquidGlassFillElevated
-import com.callscreener.app.ui.theme.LiquidGlassFillSubtle
+import com.callscreener.app.ui.theme.FrostedGlassBorder
+import com.callscreener.app.ui.theme.FrostedGlassBorderSubtle
+import com.callscreener.app.ui.theme.FrostedGlassDockBorder
+import com.callscreener.app.ui.theme.FrostedGlassDockFill
+import com.callscreener.app.ui.theme.FrostedGlassFill
+import com.callscreener.app.ui.theme.FrostedGlassFillElevated
+import com.callscreener.app.ui.theme.FrostedGlassFillSubtle
 import com.callscreener.app.ui.theme.TextMuted
 import com.callscreener.app.ui.theme.TextPrimary
 import com.callscreener.app.ui.theme.TextSecondary
 import com.callscreener.app.ui.theme.TextTertiary
 import com.callscreener.app.ui.theme.GlassBackground
-import com.callscreener.app.ui.theme.GoogleSans
+import com.callscreener.app.ui.theme.AppFont
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.ui.text.TextStyle
@@ -691,7 +691,7 @@ fun MainDashboard(
             }
         }
 
-        LiquidGlassBottomBar(
+        FrostedGlassBottomBar(
             currentTab = currentTab,
             onTabSelected = { currentTab = it },
             monetColors = monetColors,
@@ -714,7 +714,7 @@ fun MainDashboard(
                 }
             }
 
-            Ios26LiquidContactDetailsSheet(
+            ContactDetailsSheet(
                 contact = contact,
                 callHistory = contactHistory,
                 presets = presets,
@@ -802,7 +802,7 @@ fun PixelLiquidBackdrop(monetColors: ColorScheme) {
 }
 
 @Composable
-fun LiquidGlassBottomBar(
+fun FrostedGlassBottomBar(
     currentTab: DialerTab,
     onTabSelected: (DialerTab) -> Unit,
     monetColors: ColorScheme,
@@ -1077,7 +1077,7 @@ fun LiquidGlassBottomBar(
                                 text = label,
                                 color = labelColor,
                                 fontSize = 11.5.sp,
-                                fontFamily = GoogleSans,
+                                fontFamily = AppFont,
                                 fontWeight = FontWeight.SemiBold,
                                 letterSpacing = 0.2.sp,
                                 maxLines = 1,
@@ -1174,7 +1174,7 @@ fun ContactAvatar(
                 text = initials,
                 color = avatarFg,
                 fontSize = fontSize,
-                fontFamily = GoogleSans,
+                fontFamily = AppFont,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -1305,7 +1305,7 @@ fun RecentsScreen(
                         text = "Loading call history...",
                         color = monetColors.onSurfaceVariant,
                         fontSize = 15.sp,
-                        fontFamily = GoogleSans,
+                        fontFamily = AppFont,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -1321,7 +1321,7 @@ fun RecentsScreen(
                     modifier = Modifier.padding(horizontal = 32.dp)
                 ) {
                     Image(
-                        painter = painterResource(id = com.callscreener.app.R.drawable.oneplus_empty_call_log_illustration),
+                        painter = painterResource(id = com.callscreener.app.R.drawable.empty_call_log_illustration),
                         contentDescription = null,
                         modifier = Modifier
                             .size(160.dp)
@@ -1335,7 +1335,7 @@ fun RecentsScreen(
                             else "No Recent Calls",
                         color = monetColors.onSurface,
                         fontSize = 18.sp,
-                        fontFamily = GoogleSans,
+                        fontFamily = AppFont,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -1348,7 +1348,7 @@ fun RecentsScreen(
                             "Calls you make and receive will show up here",
                         color = monetColors.onSurfaceVariant,
                         fontSize = 13.5.sp,
-                        fontFamily = GoogleSans,
+                        fontFamily = AppFont,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -1377,7 +1377,7 @@ fun RecentsScreen(
                                 Text(
                                     text = dateGroup,
                                     color = monetColors.onPrimaryContainer,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 0.8.sp
@@ -1394,7 +1394,7 @@ fun RecentsScreen(
                             Text(
                                 text = "${logsInGroup.size} calls",
                                 color = monetColors.onSurfaceVariant.copy(alpha = 0.7f),
-                                fontFamily = GoogleSans,
+                                fontFamily = AppFont,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium
                             )
@@ -1471,7 +1471,7 @@ fun RecentsScreen(
                                         text = callerName,
                                         color = if (isMissed) Color(0xFFFF6B6B) else monetColors.onSurface,
                                         fontSize = 15.sp,
-                                        fontFamily = GoogleSans,
+                                        fontFamily = AppFont,
                                         fontWeight = FontWeight.Bold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -1508,7 +1508,7 @@ fun RecentsScreen(
                                                 subText,
                                             color = monetColors.onSurfaceVariant,
                                             fontSize = 12.sp,
-                                            fontFamily = GoogleSans,
+                                            fontFamily = AppFont,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -1523,7 +1523,7 @@ fun RecentsScreen(
                                         text = formatCallDate(log.timestamp),
                                         color = monetColors.onSurfaceVariant.copy(alpha = 0.8f),
                                         fontSize = 12.sp,
-                                        fontFamily = GoogleSans
+                                        fontFamily = AppFont
                                     )
 
                                     val callInteraction = remember { MutableInteractionSource() }
@@ -1638,7 +1638,7 @@ fun RecentsScreen(
                     text = "Recents",
                     color = monetColors.onSurface,
                     fontSize = 32.sp,
-                    fontFamily = GoogleSans,
+                    fontFamily = AppFont,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = (-0.8).sp
                 )
@@ -1719,7 +1719,7 @@ fun RecentsScreen(
                                         text = filter,
                                         color = pillFg,
                                         fontSize = 12.5.sp,
-                                        fontFamily = GoogleSans,
+                                        fontFamily = AppFont,
                                         fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium
                                     )
                                 }
@@ -1763,7 +1763,7 @@ fun RecentsScreen(
                                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
                                         Icon(Icons.Rounded.Settings, contentDescription = null, tint = monetColors.primary, modifier = Modifier.size(18.dp))
-                                        Text("Call Settings", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = GoogleSans)
+                                        Text("Call Settings", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = AppFont)
                                     }
                                 },
                                 onClick = {
@@ -1777,8 +1777,8 @@ fun RecentsScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
-                                        Icon(Icons.Rounded.Tune, contentDescription = null, tint = AppleAmber, modifier = Modifier.size(18.dp))
-                                        Text("Audio Presets & Personas", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = GoogleSans)
+                                        Icon(Icons.Rounded.Tune, contentDescription = null, tint = VibrantAmber, modifier = Modifier.size(18.dp))
+                                        Text("Audio Presets & Personas", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = AppFont)
                                     }
                                 },
                                 onClick = {
@@ -1807,7 +1807,7 @@ fun RecentsScreen(
 }
 
 @Composable
-fun Ios26LiquidContactDetailsSheet(
+fun ContactDetailsSheet(
     contact: ContactItem,
     callHistory: List<CallLogItem> = emptyList(),
     presets: List<AudioPreset> = emptyList(),
@@ -1993,7 +1993,7 @@ fun Ios26LiquidContactDetailsSheet(
                             text = if (isUnknownNumber) "Caller details" else "Contact info",
                             color = monetColors.onSurface,
                             fontSize = 20.sp,
-                            fontFamily = GoogleSans,
+                            fontFamily = AppFont,
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = (-0.3).sp,
                             maxLines = 1,
@@ -2153,7 +2153,7 @@ fun Ios26LiquidContactDetailsSheet(
                                         text = initials,
                                         color = avatarFg,
                                         fontSize = 36.sp,
-                                        fontFamily = GoogleSans,
+                                        fontFamily = AppFont,
                                         fontWeight = FontWeight.SemiBold,
                                         letterSpacing = 0.5.sp
                                     )
@@ -2208,7 +2208,7 @@ fun Ios26LiquidContactDetailsSheet(
                                     text = "Remove custom photo",
                                     color = monetColors.onSurfaceVariant,
                                     fontSize = 11.5.sp,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     fontWeight = FontWeight.Medium
                                 )
                             }
@@ -2218,7 +2218,7 @@ fun Ios26LiquidContactDetailsSheet(
                             text = if (isUnknownNumber) formattedNum else contact.name,
                             color = monetColors.onSurface,
                             fontSize = 24.sp,
-                            fontFamily = GoogleSans,
+                            fontFamily = AppFont,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center,
                             letterSpacing = (-0.4).sp,
@@ -2231,7 +2231,7 @@ fun Ios26LiquidContactDetailsSheet(
                                 text = formattedNum,
                                 color = monetColors.onSurfaceVariant,
                                 fontSize = 15.sp,
-                                fontFamily = GoogleSans,
+                                fontFamily = AppFont,
                                 fontWeight = FontWeight.Normal,
                                 textAlign = TextAlign.Center
                             )
@@ -2260,7 +2260,7 @@ fun Ios26LiquidContactDetailsSheet(
                                     text = if (isUnknownNumber) "Unsaved Number" else "Mobile • Saved Contact",
                                     color = monetColors.onSurfaceVariant,
                                     fontSize = 12.sp,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     fontWeight = FontWeight.Medium
                                 )
                             }
@@ -2297,7 +2297,7 @@ fun Ios26LiquidContactDetailsSheet(
                                 Text(
                                     text = "Save contact",
                                     fontSize = 14.sp,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
@@ -2399,13 +2399,13 @@ fun Ios26LiquidContactDetailsSheet(
                                         color = monetColors.onSurface,
                                         fontSize = 16.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        fontFamily = GoogleSans
+                                        fontFamily = AppFont
                                     )
                                     Text(
                                         text = "Mobile • Cellular",
                                         color = monetColors.onSurfaceVariant,
                                         fontSize = 12.sp,
-                                        fontFamily = GoogleSans
+                                        fontFamily = AppFont
                                     )
                                 }
                             }
@@ -2454,7 +2454,7 @@ fun Ios26LiquidContactDetailsSheet(
                                     text = "CALL SCREENER",
                                     color = monetColors.primary,
                                     fontSize = 11.sp,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 0.8.sp
                                 )
@@ -2470,14 +2470,14 @@ fun Ios26LiquidContactDetailsSheet(
                                         text = "Always screen this caller",
                                         color = monetColors.onSurface,
                                         fontSize = 14.sp,
-                                        fontFamily = GoogleSans,
+                                        fontFamily = AppFont,
                                         fontWeight = FontWeight.Medium
                                     )
                                     Text(
                                         text = "AI assistant intercepts before phone rings",
                                         color = monetColors.onSurfaceVariant,
                                         fontSize = 11.5.sp,
-                                        fontFamily = GoogleSans
+                                        fontFamily = AppFont
                                     )
                                 }
                                 Switch(
@@ -2512,14 +2512,14 @@ fun Ios26LiquidContactDetailsSheet(
                                         text = "VIP caller (Never screen)",
                                         color = monetColors.onSurface,
                                         fontSize = 14.sp,
-                                        fontFamily = GoogleSans,
+                                        fontFamily = AppFont,
                                         fontWeight = FontWeight.Medium
                                     )
                                     Text(
                                         text = "Calls ring through directly without screening",
                                         color = monetColors.onSurfaceVariant,
                                         fontSize = 11.5.sp,
-                                        fontFamily = GoogleSans
+                                        fontFamily = AppFont
                                     )
                                 }
                                 Switch(
@@ -2554,14 +2554,14 @@ fun Ios26LiquidContactDetailsSheet(
                                         text = "Screening Persona",
                                         color = monetColors.onSurface,
                                         fontSize = 13.5.sp,
-                                        fontFamily = GoogleSans,
+                                        fontFamily = AppFont,
                                         fontWeight = FontWeight.Medium
                                     )
                                     Text(
                                         text = "Voice applied to this caller",
                                         color = monetColors.onSurfaceVariant,
                                         fontSize = 11.sp,
-                                        fontFamily = GoogleSans
+                                        fontFamily = AppFont
                                     )
                                 }
 
@@ -2582,7 +2582,7 @@ fun Ios26LiquidContactDetailsSheet(
                                         text = "${selectedPersona.name} (${selectedPersona.code})",
                                         color = monetColors.onPrimaryContainer,
                                         fontSize = 12.sp,
-                                        fontFamily = GoogleSans,
+                                        fontFamily = AppFont,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
@@ -2617,7 +2617,7 @@ fun Ios26LiquidContactDetailsSheet(
                                         text = "CALL HISTORY",
                                         color = monetColors.primary,
                                         fontSize = 11.sp,
-                                        fontFamily = GoogleSans,
+                                        fontFamily = AppFont,
                                         fontWeight = FontWeight.Bold,
                                         letterSpacing = 0.8.sp
                                     )
@@ -2627,7 +2627,7 @@ fun Ios26LiquidContactDetailsSheet(
                                         text = "${callHistory.size} calls",
                                         color = monetColors.onSurfaceVariant,
                                         fontSize = 11.sp,
-                                        fontFamily = GoogleSans
+                                        fontFamily = AppFont
                                     )
                                 }
                             }
@@ -2668,7 +2668,7 @@ fun Ios26LiquidContactDetailsSheet(
                                                     text = if (isMissed) "Missed" else if (isOut) "Outgoing" else "Incoming",
                                                     color = if (isMissed) Color(0xFFF44336) else monetColors.onSurface,
                                                     fontSize = 13.5.sp,
-                                                    fontFamily = GoogleSans,
+                                                    fontFamily = AppFont,
                                                     fontWeight = FontWeight.Medium
                                                 )
                                                 if (!isMissed && log.durationSeconds > 0) {
@@ -2676,7 +2676,7 @@ fun Ios26LiquidContactDetailsSheet(
                                                         text = formatDuration(log.durationSeconds),
                                                         color = monetColors.onSurfaceVariant,
                                                         fontSize = 11.sp,
-                                                        fontFamily = GoogleSans
+                                                        fontFamily = AppFont
                                                     )
                                                 }
                                             }
@@ -2686,7 +2686,7 @@ fun Ios26LiquidContactDetailsSheet(
                                             text = formatCallDate(log.timestamp),
                                             color = monetColors.onSurfaceVariant,
                                             fontSize = 11.5.sp,
-                                            fontFamily = GoogleSans
+                                            fontFamily = AppFont
                                         )
                                     }
                                 }
@@ -2695,7 +2695,7 @@ fun Ios26LiquidContactDetailsSheet(
                                     text = "No recent call history with this number",
                                     color = monetColors.onSurfaceVariant.copy(alpha = 0.70f),
                                     fontSize = 12.5.sp,
-                                    fontFamily = GoogleSans
+                                    fontFamily = AppFont
                                 )
                             }
                         }
@@ -2751,7 +2751,7 @@ fun Ios26LiquidContactDetailsSheet(
                                     text = if (isContactBlocked) "Unblock this contact" else "Block number & report spam",
                                     color = Color(0xFFF44336),
                                     fontSize = 14.sp,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     fontWeight = FontWeight.Medium
                                 )
                             }
@@ -2818,7 +2818,7 @@ fun ContactHeroActionPill(
             text = label,
             color = Color(0xFFE2E2E6),
             fontSize = 11.5.sp,
-            fontFamily = GoogleSans,
+            fontFamily = AppFont,
             fontWeight = FontWeight.Medium
         )
     }
@@ -2869,7 +2869,7 @@ fun ContactHeroActionPill(
             text = label,
             color = Color(0xFFE2E2E6),
             fontSize = 11.5.sp,
-            fontFamily = GoogleSans,
+            fontFamily = AppFont,
             fontWeight = FontWeight.Medium
         )
     }
@@ -2902,7 +2902,7 @@ fun CallLogDetailsDialog(
             photoUri = customPhoto
         )
     }
-    Ios26LiquidContactDetailsSheet(
+    ContactDetailsSheet(
         contact = contact,
         callHistory = listOf(log),
         presets = presets,
@@ -2974,7 +2974,7 @@ fun PremiumGlassSearchBar(
                 textStyle = TextStyle(
                     color = Color.White,
                     fontSize = 14.5.sp,
-                    fontFamily = GoogleSans,
+                    fontFamily = AppFont,
                     fontWeight = FontWeight.Normal
                 ),
                 cursorBrush = SolidColor(Color.White),
@@ -2990,7 +2990,7 @@ fun PremiumGlassSearchBar(
                         Text(
                             text = placeholder,
                             color = Color(0x66FFFFFF),
-                            fontFamily = GoogleSans,
+                            fontFamily = AppFont,
                             fontSize = 14.5.sp
                         )
                     }
@@ -3138,7 +3138,7 @@ fun ContactsScreen(
                         text = "Loading contacts...",
                         color = monetColors.onSurfaceVariant,
                         fontSize = 15.sp,
-                        fontFamily = GoogleSans,
+                        fontFamily = AppFont,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -3155,7 +3155,7 @@ fun ContactsScreen(
                     modifier = Modifier.padding(horizontal = 32.dp)
                 ) {
                     Image(
-                        painter = painterResource(id = com.callscreener.app.R.drawable.oneplus_empty_contacts_illustration),
+                        painter = painterResource(id = com.callscreener.app.R.drawable.empty_contacts_illustration),
                         contentDescription = null,
                         modifier = Modifier
                             .size(160.dp)
@@ -3167,7 +3167,7 @@ fun ContactsScreen(
                         text = if (searchQuery.isNotEmpty()) "No Matching Contacts" else "No Contacts Yet",
                         color = monetColors.onSurface,
                         fontSize = 18.sp,
-                        fontFamily = GoogleSans,
+                        fontFamily = AppFont,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -3178,7 +3178,7 @@ fun ContactsScreen(
                             "Add contacts to your phonebook or grant permission to view them",
                         color = monetColors.onSurfaceVariant,
                         fontSize = 13.5.sp,
-                        fontFamily = GoogleSans,
+                        fontFamily = AppFont,
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(18.dp))
@@ -3208,7 +3208,7 @@ fun ContactsScreen(
                             text = "Add Contact",
                             color = monetColors.onPrimaryContainer,
                             fontSize = 14.sp,
-                            fontFamily = GoogleSans,
+                            fontFamily = AppFont,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -3232,7 +3232,7 @@ fun ContactsScreen(
                             ) {
                                 Text(
                                     text = "FREQUENT CONTACTS",
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = monetColors.primary,
@@ -3240,7 +3240,7 @@ fun ContactsScreen(
                                 )
                                 Text(
                                     text = "${frequentContacts.size} quick access",
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     fontSize = 10.5.sp,
                                     color = monetColors.onSurfaceVariant
                                 )
@@ -3329,7 +3329,7 @@ fun ContactsScreen(
                                             text = contact.name,
                                             color = monetColors.onSurface,
                                             fontSize = 12.5.sp,
-                                            fontFamily = GoogleSans,
+                                            fontFamily = AppFont,
                                             fontWeight = FontWeight.SemiBold,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
@@ -3383,7 +3383,7 @@ fun ContactsScreen(
                                 Text(
                                     text = sectionKey,
                                     color = monetColors.onPrimaryContainer,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     fontSize = 12.5.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -3399,7 +3399,7 @@ fun ContactsScreen(
                             Text(
                                 text = "${contactsInSection.size}",
                                 color = monetColors.onSurfaceVariant.copy(alpha = 0.7f),
-                                fontFamily = GoogleSans,
+                                fontFamily = AppFont,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium
                             )
@@ -3487,7 +3487,7 @@ fun ContactsScreen(
                                         text = contact.name,
                                         color = monetColors.onSurface,
                                         fontSize = 15.sp,
-                                        fontFamily = GoogleSans,
+                                        fontFamily = AppFont,
                                         fontWeight = FontWeight.SemiBold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -3497,7 +3497,7 @@ fun ContactsScreen(
                                         text = DialerRepository.formatPhoneNumber(contact.number),
                                         color = monetColors.onSurfaceVariant,
                                         fontSize = 12.sp,
-                                        fontFamily = GoogleSans,
+                                        fontFamily = AppFont,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -3640,7 +3640,7 @@ fun ContactsScreen(
                     text = "Contacts",
                     color = monetColors.onSurface,
                     fontSize = 28.sp,
-                    fontFamily = GoogleSans,
+                    fontFamily = AppFont,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = (-0.5).sp
                 )
@@ -3675,7 +3675,7 @@ fun ContactsScreen(
                             text = "New",
                             color = monetColors.onPrimaryContainer,
                             fontSize = 12.sp,
-                            fontFamily = GoogleSans,
+                            fontFamily = AppFont,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -3691,7 +3691,7 @@ fun ContactsScreen(
                             text = "${contacts.size}",
                             color = monetColors.onSurfaceVariant,
                             fontSize = 12.sp,
-                            fontFamily = GoogleSans,
+                            fontFamily = AppFont,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -3742,7 +3742,7 @@ fun ContactsScreen(
                                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
                                         Icon(Icons.Rounded.Settings, contentDescription = null, tint = monetColors.primary, modifier = Modifier.size(18.dp))
-                                        Text("Call Settings", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = GoogleSans)
+                                        Text("Call Settings", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = AppFont)
                                     }
                                 },
                                 onClick = {
@@ -3756,8 +3756,8 @@ fun ContactsScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
-                                        Icon(Icons.Rounded.Tune, contentDescription = null, tint = AppleAmber, modifier = Modifier.size(18.dp))
-                                        Text("Audio Presets & Personas", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = GoogleSans)
+                                        Icon(Icons.Rounded.Tune, contentDescription = null, tint = VibrantAmber, modifier = Modifier.size(18.dp))
+                                        Text("Audio Presets & Personas", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = AppFont)
                                     }
                                 },
                                 onClick = {
@@ -3837,7 +3837,7 @@ fun PixelDialerSearchBar(
                 .weight(1f)
                 .onFocusChanged { isSearchFocused = it.isFocused },
             textStyle = TextStyle(
-                fontFamily = GoogleSans,
+                fontFamily = AppFont,
                 fontSize = 15.sp,
                 color = monetColors.onSurface,
                 fontWeight = FontWeight.Normal
@@ -3848,7 +3848,7 @@ fun PixelDialerSearchBar(
                 if (query.isEmpty()) {
                     Text(
                         text = placeholder,
-                        fontFamily = GoogleSans,
+                        fontFamily = AppFont,
                         fontSize = 15.sp,
                         color = monetColors.onSurfaceVariant.copy(alpha = 0.7f),
                         fontWeight = FontWeight.Normal
@@ -3955,7 +3955,7 @@ fun OemDialerKeyButton(
                 color = if (isPressed) monetColors.onPrimaryContainer else monetColors.onSurface,
                 fontSize = if (digit == "*" || digit == "#") 32.sp else 30.sp,
                 fontWeight = FontWeight.Medium,
-                fontFamily = GoogleSans,
+                fontFamily = AppFont,
                 lineHeight = 30.sp
             )
             if (digit == "1") {
@@ -3967,7 +3967,7 @@ fun OemDialerKeyButton(
                     else monetColors.onSurfaceVariant.copy(alpha = 0.85f),
                     fontSize = 9.5.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = GoogleSans,
+                    fontFamily = AppFont,
                     letterSpacing = 1.8.sp,
                     lineHeight = 11.sp
                 )
@@ -3977,7 +3977,7 @@ fun OemDialerKeyButton(
                     color = if (isPressed) monetColors.onPrimaryContainer else monetColors.primary,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = GoogleSans,
+                    fontFamily = AppFont,
                     lineHeight = 12.sp
                 )
             }
@@ -4176,7 +4176,7 @@ fun KeypadScreen(
                 text = "Keypad",
                 color = monetColors.onSurface,
                 fontSize = 28.sp,
-                fontFamily = GoogleSans,
+                fontFamily = AppFont,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = (-0.5).sp
             )
@@ -4217,7 +4217,7 @@ fun KeypadScreen(
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     Icon(Icons.Rounded.Settings, contentDescription = null, tint = monetColors.primary, modifier = Modifier.size(18.dp))
-                                    Text("Call Settings", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = GoogleSans)
+                                    Text("Call Settings", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = AppFont)
                                 }
                             },
                             onClick = {
@@ -4231,8 +4231,8 @@ fun KeypadScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
-                                    Icon(Icons.Rounded.Tune, contentDescription = null, tint = AppleAmber, modifier = Modifier.size(18.dp))
-                                    Text("Audio Presets & Personas", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = GoogleSans)
+                                    Icon(Icons.Rounded.Tune, contentDescription = null, tint = VibrantAmber, modifier = Modifier.size(18.dp))
+                                    Text("Audio Presets & Personas", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = AppFont)
                                 }
                             },
                             onClick = {
@@ -4247,7 +4247,7 @@ fun KeypadScreen(
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = Color(0xFF2EAA55), modifier = Modifier.size(18.dp))
-                                    Text("AI Screening Studio", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = GoogleSans)
+                                    Text("AI Screening Studio", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = AppFont)
                                 }
                             },
                             onClick = {
@@ -4339,7 +4339,7 @@ fun KeypadScreen(
                                                 text = matchInitials,
                                                 color = avatarFg,
                                                 fontSize = 12.sp,
-                                                fontFamily = GoogleSans,
+                                                fontFamily = AppFont,
                                                 fontWeight = FontWeight.Bold
                                             )
                                         }
@@ -4351,7 +4351,7 @@ fun KeypadScreen(
                                                 text = contact.name,
                                                 color = monetColors.onSurface,
                                                 fontSize = 13.5.sp,
-                                                fontFamily = GoogleSans,
+                                                fontFamily = AppFont,
                                                 fontWeight = FontWeight.SemiBold,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
@@ -4360,7 +4360,7 @@ fun KeypadScreen(
                                                 text = DialerRepository.formatPhoneNumber(contact.number),
                                                 color = monetColors.onSurfaceVariant,
                                                 fontSize = 11.5.sp,
-                                                fontFamily = GoogleSans,
+                                                fontFamily = AppFont,
                                                 maxLines = 1
                                             )
                                         }
@@ -4422,7 +4422,7 @@ fun KeypadScreen(
                                     text = "Dial \"$keypadSearchQuery\" on keypad",
                                     color = monetColors.onSurface,
                                     fontSize = 13.sp,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     fontWeight = FontWeight.Medium
                                 )
                             }
@@ -4514,7 +4514,7 @@ fun KeypadScreen(
                                     )
                                     Text(
                                         text = "Favorites & Recents",
-                                        fontFamily = GoogleSans,
+                                        fontFamily = AppFont,
                                         fontSize = 13.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = monetColors.onSurface,
@@ -4531,7 +4531,7 @@ fun KeypadScreen(
                                 ) {
                                     Text(
                                         text = "${keypadRecents.size} quick access",
-                                        fontFamily = GoogleSans,
+                                        fontFamily = AppFont,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Medium,
                                         color = monetColors.onSurfaceVariant
@@ -4638,7 +4638,7 @@ fun KeypadScreen(
                                                 text = item.name,
                                                 color = monetColors.onSurface,
                                                 fontSize = 13.5.sp,
-                                                fontFamily = GoogleSans,
+                                                fontFamily = AppFont,
                                                 fontWeight = FontWeight.Bold,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
@@ -4672,7 +4672,7 @@ fun KeypadScreen(
                                                     text = subText,
                                                     color = monetColors.onSurfaceVariant.copy(alpha = 0.8f),
                                                     fontSize = 11.sp,
-                                                    fontFamily = GoogleSans,
+                                                    fontFamily = AppFont,
                                                     maxLines = 1
                                                 )
                                             }
@@ -4725,7 +4725,7 @@ fun KeypadScreen(
                                     modifier = Modifier.padding(horizontal = 20.dp)
                                 ) {
                                     Image(
-                                        painter = painterResource(id = com.callscreener.app.R.drawable.oneplus_empty_speed_dial_illustration),
+                                        painter = painterResource(id = com.callscreener.app.R.drawable.empty_speed_dial_illustration),
                                         contentDescription = null,
                                         modifier = Modifier.size(90.dp),
                                         contentScale = ContentScale.Fit
@@ -4733,7 +4733,7 @@ fun KeypadScreen(
                                     Column {
                                         Text(
                                             text = "No speed dial numbers",
-                                            fontFamily = GoogleSans,
+                                            fontFamily = AppFont,
                                             fontSize = 14.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = monetColors.onSurface
@@ -4741,7 +4741,7 @@ fun KeypadScreen(
                                         Spacer(modifier = Modifier.height(3.dp))
                                         Text(
                                             text = "Your frequent contacts will appear here for 1-tap calling",
-                                            fontFamily = GoogleSans,
+                                            fontFamily = AppFont,
                                             fontSize = 11.5.sp,
                                             color = monetColors.onSurfaceVariant
                                         )
@@ -4770,7 +4770,7 @@ fun KeypadScreen(
                                 text = "Hold 0 for +",
                                 color = monetColors.onSurfaceVariant,
                                 fontSize = 11.sp,
-                                fontFamily = GoogleSans
+                                fontFamily = AppFont
                             )
                         }
                     }
@@ -4787,7 +4787,7 @@ fun KeypadScreen(
                         color = monetColors.onSurface,
                         fontSize = textSize,
                         fontWeight = FontWeight.Normal,
-                        fontFamily = GoogleSans,
+                        fontFamily = AppFont,
                         letterSpacing = (-0.5).sp,
                         textAlign = TextAlign.Center,
                         maxLines = 1,
@@ -4823,7 +4823,7 @@ fun KeypadScreen(
                             text = "Add to Contacts",
                             color = monetColors.primary,
                             fontSize = 12.5.sp,
-                            fontFamily = GoogleSans,
+                            fontFamily = AppFont,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -4847,7 +4847,7 @@ fun KeypadScreen(
                             ) {
                                 Text(
                                     text = "SUGGESTIONS (${t9Matches.size})",
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = monetColors.primary,
@@ -4855,7 +4855,7 @@ fun KeypadScreen(
                                 )
                                 Text(
                                     text = "Tap profile for info",
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     fontSize = 10.5.sp,
                                     color = monetColors.onSurfaceVariant
                                 )
@@ -4948,7 +4948,7 @@ fun KeypadScreen(
                                                 text = match.name,
                                                 color = monetColors.onSurface,
                                                 fontSize = 13.sp,
-                                                fontFamily = GoogleSans,
+                                                fontFamily = AppFont,
                                                 fontWeight = FontWeight.Bold,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
@@ -4957,7 +4957,7 @@ fun KeypadScreen(
                                                 text = DialerRepository.formatPhoneNumber(match.number),
                                                 color = monetColors.onSurfaceVariant,
                                                 fontSize = 11.sp,
-                                                fontFamily = GoogleSans,
+                                                fontFamily = AppFont,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
@@ -5177,14 +5177,14 @@ fun AssistantTabScreen(
                     color = monetColors.onSurface,
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = GoogleSans,
+                    fontFamily = AppFont,
                     letterSpacing = (-0.5).sp
                 )
                 Text(
                     text = "Neural speech synthesis, voice personas & soundboard",
                     color = monetColors.onSurfaceVariant,
                     fontSize = 12.5.sp,
-                    fontFamily = GoogleSans
+                    fontFamily = AppFont
                 )
             }
         }
@@ -5271,7 +5271,7 @@ fun AssistantTabScreen(
                                 color = Color(0xFF81C995),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = GoogleSans
+                                fontFamily = AppFont
                             )
                         }
                     }
@@ -5298,13 +5298,13 @@ fun GlassOperationModeCard(
             .fillMaxWidth()
             .shadow(elevation = 16.dp, shape = RoundedCornerShape(26.dp), spotColor = Color(0x60000000), ambientColor = Color(0x40000000))
             .clip(RoundedCornerShape(26.dp))
-            .background(LiquidGlassFill)
+            .background(FrostedGlassFill)
             .border(
                 1.2.dp,
                 if (currentMode == AppOperationMode.ROOT_ENHANCED)
-                    Brush.verticalGradient(listOf(AppleAmber.copy(alpha = 0.8f), ApplePurple.copy(alpha = 0.4f)))
+                    Brush.verticalGradient(listOf(VibrantAmber.copy(alpha = 0.8f), VibrantPurple.copy(alpha = 0.4f)))
                 else
-                    LiquidGlassBorder,
+                    FrostedGlassBorder,
                 RoundedCornerShape(26.dp)
             )
             .padding(18.dp)
@@ -5321,15 +5321,15 @@ fun GlassOperationModeCard(
                             .size(38.dp)
                             .clip(CircleShape)
                             .background(
-                                if (currentMode == AppOperationMode.ROOT_ENHANCED) AppleAmber.copy(alpha = 0.25f)
-                                else AppleBlue.copy(alpha = 0.25f)
+                                if (currentMode == AppOperationMode.ROOT_ENHANCED) VibrantAmber.copy(alpha = 0.25f)
+                                else VibrantBlue.copy(alpha = 0.25f)
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = if (currentMode == AppOperationMode.ROOT_ENHANCED) Icons.Rounded.Security else Icons.Filled.Call,
                             contentDescription = null,
-                            tint = if (currentMode == AppOperationMode.ROOT_ENHANCED) AppleAmber else AppleBlue,
+                            tint = if (currentMode == AppOperationMode.ROOT_ENHANCED) VibrantAmber else VibrantBlue,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -5346,7 +5346,7 @@ fun GlassOperationModeCard(
                         )
                         Text(
                             text = if (currentMode == AppOperationMode.ROOT_ENHANCED) "Root Superpowers Active" else "Standard Non-Root Profile",
-                            color = if (currentMode == AppOperationMode.ROOT_ENHANCED) AppleAmber else TextSecondary,
+                            color = if (currentMode == AppOperationMode.ROOT_ENHANCED) VibrantAmber else TextSecondary,
                             fontSize = 12.sp
                         )
                     }
@@ -5357,9 +5357,9 @@ fun GlassOperationModeCard(
                         .clip(RoundedCornerShape(10.dp))
                         .background(
                             if (currentMode == AppOperationMode.ROOT_ENHANCED)
-                                (if (rootAvailable) AppleGreen.copy(alpha = 0.2f) else AppleAmber.copy(alpha = 0.2f))
+                                (if (rootAvailable) VibrantGreen.copy(alpha = 0.2f) else VibrantAmber.copy(alpha = 0.2f))
                             else
-                                AppleBlue.copy(alpha = 0.2f)
+                                VibrantBlue.copy(alpha = 0.2f)
                         )
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
@@ -5369,9 +5369,9 @@ fun GlassOperationModeCard(
                         else
                             "STANDARD",
                         color = if (currentMode == AppOperationMode.ROOT_ENHANCED)
-                            (if (rootAvailable) AppleGreen else AppleAmber)
+                            (if (rootAvailable) VibrantGreen else VibrantAmber)
                         else
-                            AppleBlue,
+                            VibrantBlue,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
@@ -5383,8 +5383,8 @@ fun GlassOperationModeCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(LiquidGlassFillSubtle)
-                    .border(1.dp, LiquidGlassBorderSubtle, RoundedCornerShape(16.dp))
+                    .background(FrostedGlassFillSubtle)
+                    .border(1.dp, FrostedGlassBorderSubtle, RoundedCornerShape(16.dp))
                     .padding(3.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
@@ -5393,7 +5393,7 @@ fun GlassOperationModeCard(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(13.dp))
-                        .background(if (isStandard) AppleBlueGlassFill else SolidColor(Color.Transparent))
+                        .background(if (isStandard) VibrantBlueGlassFill else SolidColor(Color.Transparent))
                         .clickable { onSelectMode(AppOperationMode.STANDARD) }
                         .padding(vertical = 9.dp),
                     contentAlignment = Alignment.Center
@@ -5411,7 +5411,7 @@ fun GlassOperationModeCard(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(13.dp))
-                        .background(if (isRoot) AppleAmberGlassFill else SolidColor(Color.Transparent))
+                        .background(if (isRoot) VibrantAmberGlassFill else SolidColor(Color.Transparent))
                         .clickable {
                             onSelectMode(AppOperationMode.ROOT_ENHANCED)
                             coroutineScope.launch {
@@ -5443,7 +5443,7 @@ fun GlassOperationModeCard(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(LiquidGlassFillSubtle)
+                            .background(FrostedGlassFillSubtle)
                             .padding(10.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
@@ -5459,13 +5459,13 @@ fun GlassOperationModeCard(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(AppleGreen.copy(alpha = 0.12f))
-                                .border(0.8.dp, AppleGreen.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
+                                .background(VibrantGreen.copy(alpha = 0.12f))
+                                .border(0.8.dp, VibrantGreen.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
                                 .padding(8.dp)
                         ) {
                             Text(
                                 text = "Root (su) detected on this device. Switch to 'Root Enhanced' above anytime to unlock dual-side ALSA recording & live voice changer.",
-                                color = AppleGreen,
+                                color = VibrantGreen,
                                 fontSize = 11.sp,
                                 lineHeight = 15.sp
                             )
@@ -5485,7 +5485,7 @@ fun GlassOperationModeCard(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(LiquidGlassFillSubtle)
+                            .background(FrostedGlassFillSubtle)
                             .padding(10.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
@@ -5508,11 +5508,11 @@ fun GlassOperationModeCard(
                                 }
                             },
                             enabled = !isCheckingRoot,
-                            colors = ButtonDefaults.buttonColors(containerColor = AppleAmber),
+                            colors = ButtonDefaults.buttonColors(containerColor = VibrantAmber),
                             shape = RoundedCornerShape(14.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .border(1.dp, LiquidGlassBorder, RoundedCornerShape(14.dp))
+                                .border(1.dp, FrostedGlassBorder, RoundedCornerShape(14.dp))
                         ) {
                             Text(
                                 text = if (isCheckingRoot) "Checking su..." else "Verify / Grant Root Access",
@@ -5534,7 +5534,7 @@ fun ModeFeatureRow(text: String, isIncluded: Boolean) {
         Icon(
             imageVector = if (isIncluded) Icons.Filled.CheckCircle else Icons.Filled.Clear,
             contentDescription = null,
-            tint = if (isIncluded) AppleGreen else TextMuted,
+            tint = if (isIncluded) VibrantGreen else TextMuted,
             modifier = Modifier.size(14.dp)
         )
         Spacer(modifier = Modifier.width(8.dp))
@@ -5559,8 +5559,8 @@ fun GlassDefaultAppCard(
             .fillMaxWidth()
             .shadow(elevation = 14.dp, shape = RoundedCornerShape(26.dp), spotColor = Color(0x60000000), ambientColor = Color(0x40000000))
             .clip(RoundedCornerShape(26.dp))
-            .background(LiquidGlassFill)
-            .border(1.2.dp, LiquidGlassBorder, RoundedCornerShape(26.dp))
+            .background(FrostedGlassFill)
+            .border(1.2.dp, FrostedGlassBorder, RoundedCornerShape(26.dp))
             .padding(18.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -5569,13 +5569,13 @@ fun GlassDefaultAppCard(
                     modifier = Modifier
                         .size(38.dp)
                         .clip(CircleShape)
-                        .background(if (isDefaultDialer) AppleGreen.copy(alpha = 0.25f) else AppleAmber.copy(alpha = 0.25f)),
+                        .background(if (isDefaultDialer) VibrantGreen.copy(alpha = 0.25f) else VibrantAmber.copy(alpha = 0.25f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = if (isDefaultDialer) Icons.Filled.CheckCircle else Icons.Filled.Warning,
                         contentDescription = null,
-                        tint = if (isDefaultDialer) AppleGreen else AppleAmber,
+                        tint = if (isDefaultDialer) VibrantGreen else VibrantAmber,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -5604,11 +5604,11 @@ fun GlassDefaultAppCard(
             if (!isDefaultDialer) {
                 Button(
                     onClick = onRequestDefaultDialer,
-                    colors = ButtonDefaults.buttonColors(containerColor = AppleBlue),
+                    colors = ButtonDefaults.buttonColors(containerColor = VibrantBlue),
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, LiquidGlassBorder, RoundedCornerShape(16.dp))
+                        .border(1.dp, FrostedGlassBorder, RoundedCornerShape(16.dp))
                 ) {
                     Text("Set as Default Phone App", color = Color.White, fontWeight = FontWeight.Bold)
                 }
@@ -5628,7 +5628,7 @@ fun GlassDefaultAppCard(
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, LiquidGlassBorderSubtle, RoundedCornerShape(16.dp))
+                        .border(1.dp, FrostedGlassBorderSubtle, RoundedCornerShape(16.dp))
                 ) {
                     Text("Open App System Settings", fontSize = 12.sp)
                 }
@@ -5652,8 +5652,8 @@ fun GlassRootPowerCard() {
             .fillMaxWidth()
             .shadow(elevation = 14.dp, shape = RoundedCornerShape(26.dp), spotColor = Color(0x60000000), ambientColor = Color(0x40000000))
             .clip(RoundedCornerShape(26.dp))
-            .background(LiquidGlassFill)
-            .border(1.2.dp, LiquidGlassBorder, RoundedCornerShape(26.dp))
+            .background(FrostedGlassFill)
+            .border(1.2.dp, FrostedGlassBorder, RoundedCornerShape(26.dp))
             .padding(18.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -5663,16 +5663,16 @@ fun GlassRootPowerCard() {
                         .size(38.dp)
                         .clip(CircleShape)
                         .background(
-                            if (isPrivileged) AppleGreen.copy(alpha = 0.25f)
-                            else if (isModuleInstalled) AppleAmber.copy(alpha = 0.25f)
-                            else AppleBlue.copy(alpha = 0.25f)
+                            if (isPrivileged) VibrantGreen.copy(alpha = 0.25f)
+                            else if (isModuleInstalled) VibrantAmber.copy(alpha = 0.25f)
+                            else VibrantBlue.copy(alpha = 0.25f)
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Security,
                         contentDescription = null,
-                        tint = if (isPrivileged) AppleGreen else if (isModuleInstalled) AppleAmber else AppleTeal,
+                        tint = if (isPrivileged) VibrantGreen else if (isModuleInstalled) VibrantAmber else VibrantTeal,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -5686,9 +5686,9 @@ fun GlassRootPowerCard() {
                         else -> "Root Priv-App Architecture"
                     }
                     val titleColor = when {
-                        isPrivileged -> AppleGreen
-                        isModuleInstalled -> AppleAmber
-                        else -> AppleTeal
+                        isPrivileged -> VibrantGreen
+                        isModuleInstalled -> VibrantAmber
+                        else -> VibrantTeal
                     }
 
                     Text(
@@ -5717,13 +5717,13 @@ fun GlassRootPowerCard() {
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(LiquidGlassFillSubtle)
-                        .border(1.dp, AppleGreen.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+                        .background(FrostedGlassFillSubtle)
+                        .border(1.dp, VibrantGreen.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
                         .padding(12.dp)
                 ) {
                     Text(
                         text = "System privileged app status verified with CAPTURE_AUDIO_OUTPUT & MODIFY_PHONE_STATE permissions. Cellular audio uplink direct injection enabled.",
-                        color = AppleGreen,
+                        color = VibrantGreen,
                         fontSize = 12.sp,
                         lineHeight = 16.sp
                     )
@@ -5743,7 +5743,7 @@ fun GlassRootPowerCard() {
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, LiquidGlassBorderSubtle, RoundedCornerShape(16.dp))
+                        .border(1.dp, FrostedGlassBorderSubtle, RoundedCornerShape(16.dp))
                 ) {
                     Text("Uninstall System Module", fontSize = 12.sp)
                 }
@@ -5752,8 +5752,8 @@ fun GlassRootPowerCard() {
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(LiquidGlassFillSubtle)
-                        .border(1.dp, LiquidGlassBorderSubtle, RoundedCornerShape(14.dp))
+                        .background(FrostedGlassFillSubtle)
+                        .border(1.dp, FrostedGlassBorderSubtle, RoundedCornerShape(14.dp))
                         .padding(12.dp)
                 ) {
                     Text(
@@ -5777,11 +5777,11 @@ fun GlassRootPowerCard() {
                                     RootPrivilegeManager.rebootDevice()
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = AppleAmber),
+                            colors = ButtonDefaults.buttonColors(containerColor = VibrantAmber),
                             shape = RoundedCornerShape(16.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .border(1.dp, LiquidGlassBorder, RoundedCornerShape(16.dp))
+                                .border(1.dp, FrostedGlassBorder, RoundedCornerShape(16.dp))
                         ) {
                             Text("Restart Device Now", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold)
                         }
@@ -5800,11 +5800,11 @@ fun GlassRootPowerCard() {
                             }
                         },
                         enabled = !isInstalling,
-                        colors = ButtonDefaults.buttonColors(containerColor = AppleBlue),
+                        colors = ButtonDefaults.buttonColors(containerColor = VibrantBlue),
                         shape = RoundedCornerShape(16.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .border(1.dp, LiquidGlassBorder, RoundedCornerShape(16.dp))
+                            .border(1.dp, FrostedGlassBorder, RoundedCornerShape(16.dp))
                     ) {
                         Text(
                             text = if (isInstalling) "Configuring Module..." else if (isModuleInstalled) "Re-install / Update Module" else "Activate Priv-App Module",
@@ -5827,7 +5827,7 @@ fun GlassRootPowerCard() {
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .border(1.dp, LiquidGlassBorderSubtle, RoundedCornerShape(16.dp))
+                                .border(1.dp, FrostedGlassBorderSubtle, RoundedCornerShape(16.dp))
                         ) {
                             Text("Remove Module", fontSize = 12.sp)
                         }
@@ -5838,7 +5838,7 @@ fun GlassRootPowerCard() {
             installStatus?.let { status ->
                 Text(
                     text = status,
-                    color = AppleTeal,
+                    color = VibrantTeal,
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace
                 )
@@ -5854,8 +5854,8 @@ fun GlassSimulatorCard(onStartSimulation: () -> Unit) {
             .fillMaxWidth()
             .shadow(elevation = 14.dp, shape = RoundedCornerShape(26.dp), spotColor = Color(0x60000000), ambientColor = Color(0x40000000))
             .clip(RoundedCornerShape(26.dp))
-            .background(LiquidGlassFill)
-            .border(1.2.dp, LiquidGlassBorder, RoundedCornerShape(26.dp))
+            .background(FrostedGlassFill)
+            .border(1.2.dp, FrostedGlassBorder, RoundedCornerShape(26.dp))
             .padding(18.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -5864,13 +5864,13 @@ fun GlassSimulatorCard(onStartSimulation: () -> Unit) {
                     modifier = Modifier
                         .size(38.dp)
                         .clip(CircleShape)
-                        .background(AppleIndigo.copy(alpha = 0.25f)),
+                        .background(VibrantIndigo.copy(alpha = 0.25f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Headphones,
                         contentDescription = null,
-                        tint = AppleIndigo,
+                        tint = VibrantIndigo,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -5902,11 +5902,11 @@ fun GlassSimulatorCard(onStartSimulation: () -> Unit) {
 
             Button(
                 onClick = onStartSimulation,
-                colors = ButtonDefaults.buttonColors(containerColor = AppleBlue),
+                colors = ButtonDefaults.buttonColors(containerColor = VibrantBlue),
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.dp, LiquidGlassBorder, RoundedCornerShape(16.dp))
+                    .border(1.dp, FrostedGlassBorder, RoundedCornerShape(16.dp))
             ) {
                 Icon(Icons.Rounded.PhoneInTalk, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(8.dp))
@@ -5976,14 +5976,14 @@ fun GlassVoiceStudioCard(
                         color = monetColors.onSurface,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = GoogleSans,
+                        fontFamily = AppFont,
                         letterSpacing = (-0.3).sp
                     )
                     Text(
                         text = "Select neural voice for live calls & screening",
                         color = monetColors.onSurfaceVariant,
                         fontSize = 11.5.sp,
-                        fontFamily = GoogleSans
+                        fontFamily = AppFont
                     )
                 }
             }
@@ -6015,7 +6015,7 @@ fun GlassVoiceStudioCard(
                             color = if (isTabActive) monetColors.onPrimary else monetColors.onSurfaceVariant,
                             fontSize = 11.5.sp,
                             fontWeight = if (isTabActive) FontWeight.Bold else FontWeight.Medium,
-                            fontFamily = GoogleSans
+                            fontFamily = AppFont
                         )
                     }
                 }
@@ -6064,7 +6064,7 @@ fun GlassVoiceStudioCard(
                                         color = if (isSelected) monetColors.onPrimary else monetColors.onSurfaceVariant,
                                         fontSize = 9.5.sp,
                                         fontWeight = FontWeight.Bold,
-                                        fontFamily = GoogleSans
+                                        fontFamily = AppFont
                                     )
                                 }
 
@@ -6083,7 +6083,7 @@ fun GlassVoiceStudioCard(
                                 color = if (isSelected) monetColors.onPrimaryContainer else monetColors.onSurface,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = GoogleSans,
+                                fontFamily = AppFont,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -6092,7 +6092,7 @@ fun GlassVoiceStudioCard(
                                 text = persona.tag,
                                 color = if (isSelected) monetColors.onPrimaryContainer.copy(alpha = 0.8f) else monetColors.onSurfaceVariant,
                                 fontSize = 11.sp,
-                                fontFamily = GoogleSans,
+                                fontFamily = AppFont,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -6126,7 +6126,7 @@ fun GlassVoiceStudioCard(
                             color = monetColors.onSecondaryContainer,
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Medium,
-                            fontFamily = GoogleSans
+                            fontFamily = AppFont
                         )
                     }
                 }
@@ -6176,7 +6176,7 @@ fun GlassVoiceStudioCard(
                             color = monetColors.primary,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = GoogleSans
+                            fontFamily = AppFont
                         )
                     }
                 }
@@ -6217,7 +6217,7 @@ fun GlassVoiceStudioCard(
                             color = if (isListening) Color(0xFF81C995) else monetColors.onSurface,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = GoogleSans
+                            fontFamily = AppFont
                         )
                     }
                 }
@@ -6312,7 +6312,7 @@ fun GlassAudioPresetsCard(
                                 color = monetColors.onSurface,
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = GoogleSans,
+                                fontFamily = AppFont,
                                 letterSpacing = (-0.3).sp
                             )
                             Box(
@@ -6325,7 +6325,7 @@ fun GlassAudioPresetsCard(
                                     text = "ALSA",
                                     color = monetColors.onSurfaceVariant,
                                     fontSize = 9.sp,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -6334,7 +6334,7 @@ fun GlassAudioPresetsCard(
                             text = "Direct hardware soundboard (${presets.size} items)",
                             color = monetColors.onSurfaceVariant,
                             fontSize = 11.5.sp,
-                            fontFamily = GoogleSans,
+                            fontFamily = AppFont,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -6394,7 +6394,7 @@ fun GlassAudioPresetsCard(
                                     color = if (isPaused) Color(0xFFFFB74D) else monetColors.onSurface,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -6402,7 +6402,7 @@ fun GlassAudioPresetsCard(
                                     text = if (preset.isAudioFile) "Custom Audio Track" else preset.textOrPath,
                                     color = monetColors.onSurfaceVariant,
                                     fontSize = 11.sp,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -6478,13 +6478,13 @@ fun GlassAudioPresetsCard(
                                 color = monetColors.onSurface,
                                 fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = GoogleSans
+                                fontFamily = AppFont
                             )
                             Text(
                                 text = "Align in-call audio tracks, arrange & organize",
                                 color = monetColors.onSurfaceVariant,
                                 fontSize = 11.sp,
-                                fontFamily = GoogleSans
+                                fontFamily = AppFont
                             )
                         }
                     }
@@ -6520,7 +6520,7 @@ fun GlassAudioPresetsCard(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Icon(Icons.Rounded.RecordVoiceOver, contentDescription = null, tint = monetColors.onSurface, modifier = Modifier.size(15.dp))
-                        Text("Add Phrase", color = monetColors.onSurface, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, fontFamily = GoogleSans)
+                        Text("Add Phrase", color = monetColors.onSurface, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont)
                     }
                 }
 
@@ -6541,7 +6541,7 @@ fun GlassAudioPresetsCard(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = monetColors.onPrimaryContainer, modifier = Modifier.size(15.dp))
-                        Text("Import Audio", color = monetColors.onPrimaryContainer, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
+                        Text("Import Audio", color = monetColors.onPrimaryContainer, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = AppFont)
                     }
                 }
             }
@@ -6559,13 +6559,13 @@ fun GlassAudioPresetsCard(
                     .padding(22.dp)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text("Add Custom Voice Phrase", color = monetColors.onSurface, fontSize = 17.sp, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
-                    Text("Assistant speaks this response directly into caller's ear with 0% background noise.", color = monetColors.onSurfaceVariant, fontSize = 12.sp, fontFamily = GoogleSans)
+                    Text("Add Custom Voice Phrase", color = monetColors.onSurface, fontSize = 17.sp, fontWeight = FontWeight.Bold, fontFamily = AppFont)
+                    Text("Assistant speaks this response directly into caller's ear with 0% background noise.", color = monetColors.onSurfaceVariant, fontSize = 12.sp, fontFamily = AppFont)
 
                     BasicTextField(
                         value = textPresetTitle,
                         onValueChange = { textPresetTitle = it },
-                        textStyle = TextStyle(color = monetColors.onSurface, fontSize = 14.sp, fontFamily = GoogleSans),
+                        textStyle = TextStyle(color = monetColors.onSurface, fontSize = 14.sp, fontFamily = AppFont),
                         decorationBox = { inner ->
                             Box(
                                 modifier = Modifier
@@ -6574,7 +6574,7 @@ fun GlassAudioPresetsCard(
                                     .background(monetColors.surfaceVariant.copy(alpha = 0.6f))
                                     .padding(14.dp)
                             ) {
-                                if (textPresetTitle.isBlank()) Text("Preset Title (e.g. Can't talk)", color = monetColors.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 14.sp, fontFamily = GoogleSans)
+                                if (textPresetTitle.isBlank()) Text("Preset Title (e.g. Can't talk)", color = monetColors.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 14.sp, fontFamily = AppFont)
                                 inner()
                             }
                         }
@@ -6583,7 +6583,7 @@ fun GlassAudioPresetsCard(
                     BasicTextField(
                         value = textPresetPhrase,
                         onValueChange = { textPresetPhrase = it },
-                        textStyle = TextStyle(color = monetColors.onSurface, fontSize = 14.sp, fontFamily = GoogleSans),
+                        textStyle = TextStyle(color = monetColors.onSurface, fontSize = 14.sp, fontFamily = AppFont),
                         decorationBox = { inner ->
                             Box(
                                 modifier = Modifier
@@ -6592,7 +6592,7 @@ fun GlassAudioPresetsCard(
                                     .background(monetColors.surfaceVariant.copy(alpha = 0.6f))
                                     .padding(14.dp)
                             ) {
-                                if (textPresetPhrase.isBlank()) Text("Phrase to speak (e.g. I am in a meeting, call back later)", color = monetColors.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 14.sp, fontFamily = GoogleSans)
+                                if (textPresetPhrase.isBlank()) Text("Phrase to speak (e.g. I am in a meeting, call back later)", color = monetColors.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 14.sp, fontFamily = AppFont)
                                 inner()
                             }
                         }
@@ -6607,7 +6607,7 @@ fun GlassAudioPresetsCard(
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = monetColors.onSurfaceVariant)
                         ) {
-                            Text("Cancel", fontFamily = GoogleSans)
+                            Text("Cancel", fontFamily = AppFont)
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Button(
@@ -6622,7 +6622,7 @@ fun GlassAudioPresetsCard(
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = monetColors.primary)
                         ) {
-                            Text("Save Preset", color = monetColors.onPrimary, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
+                            Text("Save Preset", color = monetColors.onPrimary, fontWeight = FontWeight.Bold, fontFamily = AppFont)
                         }
                     }
                 }
@@ -6641,13 +6641,13 @@ fun GlassAudioPresetsCard(
                     .padding(22.dp)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text("Name Audio Preset", color = monetColors.onSurface, fontSize = 17.sp, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
-                    Text("File imported for hardware uplink injection during active calls.", color = monetColors.onSurfaceVariant, fontSize = 12.sp, fontFamily = GoogleSans)
+                    Text("Name Audio Preset", color = monetColors.onSurface, fontSize = 17.sp, fontWeight = FontWeight.Bold, fontFamily = AppFont)
+                    Text("File imported for hardware uplink injection during active calls.", color = monetColors.onSurfaceVariant, fontSize = 12.sp, fontFamily = AppFont)
 
                     BasicTextField(
                         value = audioPresetTitle,
                         onValueChange = { audioPresetTitle = it },
-                        textStyle = TextStyle(color = monetColors.onSurface, fontSize = 14.sp, fontFamily = GoogleSans),
+                        textStyle = TextStyle(color = monetColors.onSurface, fontSize = 14.sp, fontFamily = AppFont),
                         decorationBox = { inner ->
                             Box(
                                 modifier = Modifier
@@ -6656,7 +6656,7 @@ fun GlassAudioPresetsCard(
                                     .background(monetColors.surfaceVariant.copy(alpha = 0.6f))
                                     .padding(14.dp)
                             ) {
-                                if (audioPresetTitle.isBlank()) Text("Preset Name (e.g. Office Ambient / Ringtone)", color = monetColors.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 14.sp, fontFamily = GoogleSans)
+                                if (audioPresetTitle.isBlank()) Text("Preset Name (e.g. Office Ambient / Ringtone)", color = monetColors.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 14.sp, fontFamily = AppFont)
                                 inner()
                             }
                         }
@@ -6671,7 +6671,7 @@ fun GlassAudioPresetsCard(
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = monetColors.onSurfaceVariant)
                         ) {
-                            Text("Cancel", fontFamily = GoogleSans)
+                            Text("Cancel", fontFamily = AppFont)
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Button(
@@ -6691,7 +6691,7 @@ fun GlassAudioPresetsCard(
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = monetColors.primary)
                         ) {
-                            Text("Import", color = monetColors.onPrimary, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
+                            Text("Import", color = monetColors.onPrimary, fontWeight = FontWeight.Bold, fontFamily = AppFont)
                         }
                     }
                 }
@@ -6710,13 +6710,13 @@ fun GlassAudioPresetsCard(
                     .padding(22.dp)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text("Rename Preset", color = monetColors.onSurface, fontSize = 17.sp, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
-                    Text("Enter a custom title so you know which preset is playing during calls.", color = monetColors.onSurfaceVariant, fontSize = 12.sp, fontFamily = GoogleSans)
+                    Text("Rename Preset", color = monetColors.onSurface, fontSize = 17.sp, fontWeight = FontWeight.Bold, fontFamily = AppFont)
+                    Text("Enter a custom title so you know which preset is playing during calls.", color = monetColors.onSurfaceVariant, fontSize = 12.sp, fontFamily = AppFont)
 
                     BasicTextField(
                         value = renamePresetTitle,
                         onValueChange = { renamePresetTitle = it },
-                        textStyle = TextStyle(color = monetColors.onSurface, fontSize = 14.sp, fontFamily = GoogleSans),
+                        textStyle = TextStyle(color = monetColors.onSurface, fontSize = 14.sp, fontFamily = AppFont),
                         decorationBox = { inner ->
                             Box(
                                 modifier = Modifier
@@ -6725,7 +6725,7 @@ fun GlassAudioPresetsCard(
                                     .background(monetColors.surfaceVariant.copy(alpha = 0.6f))
                                     .padding(14.dp)
                             ) {
-                                if (renamePresetTitle.isBlank()) Text("Preset Name", color = monetColors.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 14.sp, fontFamily = GoogleSans)
+                                if (renamePresetTitle.isBlank()) Text("Preset Name", color = monetColors.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 14.sp, fontFamily = AppFont)
                                 inner()
                             }
                         }
@@ -6740,7 +6740,7 @@ fun GlassAudioPresetsCard(
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = monetColors.onSurfaceVariant)
                         ) {
-                            Text("Cancel", fontFamily = GoogleSans)
+                            Text("Cancel", fontFamily = AppFont)
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Button(
@@ -6755,7 +6755,7 @@ fun GlassAudioPresetsCard(
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = monetColors.primary)
                         ) {
-                            Text("Save", color = monetColors.onPrimary, fontWeight = FontWeight.Bold, fontFamily = GoogleSans)
+                            Text("Save", color = monetColors.onPrimary, fontWeight = FontWeight.Bold, fontFamily = AppFont)
                         }
                     }
                 }
@@ -6774,8 +6774,8 @@ fun GlassAssistantGreetingCard(
             .fillMaxWidth()
             .shadow(elevation = 14.dp, shape = RoundedCornerShape(26.dp), spotColor = Color(0x60000000), ambientColor = Color(0x40000000))
             .clip(RoundedCornerShape(26.dp))
-            .background(LiquidGlassFill)
-            .border(1.2.dp, LiquidGlassBorder, RoundedCornerShape(26.dp))
+            .background(FrostedGlassFill)
+            .border(1.2.dp, FrostedGlassBorder, RoundedCornerShape(26.dp))
             .padding(18.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -6792,7 +6792,7 @@ fun GlassAssistantGreetingCard(
                         Icon(
                             imageVector = Icons.Rounded.RecordVoiceOver,
                             contentDescription = null,
-                            tint = AppleIndigo,
+                            tint = VibrantIndigo,
                             modifier = Modifier.size(18.dp)
                         )
                         Text(
@@ -6809,7 +6809,7 @@ fun GlassAssistantGreetingCard(
                             "Speaks automated assistant announcement on pickup"
                         else
                             "Instant silent pickup: ready for speech relay without robotic announcement",
-                        color = if (isGreetingEnabled) AppleIndigo else TextSecondary,
+                        color = if (isGreetingEnabled) VibrantIndigo else TextSecondary,
                         fontSize = 12.sp,
                         lineHeight = 16.sp
                     )
@@ -6820,7 +6820,7 @@ fun GlassAssistantGreetingCard(
                     onCheckedChange = onToggleGreeting,
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = Color.White,
-                        checkedTrackColor = AppleIndigo,
+                        checkedTrackColor = VibrantIndigo,
                         uncheckedThumbColor = TextMuted,
                         uncheckedTrackColor = Color(0x22FFFFFF)
                     )
@@ -6846,8 +6846,8 @@ fun DialerSystemSettingsCard(
             .fillMaxWidth()
             .shadow(elevation = 14.dp, shape = RoundedCornerShape(26.dp), spotColor = Color(0x60000000), ambientColor = Color(0x40000000))
             .clip(RoundedCornerShape(26.dp))
-            .background(LiquidGlassFill)
-            .border(1.2.dp, LiquidGlassBorder, RoundedCornerShape(26.dp))
+            .background(FrostedGlassFill)
+            .border(1.2.dp, FrostedGlassBorder, RoundedCornerShape(26.dp))
             .padding(18.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -6869,7 +6869,7 @@ fun DialerSystemSettingsCard(
                         Icon(
                             imageVector = Icons.Filled.Mic,
                             contentDescription = null,
-                            tint = AppleRed,
+                            tint = VibrantRed,
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
@@ -6885,7 +6885,7 @@ fun DialerSystemSettingsCard(
                             "Automatic 2-way call recording active: captures caller and mic directly"
                         else
                             "Automatic recording off: you can still record anytime during calls with the REC button",
-                        color = if (isAutoRecordEnabled) AppleRed else TextSecondary,
+                        color = if (isAutoRecordEnabled) VibrantRed else TextSecondary,
                         fontSize = 12.sp
                     )
                 }
@@ -6895,7 +6895,7 @@ fun DialerSystemSettingsCard(
                     onCheckedChange = onToggleAutoRecord,
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = Color.White,
-                        checkedTrackColor = AppleRed,
+                        checkedTrackColor = VibrantRed,
                         uncheckedThumbColor = TextMuted,
                         uncheckedTrackColor = Color(0x22FFFFFF)
                     )
@@ -6907,7 +6907,7 @@ fun DialerSystemSettingsCard(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
                     .background(Color(0x18FFFFFF))
-                    .border(1.dp, LiquidGlassBorderSubtle, RoundedCornerShape(16.dp))
+                    .border(1.dp, FrostedGlassBorderSubtle, RoundedCornerShape(16.dp))
                     .clickable { showRecordingsDialog = true }
                     .padding(horizontal = 14.dp, vertical = 12.dp)
             ) {
@@ -6920,7 +6920,7 @@ fun DialerSystemSettingsCard(
                         Icon(
                             imageVector = Icons.Rounded.GraphicEq,
                             contentDescription = null,
-                            tint = AppleTeal,
+                            tint = VibrantTeal,
                             modifier = Modifier.size(18.dp)
                         )
                         Column {
@@ -6941,12 +6941,12 @@ fun DialerSystemSettingsCard(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(10.dp))
-                            .background(AppleTeal.copy(alpha = 0.2f))
+                            .background(VibrantTeal.copy(alpha = 0.2f))
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text(
                             text = "Manage",
-                            color = AppleTeal,
+                            color = VibrantTeal,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -6971,7 +6971,7 @@ fun DialerSystemSettingsCard(
                         Icon(
                             imageVector = Icons.Rounded.VisibilityOff,
                             contentDescription = null,
-                            tint = AppleTeal,
+                            tint = VibrantTeal,
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
@@ -6987,7 +6987,7 @@ fun DialerSystemSettingsCard(
                             "Stealth mode active: raw numbers masked as 'Private Caller' on incoming screens"
                         else
                             "Standard display: full caller phone numbers shown on incoming screens",
-                        color = if (isHideNumberOnCallerId) AppleTeal else TextSecondary,
+                        color = if (isHideNumberOnCallerId) VibrantTeal else TextSecondary,
                         fontSize = 12.sp
                     )
                 }
@@ -6997,7 +6997,7 @@ fun DialerSystemSettingsCard(
                     onCheckedChange = onToggleHideNumber,
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = Color.White,
-                        checkedTrackColor = AppleTeal,
+                        checkedTrackColor = VibrantTeal,
                         uncheckedThumbColor = TextMuted,
                         uncheckedTrackColor = Color(0x22FFFFFF)
                     )
@@ -7035,7 +7035,7 @@ fun DialerSystemSettingsCard(
                     onCheckedChange = onToggleAutoScreen,
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = Color.White,
-                        checkedTrackColor = AppleBlue,
+                        checkedTrackColor = VibrantBlue,
                         uncheckedThumbColor = TextMuted,
                         uncheckedTrackColor = Color(0x22FFFFFF)
                     )
@@ -7058,7 +7058,7 @@ fun SettingsSectionHeader(
         text = title,
         color = monetColors.primary,
         fontSize = 11.5.sp,
-        fontFamily = GoogleSans,
+        fontFamily = AppFont,
         fontWeight = FontWeight.Bold,
         letterSpacing = 0.8.sp,
         modifier = Modifier.padding(start = 6.dp, top = 10.dp, bottom = 4.dp)
@@ -7133,7 +7133,7 @@ fun SettingsItemRow(
                 text = title,
                 color = monetColors.onSurface,
                 fontSize = 15.sp,
-                fontFamily = GoogleSans,
+                fontFamily = AppFont,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = (-0.2).sp
             )
@@ -7142,7 +7142,7 @@ fun SettingsItemRow(
                 text = subtitle,
                 color = monetColors.onSurfaceVariant,
                 fontSize = 12.sp,
-                fontFamily = GoogleSans,
+                fontFamily = AppFont,
                 lineHeight = 16.sp
             )
         }
@@ -7215,7 +7215,7 @@ private fun DeveloperSocialPill(
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White,
-                fontFamily = GoogleSans,
+                fontFamily = AppFont,
                 maxLines = 1
             )
         }
@@ -7346,14 +7346,14 @@ fun DialerSettingsSheet(
                                     color = monetColors.onSurface,
                                     fontSize = 24.sp,
                                     fontWeight = FontWeight.Bold,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     letterSpacing = (-0.5).sp
                                 )
                                 Text(
                                     text = "Telephony, Recording & Privileges",
                                     color = monetColors.onSurfaceVariant,
                                     fontSize = 12.sp,
-                                    fontFamily = GoogleSans
+                                    fontFamily = AppFont
                                 )
                             }
                         }
@@ -7402,7 +7402,7 @@ fun DialerSettingsSheet(
                                                     color = Color(0xFF81C995),
                                                     fontSize = 10.5.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    fontFamily = GoogleSans
+                                                    fontFamily = AppFont
                                                 )
                                             }
                                         }
@@ -7422,7 +7422,7 @@ fun DialerSettingsSheet(
                                                 color = monetColors.onPrimary,
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                fontFamily = GoogleSans
+                                                fontFamily = AppFont
                                             )
                                         }
                                     }
@@ -7543,7 +7543,7 @@ fun DialerSettingsSheet(
                                                 color = Color(0xFF8AB4F8),
                                                 fontSize = 11.5.sp,
                                                 fontWeight = FontWeight.SemiBold,
-                                                fontFamily = GoogleSans
+                                                fontFamily = AppFont
                                             )
                                             Icon(
                                                 imageVector = Icons.Rounded.ChevronRight,
@@ -7615,7 +7615,7 @@ fun DialerSettingsSheet(
                                                 color = monetColors.onSurface,
                                                 fontSize = 11.5.sp,
                                                 fontWeight = FontWeight.SemiBold,
-                                                fontFamily = GoogleSans
+                                                fontFamily = AppFont
                                             )
                                             Icon(
                                                 imageVector = Icons.Rounded.ChevronRight,
@@ -7691,7 +7691,7 @@ fun DialerSettingsSheet(
                                                 color = Color(0xFFD0BCFF),
                                                 fontSize = 11.5.sp,
                                                 fontWeight = FontWeight.SemiBold,
-                                                fontFamily = GoogleSans
+                                                fontFamily = AppFont
                                             )
                                             Icon(
                                                 imageVector = Icons.Rounded.ChevronRight,
@@ -7744,7 +7744,7 @@ fun DialerSettingsSheet(
                                                 color = if (isStandard) monetColors.onSurface else monetColors.onSurfaceVariant,
                                                 fontSize = 13.sp,
                                                 fontWeight = if (isStandard) FontWeight.SemiBold else FontWeight.Medium,
-                                                fontFamily = GoogleSans
+                                                fontFamily = AppFont
                                             )
                                         }
                                     }
@@ -7782,7 +7782,7 @@ fun DialerSettingsSheet(
                                                 color = if (isRoot) monetColors.onSurface else monetColors.onSurfaceVariant,
                                                 fontSize = 13.sp,
                                                 fontWeight = if (isRoot) FontWeight.SemiBold else FontWeight.Medium,
-                                                fontFamily = GoogleSans
+                                                fontFamily = AppFont
                                             )
                                         }
                                     }
@@ -7811,7 +7811,7 @@ fun DialerSettingsSheet(
                                                 color = monetColors.primary,
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                fontFamily = GoogleSans
+                                                fontFamily = AppFont
                                             )
                                         }
                                     }
@@ -7858,7 +7858,7 @@ fun DialerSettingsSheet(
                                                 color = badgeColor,
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                fontFamily = GoogleSans
+                                                fontFamily = AppFont
                                             )
                                         }
                                     }
@@ -7884,7 +7884,7 @@ fun DialerSettingsSheet(
                                             colors = ButtonDefaults.outlinedButtonColors(contentColor = monetColors.onSurfaceVariant),
                                             modifier = Modifier.fillMaxWidth().height(40.dp)
                                         ) {
-                                            Text("Uninstall System Module", fontSize = 12.sp, fontFamily = GoogleSans)
+                                            Text("Uninstall System Module", fontSize = 12.sp, fontFamily = AppFont)
                                         }
                                     } else if (rootAvailable) {
                                         if (isModuleInstalled) {
@@ -7898,7 +7898,7 @@ fun DialerSettingsSheet(
                                                 shape = RoundedCornerShape(14.dp),
                                                 modifier = Modifier.fillMaxWidth().height(42.dp)
                                             ) {
-                                                Text("Restart Device Now", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold, fontSize = 12.5.sp, fontFamily = GoogleSans)
+                                                Text("Restart Device Now", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold, fontSize = 12.5.sp, fontFamily = AppFont)
                                             }
                                         }
 
@@ -7923,7 +7923,7 @@ fun DialerSettingsSheet(
                                                 color = monetColors.onPrimary,
                                                 fontWeight = FontWeight.SemiBold,
                                                 fontSize = 12.5.sp,
-                                                fontFamily = GoogleSans
+                                                fontFamily = AppFont
                                             )
                                         }
 
@@ -7940,7 +7940,7 @@ fun DialerSettingsSheet(
                                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = monetColors.onSurfaceVariant),
                                                 modifier = Modifier.fillMaxWidth().height(38.dp)
                                             ) {
-                                                Text("Uninstall Module", fontSize = 12.sp, fontFamily = GoogleSans)
+                                                Text("Uninstall Module", fontSize = 12.sp, fontFamily = AppFont)
                                             }
                                         }
                                     }
@@ -8006,7 +8006,7 @@ fun DialerSettingsSheet(
                                                     color = monetColors.onPrimary,
                                                     fontSize = 10.5.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    fontFamily = GoogleSans
+                                                    fontFamily = AppFont
                                                 )
                                             }
                                         }
@@ -8032,7 +8032,7 @@ fun DialerSettingsSheet(
                                                         color = Color(0xFF81C995),
                                                         fontSize = 10.sp,
                                                         fontWeight = FontWeight.Bold,
-                                                        fontFamily = GoogleSans
+                                                        fontFamily = AppFont
                                                     )
                                                 }
                                             }
@@ -8053,7 +8053,7 @@ fun DialerSettingsSheet(
                                                         color = monetColors.onSurface,
                                                         fontSize = 11.5.sp,
                                                         fontWeight = FontWeight.SemiBold,
-                                                        fontFamily = GoogleSans
+                                                        fontFamily = AppFont
                                                     )
                                                     Icon(
                                                         imageVector = Icons.Rounded.Refresh,
@@ -8119,7 +8119,7 @@ fun DialerSettingsSheet(
                                                 fontSize = 17.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = Color.White,
-                                                fontFamily = GoogleSans
+                                                fontFamily = AppFont
                                             )
                                             Box(
                                                 modifier = Modifier
@@ -8141,14 +8141,14 @@ fun DialerSettingsSheet(
                                             text = "Developer & Open-Source Maintainer",
                                             fontSize = 12.sp,
                                             color = monetColors.onSurfaceVariant,
-                                            fontFamily = GoogleSans
+                                            fontFamily = AppFont
                                         )
                                         Spacer(modifier = Modifier.height(3.dp))
                                         Text(
                                             text = "Building clean, high-performance Android tools for everyone.",
                                             fontSize = 11.5.sp,
                                             color = monetColors.onSurfaceVariant.copy(alpha = 0.8f),
-                                            fontFamily = GoogleSans
+                                            fontFamily = AppFont
                                         )
                                     }
                                 }
@@ -8481,7 +8481,7 @@ fun CallStatsScreen(
                             text = "Call statistics",
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = GoogleSans,
+                            fontFamily = AppFont,
                             letterSpacing = (-0.3).sp,
                             color = monetColors.onSurface,
                             modifier = Modifier
@@ -8517,7 +8517,7 @@ fun CallStatsScreen(
                                         color = monetColors.onPrimaryContainer,
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        fontFamily = GoogleSans
+                                        fontFamily = AppFont
                                     )
                                 }
                             }
@@ -8585,7 +8585,7 @@ fun CallStatsScreen(
                                 ) {
                                     Text(
                                         text = "Top contacts",
-                                        fontFamily = GoogleSans,
+                                        fontFamily = AppFont,
                                         fontSize = 17.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = monetColors.onSurface
@@ -8601,7 +8601,7 @@ fun CallStatsScreen(
                                             fontSize = 11.5.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = monetColors.onSurfaceVariant,
-                                            fontFamily = GoogleSans
+                                            fontFamily = AppFont
                                         )
                                     }
                                 }
@@ -8624,7 +8624,7 @@ fun CallStatsScreen(
                                         verticalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         Image(
-                                            painter = painterResource(id = com.callscreener.app.R.drawable.oneplus_empty_call_log_illustration),
+                                            painter = painterResource(id = com.callscreener.app.R.drawable.empty_call_log_illustration),
                                             contentDescription = null,
                                             modifier = Modifier.size(130.dp),
                                             contentScale = ContentScale.Fit
@@ -8632,14 +8632,14 @@ fun CallStatsScreen(
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
                                             text = "No calls found",
-                                            fontFamily = GoogleSans,
+                                            fontFamily = AppFont,
                                             fontWeight = FontWeight.SemiBold,
                                             fontSize = 15.sp,
                                             color = monetColors.onSurface
                                         )
                                         Text(
                                             text = "No calls match the selected date range and call type filters.",
-                                            fontFamily = GoogleSans,
+                                            fontFamily = AppFont,
                                             fontSize = 12.sp,
                                             color = monetColors.onSurfaceVariant,
                                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -8718,7 +8718,7 @@ fun <T> StatsChoiceRow(
                     fontSize = 12.5.sp,
                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                     color = if (isSelected) monetColors.onPrimaryContainer else monetColors.onSurfaceVariant,
-                    fontFamily = GoogleSans
+                    fontFamily = AppFont
                 )
             }
         }
@@ -8773,7 +8773,7 @@ fun StatsSummaryCard(
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.8.sp,
                         color = monetColors.primary,
-                        fontFamily = GoogleSans
+                        fontFamily = AppFont
                     )
                 }
             }
@@ -8783,7 +8783,7 @@ fun StatsSummaryCard(
                     text = "Total Call Time",
                     fontSize = 12.sp,
                     color = monetColors.onSurfaceVariant,
-                    fontFamily = GoogleSans
+                    fontFamily = AppFont
                 )
                 Text(
                     text = formatCallDuration(totalDuration),
@@ -8792,7 +8792,7 @@ fun StatsSummaryCard(
                     fontWeight = FontWeight.Bold,
                     letterSpacing = (-0.5).sp,
                     color = monetColors.onSurface,
-                    fontFamily = GoogleSans
+                    fontFamily = AppFont
                 )
             }
 
@@ -8824,13 +8824,13 @@ fun StatsSummaryCard(
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = monetColors.onSurface,
-                                fontFamily = GoogleSans
+                                fontFamily = AppFont
                             )
                             Text(
                                 text = "Filtered volume",
                                 fontSize = 10.5.sp,
                                 color = monetColors.onSurfaceVariant,
-                                fontFamily = GoogleSans
+                                fontFamily = AppFont
                             )
                         }
                     }
@@ -8860,13 +8860,13 @@ fun StatsSummaryCard(
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = monetColors.onSurface,
-                                fontFamily = GoogleSans
+                                fontFamily = AppFont
                             )
                             Text(
                                 text = "Average length",
                                 fontSize = 10.5.sp,
                                 color = monetColors.onSurfaceVariant,
-                                fontFamily = GoogleSans
+                                fontFamily = AppFont
                             )
                         }
                     }
@@ -8964,7 +8964,7 @@ fun StatsMetricMiniCard(
                     text = title,
                     fontSize = 11.5.sp,
                     color = monetColors.onSurfaceVariant,
-                    fontFamily = GoogleSans,
+                    fontFamily = AppFont,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1
                 )
@@ -8975,14 +8975,14 @@ fun StatsMetricMiniCard(
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 color = monetColors.onSurface,
-                fontFamily = GoogleSans
+                fontFamily = AppFont
             )
 
             Text(
                 text = duration,
                 fontSize = 11.sp,
                 color = monetColors.onSurfaceVariant.copy(alpha = 0.8f),
-                fontFamily = GoogleSans,
+                fontFamily = AppFont,
                 maxLines = 1
             )
         }
@@ -9047,7 +9047,7 @@ fun ContactMetricCard(
                         maxLines = 1,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                         color = monetColors.onSurface,
-                        fontFamily = GoogleSans
+                        fontFamily = AppFont
                     )
                     if (contact.name.isNotBlank() && contact.name != contact.number) {
                         Text(
@@ -9056,7 +9056,7 @@ fun ContactMetricCard(
                             color = monetColors.onSurfaceVariant,
                             maxLines = 1,
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                            fontFamily = GoogleSans
+                            fontFamily = AppFont
                         )
                     }
                 }
@@ -9072,7 +9072,7 @@ fun ContactMetricCard(
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = monetColors.onSurface,
-                        fontFamily = GoogleSans
+                        fontFamily = AppFont
                     )
                     Box(
                         modifier = Modifier
@@ -9085,7 +9085,7 @@ fun ContactMetricCard(
                             fontSize = 10.5.sp,
                             fontWeight = FontWeight.Medium,
                             color = monetColors.onSurfaceVariant,
-                            fontFamily = GoogleSans
+                            fontFamily = AppFont
                         )
                     }
                 }
@@ -9246,14 +9246,14 @@ fun SavedRecordingsDialog(
                                 color = monetColors.onSurface,
                                 fontSize = 21.sp,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = GoogleSans,
+                                fontFamily = AppFont,
                                 letterSpacing = (-0.3).sp
                             )
                             Text(
                                 text = "${recordings.size} files recorded • Root Audio HAL",
                                 color = monetColors.onSurfaceVariant,
                                 fontSize = 12.sp,
-                                fontFamily = GoogleSans
+                                fontFamily = AppFont
                             )
                         }
 
@@ -9307,7 +9307,7 @@ fun SavedRecordingsDialog(
                                             color = monetColors.onSurface,
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold,
-                                            fontFamily = GoogleSans
+                                            fontFamily = AppFont
                                         )
                                         Text(
                                             text = "Recordings",
@@ -9377,7 +9377,7 @@ fun SavedRecordingsDialog(
                                             color = monetColors.onSurface,
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold,
-                                            fontFamily = GoogleSans
+                                            fontFamily = AppFont
                                         )
                                         Text(
                                             text = "Uncompressed",
@@ -9422,7 +9422,7 @@ fun SavedRecordingsDialog(
                                     color = monetColors.onSurface,
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    fontFamily = GoogleSans
+                                    fontFamily = AppFont
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
@@ -9430,7 +9430,7 @@ fun SavedRecordingsDialog(
                                     color = monetColors.onSurfaceVariant,
                                     fontSize = 13.sp,
                                     textAlign = TextAlign.Center,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     lineHeight = 18.sp
                                 )
                             }
@@ -9510,7 +9510,7 @@ fun SavedRecordingsDialog(
                                                     color = monetColors.onSurface,
                                                     fontSize = 15.5.sp,
                                                     fontWeight = FontWeight.SemiBold,
-                                                    fontFamily = GoogleSans,
+                                                    fontFamily = AppFont,
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
@@ -9519,14 +9519,14 @@ fun SavedRecordingsDialog(
                                                         text = formattedNumber,
                                                         color = monetColors.onSurfaceVariant,
                                                         fontSize = 12.sp,
-                                                        fontFamily = GoogleSans
+                                                        fontFamily = AppFont
                                                     )
                                                 }
                                                 Text(
                                                     text = formattedDate,
                                                     color = monetColors.onSurfaceVariant.copy(alpha = 0.80f),
                                                     fontSize = 11.5.sp,
-                                                    fontFamily = GoogleSans
+                                                    fontFamily = AppFont
                                                 )
                                             }
                                         }
@@ -9568,7 +9568,7 @@ fun SavedRecordingsDialog(
                                                         text = item.fileSizeFormatted,
                                                         color = monetColors.onSurfaceVariant,
                                                         fontSize = 10.5.sp,
-                                                        fontFamily = GoogleSans
+                                                        fontFamily = AppFont
                                                     )
                                                 }
                                             }
@@ -9696,8 +9696,8 @@ fun GlassArchitectureCard() {
             .fillMaxWidth()
             .shadow(elevation = 14.dp, shape = RoundedCornerShape(26.dp), spotColor = Color(0x60000000), ambientColor = Color(0x40000000))
             .clip(RoundedCornerShape(26.dp))
-            .background(LiquidGlassFillSubtle)
-            .border(1.2.dp, LiquidGlassBorderSubtle, RoundedCornerShape(26.dp))
+            .background(FrostedGlassFillSubtle)
+            .border(1.2.dp, FrostedGlassBorderSubtle, RoundedCornerShape(26.dp))
             .padding(18.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

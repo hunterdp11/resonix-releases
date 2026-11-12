@@ -78,7 +78,7 @@ import com.callscreener.app.data.CallerProfileManager
 import com.callscreener.app.data.DialerRepository
 import com.callscreener.app.data.rememberContactPhotoBitmap
 import com.callscreener.app.ui.getPixelMonetDarkColorScheme
-import com.callscreener.app.ui.theme.GoogleSans
+import com.callscreener.app.ui.theme.AppFont
 import kotlin.math.roundToInt
 
 @Composable
@@ -295,7 +295,7 @@ fun DynamicIncomingCallCapsule(
                                     text = initial,
                                     fontSize = 19.sp,
                                     fontWeight = FontWeight.Bold,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     color = monetColors.onPrimaryContainer
                                 )
                             }
@@ -323,7 +323,7 @@ fun DynamicIncomingCallCapsule(
                             text = displayName,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
-                            fontFamily = GoogleSans,
+                            fontFamily = AppFont,
                             color = monetColors.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -339,7 +339,7 @@ fun DynamicIncomingCallCapsule(
                                 text = subtitleText,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Normal,
-                                fontFamily = GoogleSans,
+                                fontFamily = AppFont,
                                 color = monetColors.onSurfaceVariant,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -358,7 +358,7 @@ fun DynamicIncomingCallCapsule(
                                     text = "HD",
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold,
-                                    fontFamily = GoogleSans,
+                                    fontFamily = AppFont,
                                     color = monetColors.onPrimaryContainer
                                 )
                             }
