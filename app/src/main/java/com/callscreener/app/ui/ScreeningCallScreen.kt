@@ -3326,19 +3326,6 @@ fun OemIncomingCallScreen(
                 )
             )
     ) {
-        // Radial glow behind avatar area
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        monetColors.primary.copy(alpha = 0.18f),
-                        Color.Transparent
-                    ),
-                    center = Offset(size.width / 2f, size.height * 0.26f),
-                    radius = size.width * 0.72f
-                )
-            )
-        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -4104,19 +4091,6 @@ fun StandardInCallScreen(
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
-        // Subtle top-center radial glow (Material You accent)
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        monetColors.primary.copy(alpha = 0.14f),
-                        Color.Transparent
-                    ),
-                    center = Offset(size.width / 2f, size.height * 0.18f),
-                    radius = size.width * 0.65f
-                )
-            )
-        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
