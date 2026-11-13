@@ -9,6 +9,11 @@ import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.automirrored.rounded.Message
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PersonAdd
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -288,6 +293,7 @@ fun ScreeningCallScreen(
 
     var isQuickReplyOpen by remember { mutableStateOf(false) }
     var isToolsMenuOpen by remember { mutableStateOf(false) }
+    var isAddCallOpen by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
     Box(
@@ -379,6 +385,8 @@ fun ScreeningCallScreen(
                         onAddCall = onAddCall,
                         onMergeCalls = onMergeCalls,
                         onSwapCalls = onSwapCalls,
+                        isAddCallOpen = isAddCallOpen,
+                        onToggleAddCall = { isAddCallOpen = it },
                         monetColors = monetColors,
                         isEndCallHandledExternally = true
                     )
@@ -445,6 +453,7 @@ fun ScreeningCallScreen(
             mode = currentDisplayMode,
             isQuickReplyOpen = isQuickReplyOpen,
             isToolsMenuOpen = isToolsMenuOpen,
+            isAddCallOpen = isAddCallOpen,
             onHangUp = onHangUp,
             monetColors = monetColors,
             isCallEnded = state.status == CallStatus.ENDED
@@ -490,13 +499,14 @@ fun SharedMorphingDeclineButton(
     mode: CallDisplayMode,
     isQuickReplyOpen: Boolean,
     isToolsMenuOpen: Boolean = false,
+    isAddCallOpen: Boolean = false,
     onHangUp: () -> Unit,
     monetColors: ColorScheme,
     isCallEnded: Boolean = false
 ) {
     val haptic = LocalHapticFeedback.current
 
-    val isHidden = isQuickReplyOpen || isCallEnded || isToolsMenuOpen
+    val isHidden = isQuickReplyOpen || isCallEnded || isToolsMenuOpen || isAddCallOpen
 
     val quickReplyAlpha by animateFloatAsState(
         targetValue = if (isHidden) 0f else 1f,
@@ -4015,6 +4025,8 @@ fun StandardInCallScreen(
     onAddCall: (String) -> Unit = {},
     onMergeCalls: () -> Unit = {},
     onSwapCalls: () -> Unit = {},
+    isAddCallOpen: Boolean = false,
+    onToggleAddCall: ((Boolean) -> Unit)? = null,
     monetColors: ColorScheme = getPixelMonetDarkColorScheme(),
     isEndCallHandledExternally: Boolean = false
 ) {
@@ -4022,7 +4034,15 @@ fun StandardInCallScreen(
     val haptic = LocalHapticFeedback.current
     var showKeypad by remember { mutableStateOf(false) }
     var dtmfDigits by remember { mutableStateOf("") }
-    var showAddCallSheet by remember { mutableStateOf(false) }
+    var localAddCallSheet by remember { mutableStateOf(false) }
+    val showAddCallSheet = if (onToggleAddCall != null) isAddCallOpen else localAddCallSheet
+    fun setAddCallSheet(open: Boolean) {
+        if (onToggleAddCall != null) {
+            onToggleAddCall(open)
+        } else {
+            localAddCallSheet = open
+        }
+    }
     var addCallNumber by remember { mutableStateOf("") }
 
     val displayCallerTitle = if (isConference) {
@@ -4727,7 +4747,7 @@ fun StandardInCallScreen(
                                     monetColors = monetColors,
                                     onClick = {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        showAddCallSheet = true
+                                        setAddCallSheet(true)
                                     }
                                 )
                             }
@@ -4955,11 +4975,25 @@ fun StandardInCallScreen(
             enter = fadeIn(tween(200)) + slideInVertically(tween(300)) { it },
             exit = fadeOut(tween(150)) + slideOutVertically(tween(250)) { it }
         ) {
+            var showDialpad by remember { mutableStateOf(false) }
+            val allContacts = remember { DialerRepository.getCachedContacts(context) }
+            val filteredContacts = remember(addCallNumber, allContacts) {
+                if (addCallNumber.isBlank()) {
+                    allContacts
+                } else {
+                    val clean = addCallNumber.filter { it.isDigit() }
+                    allContacts.filter { c ->
+                        c.name.contains(addCallNumber, ignoreCase = true) ||
+                        (clean.isNotEmpty() && c.number.replace(Regex("[^0-9]"), "").contains(clean))
+                    }
+                }
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color(0x80000000))
-                    .clickable { showAddCallSheet = false },
+                    .clickable { setAddCallSheet(false) },
                 contentAlignment = Alignment.BottomCenter
             ) {
                 Box(
@@ -4974,11 +5008,14 @@ fun StandardInCallScreen(
                             RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
                         )
                         .navigationBarsPadding()
-                        .padding(20.dp)
+                        .imePadding()
+                        .padding(horizontal = 20.dp, vertical = 16.dp)
                 ) {
                     Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 580.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Box(
                             modifier = Modifier
@@ -5011,78 +5048,138 @@ fun StandardInCallScreen(
                                 )
                             }
 
-                            IconButton(
-                                onClick = { showAddCallSheet = false },
-                                modifier = Modifier.size(36.dp)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Close,
-                                    contentDescription = "Close",
-                                    tint = monetColors.onSurfaceVariant
-                                )
+                                IconButton(
+                                    onClick = { showDialpad = !showDialpad },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Dialpad,
+                                        contentDescription = "Toggle Keypad",
+                                        tint = if (showDialpad) monetColors.primary else monetColors.onSurfaceVariant
+                                    )
+                                }
+
+                                IconButton(
+                                    onClick = { setAddCallSheet(false) },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Close,
+                                        contentDescription = "Close",
+                                        tint = monetColors.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
 
+                        // Search & Number Input Box (Real interactive editable TextField!)
                         Surface(
                             shape = RoundedCornerShape(16.dp),
                             color = monetColors.surfaceContainerHighest,
-                            border = BorderStroke(1.dp, monetColors.outlineVariant.copy(alpha = 0.30f)),
+                            border = BorderStroke(1.dp, monetColors.outlineVariant.copy(alpha = 0.35f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 14.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Text(
-                                    text = if (addCallNumber.isBlank()) "Type number or pick contact…" else addCallNumber,
-                                    color = if (addCallNumber.isBlank()) monetColors.onSurfaceVariant.copy(alpha = 0.6f) else monetColors.onSurface,
-                                    fontSize = if (addCallNumber.isBlank()) 14.sp else 18.sp,
-                                    fontFamily = if (addCallNumber.isBlank()) FontFamily.Default else FontFamily.Monospace,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.weight(1f)
+                                Icon(
+                                    imageVector = Icons.Rounded.Search,
+                                    contentDescription = "Search",
+                                    tint = if (addCallNumber.isNotBlank()) monetColors.primary else monetColors.onSurfaceVariant.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(20.dp)
                                 )
+
+                                Box(modifier = Modifier.weight(1f)) {
+                                    if (addCallNumber.isEmpty()) {
+                                        Text(
+                                            text = "Search contacts or type number…",
+                                            color = monetColors.onSurfaceVariant.copy(alpha = 0.6f),
+                                            fontSize = 15.sp
+                                        )
+                                    }
+                                    BasicTextField(
+                                        value = addCallNumber,
+                                        onValueChange = { addCallNumber = it },
+                                        textStyle = TextStyle(
+                                            color = monetColors.onSurface,
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        ),
+                                        cursorBrush = SolidColor(monetColors.primary),
+                                        singleLine = true,
+                                        keyboardOptions = KeyboardOptions(
+                                            keyboardType = KeyboardType.Text,
+                                            imeAction = ImeAction.Search
+                                        ),
+                                        keyboardActions = KeyboardActions(
+                                            onSearch = {
+                                                val cleanDigits = addCallNumber.filter { it.isDigit() || it == '+' || it == '*' || it == '#' }
+                                                if (cleanDigits.isNotBlank()) {
+                                                    onAddCall(cleanDigits)
+                                                    setAddCallSheet(false)
+                                                }
+                                            }
+                                        ),
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
 
                                 if (addCallNumber.isNotBlank()) {
                                     IconButton(
-                                        onClick = { addCallNumber = addCallNumber.dropLast(1) },
-                                        modifier = Modifier.size(32.dp)
+                                        onClick = { addCallNumber = "" },
+                                        modifier = Modifier.size(26.dp)
                                     ) {
                                         Icon(
-                                            imageVector = Icons.AutoMirrored.Filled.Backspace,
-                                            contentDescription = "Backspace",
-                                            tint = monetColors.primary,
-                                            modifier = Modifier.size(18.dp)
+                                            imageVector = Icons.Filled.Close,
+                                            contentDescription = "Clear",
+                                            tint = monetColors.onSurfaceVariant,
+                                            modifier = Modifier.size(16.dp)
                                         )
                                     }
                                 }
                             }
                         }
 
-                        val allContacts = remember { DialerRepository.getCachedContacts(context) }
-                        val filteredContacts = remember(addCallNumber, allContacts) {
-                            if (addCallNumber.isBlank()) {
-                                allContacts.take(4)
-                            } else {
-                                val clean = addCallNumber.filter { it.isDigit() }
-                                allContacts.filter { c ->
-                                    c.name.contains(addCallNumber, ignoreCase = true) ||
-                                    c.number.replace(Regex("[^0-9]"), "").contains(clean)
-                                }.take(4)
-                            }
-                        }
-
-                        if (filteredContacts.isNotEmpty()) {
+                        // Contacts Section Header
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Text(
-                                text = "Contacts",
+                                text = if (addCallNumber.isBlank()) "Contacts (${filteredContacts.size})" else "Matching Contacts (${filteredContacts.size})",
                                 color = monetColors.onSurfaceVariant,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
+
+                            if (!showDialpad) {
+                                Text(
+                                    text = "Show Dialpad",
+                                    color = monetColors.primary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.clickable { showDialpad = true }
+                                )
+                            }
+                        }
+
+                        // Contacts List (All contacts, smooth scrolling, no limit)
+                        if (filteredContacts.isNotEmpty()) {
                             LazyColumn(
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.heightIn(max = 140.dp)
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f, fill = false)
+                                    .heightIn(min = 100.dp, max = if (showDialpad) 140.dp else 280.dp)
                             ) {
                                 items(filteredContacts) { contact ->
                                     Surface(
@@ -5093,7 +5190,7 @@ fun StandardInCallScreen(
                                             .clickable {
                                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                                 onAddCall(contact.number)
-                                                showAddCallSheet = false
+                                                setAddCallSheet(false)
                                             }
                                     ) {
                                         Row(
@@ -5138,45 +5235,65 @@ fun StandardInCallScreen(
                                     }
                                 }
                             }
+                        } else if (addCallNumber.isNotBlank()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "No contacts match \"$addCallNumber\"",
+                                    color = monetColors.onSurfaceVariant.copy(alpha = 0.7f),
+                                    fontSize = 13.sp
+                                )
+                            }
                         }
 
-                        val padRows = remember {
-                            listOf(
-                                listOf("1", "2", "3"),
-                                listOf("4", "5", "6"),
-                                listOf("7", "8", "9"),
-                                listOf("*", "0", "#")
-                            )
-                        }
-
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.fillMaxWidth()
+                        // Collapsible In-Sheet Dialpad
+                        AnimatedVisibility(
+                            visible = showDialpad,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
                         ) {
-                            padRows.forEach { row ->
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    row.forEach { digit ->
-                                        Surface(
-                                            shape = RoundedCornerShape(12.dp),
-                                            color = monetColors.surfaceContainerHighest,
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .height(42.dp)
-                                                .clickable {
-                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                    addCallNumber += digit
+                            val padRows = remember {
+                                listOf(
+                                    listOf("1", "2", "3"),
+                                    listOf("4", "5", "6"),
+                                    listOf("7", "8", "9"),
+                                    listOf("*", "0", "#")
+                                )
+                            }
+
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                padRows.forEach { row ->
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        row.forEach { digit ->
+                                            Surface(
+                                                shape = RoundedCornerShape(12.dp),
+                                                color = monetColors.surfaceContainerHighest,
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .height(40.dp)
+                                                    .clickable {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                        addCallNumber += digit
+                                                    }
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Text(
+                                                        text = digit,
+                                                        color = monetColors.onSurface,
+                                                        fontSize = 16.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
                                                 }
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Text(
-                                                    text = digit,
-                                                    color = monetColors.onSurface,
-                                                    fontSize = 16.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
                                             }
                                         }
                                     }
@@ -5184,19 +5301,23 @@ fun StandardInCallScreen(
                             }
                         }
 
+                        // Call Action Button
                         Button(
                             onClick = {
                                 if (addCallNumber.isNotBlank()) {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    onAddCall(addCallNumber)
-                                    showAddCallSheet = false
+                                    val cleanDigits = addCallNumber.filter { it.isDigit() || it == '+' || it == '*' || it == '#' }
+                                    onAddCall(if (cleanDigits.isNotBlank()) cleanDigits else addCallNumber)
+                                    setAddCallSheet(false)
                                 }
                             },
                             enabled = addCallNumber.isNotBlank(),
                             shape = RoundedCornerShape(16.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFF34A853),
-                                contentColor = Color.White
+                                contentColor = Color.White,
+                                disabledContainerColor = monetColors.surfaceContainerHighest,
+                                disabledContentColor = monetColors.onSurfaceVariant.copy(alpha = 0.4f)
                             ),
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -5212,7 +5333,7 @@ fun StandardInCallScreen(
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Text(
-                                    text = "Call & Put Active on Hold",
+                                    text = if (addCallNumber.isNotBlank()) "Call $addCallNumber & Hold Active" else "Select a contact or enter number",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp
                                 )
