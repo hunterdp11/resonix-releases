@@ -286,10 +286,13 @@ fun ScreeningCallScreen(
         }
     }
 
-    val currentDisplayMode = remember(state.status, state.isIncoming) {
+    val isRootActiveForMode = state.operationMode == AppOperationMode.ROOT_ENHANCED &&
+        RootPrivilegeManager.isRootModeActive(context)
+
+    val currentDisplayMode = remember(state.status, state.isIncoming, isRootActiveForMode) {
         if (state.status == CallStatus.RINGING && state.isIncoming) {
             CallDisplayMode.INCOMING_RINGING
-        } else if (state.status == CallStatus.SCREENING_ACTIVE) {
+        } else if (state.status == CallStatus.SCREENING_ACTIVE && isRootActiveForMode) {
             CallDisplayMode.ASSISTANT_SCREENING
         } else {
             CallDisplayMode.STANDARD_IN_CALL
