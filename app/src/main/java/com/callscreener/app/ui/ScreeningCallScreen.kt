@@ -4718,6 +4718,8 @@ fun StandardInCallScreen(
                 }
             }
 
+            Spacer(modifier = Modifier.height(16.dp))
+
             // 3rd row: Screen Call (always visible when call is active, not in keypad mode)
             AnimatedVisibility(
                 visible = !showKeypad && status != CallStatus.ENDED,
