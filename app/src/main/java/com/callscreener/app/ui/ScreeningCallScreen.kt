@@ -133,6 +133,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.IconButton
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import kotlinx.coroutines.delay
 import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.material.icons.rounded.SwapCalls
 import androidx.compose.material.icons.automirrored.rounded.CallMerge
@@ -4976,6 +4980,19 @@ fun StandardInCallScreen(
             exit = fadeOut(tween(150)) + slideOutVertically(tween(250)) { it }
         ) {
             var showDialpad by remember { mutableStateOf(false) }
+            val focusRequester = remember { FocusRequester() }
+            val keyboardController = LocalSoftwareKeyboardController.current
+
+            LaunchedEffect(showAddCallSheet) {
+                if (showAddCallSheet && !showDialpad) {
+                    delay(300)
+                    try {
+                        focusRequester.requestFocus()
+                        keyboardController?.show()
+                    } catch (_: Exception) {}
+                }
+            }
+
             val allContacts = remember { DialerRepository.getCachedContacts(context) }
             val filteredContacts = remember(addCallNumber, allContacts) {
                 if (addCallNumber.isBlank()) {
@@ -4999,7 +5016,10 @@ fun StandardInCallScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(enabled = false) {}
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {}
                         .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                         .background(monetColors.surfaceContainerHigh)
                         .border(
@@ -5053,7 +5073,12 @@ fun StandardInCallScreen(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 IconButton(
-                                    onClick = { showDialpad = !showDialpad },
+                                    onClick = {
+                                        showDialpad = !showDialpad
+                                        if (showDialpad) {
+                                            keyboardController?.hide()
+                                        }
+                                    },
                                     modifier = Modifier.size(36.dp)
                                 ) {
                                     Icon(
@@ -5076,66 +5101,30 @@ fun StandardInCallScreen(
                             }
                         }
 
-                        // Search & Number Input Box (Real interactive editable TextField!)
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = monetColors.surfaceContainerHighest,
-                            border = BorderStroke(1.dp, monetColors.outlineVariant.copy(alpha = 0.35f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
+                        // Search & Number Input Box (Material 3 OutlinedTextField)
+                        OutlinedTextField(
+                            value = addCallNumber,
+                            onValueChange = { addCallNumber = it },
+                            placeholder = {
+                                Text(
+                                    text = "Search contacts or type number…",
+                                    color = monetColors.onSurfaceVariant.copy(alpha = 0.6f),
+                                    fontSize = 14.sp
+                                )
+                            },
+                            leadingIcon = {
                                 Icon(
                                     imageVector = Icons.Rounded.Search,
                                     contentDescription = "Search",
                                     tint = if (addCallNumber.isNotBlank()) monetColors.primary else monetColors.onSurfaceVariant.copy(alpha = 0.6f),
                                     modifier = Modifier.size(20.dp)
                                 )
-
-                                Box(modifier = Modifier.weight(1f)) {
-                                    if (addCallNumber.isEmpty()) {
-                                        Text(
-                                            text = "Search contacts or type number…",
-                                            color = monetColors.onSurfaceVariant.copy(alpha = 0.6f),
-                                            fontSize = 15.sp
-                                        )
-                                    }
-                                    BasicTextField(
-                                        value = addCallNumber,
-                                        onValueChange = { addCallNumber = it },
-                                        textStyle = TextStyle(
-                                            color = monetColors.onSurface,
-                                            fontSize = 16.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        ),
-                                        cursorBrush = SolidColor(monetColors.primary),
-                                        singleLine = true,
-                                        keyboardOptions = KeyboardOptions(
-                                            keyboardType = KeyboardType.Text,
-                                            imeAction = ImeAction.Search
-                                        ),
-                                        keyboardActions = KeyboardActions(
-                                            onSearch = {
-                                                val cleanDigits = addCallNumber.filter { it.isDigit() || it == '+' || it == '*' || it == '#' }
-                                                if (cleanDigits.isNotBlank()) {
-                                                    onAddCall(cleanDigits)
-                                                    setAddCallSheet(false)
-                                                }
-                                            }
-                                        ),
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
-
+                            },
+                            trailingIcon = {
                                 if (addCallNumber.isNotBlank()) {
                                     IconButton(
                                         onClick = { addCallNumber = "" },
-                                        modifier = Modifier.size(26.dp)
+                                        modifier = Modifier.size(28.dp)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Filled.Close,
@@ -5145,8 +5134,35 @@ fun StandardInCallScreen(
                                         )
                                     }
                                 }
-                            }
-                        }
+                            },
+                            singleLine = true,
+                            shape = RoundedCornerShape(16.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = monetColors.surfaceContainerHighest,
+                                unfocusedContainerColor = monetColors.surfaceContainerHighest,
+                                focusedBorderColor = monetColors.primary,
+                                unfocusedBorderColor = monetColors.outlineVariant.copy(alpha = 0.35f),
+                                focusedTextColor = monetColors.onSurface,
+                                unfocusedTextColor = monetColors.onSurface,
+                                cursorColor = monetColors.primary
+                            ),
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Text,
+                                imeAction = ImeAction.Search
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onSearch = {
+                                    val cleanDigits = addCallNumber.filter { it.isDigit() || it == '+' || it == '*' || it == '#' }
+                                    if (cleanDigits.isNotBlank()) {
+                                        onAddCall(cleanDigits)
+                                        setAddCallSheet(false)
+                                    }
+                                }
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(focusRequester)
+                        )
 
                         // Contacts Section Header
                         Row(
