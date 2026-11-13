@@ -1,6 +1,7 @@
 package com.callscreener.app.service
 
 import android.app.KeyguardManager
+import android.app.Notification
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -29,6 +30,10 @@ class CallScreeningInCallService : InCallService() {
     private var isCurrentCallBlocked = false
     private var currentCallerNumber: String? = null
     private var currentCallerName: String? = null
+
+    private var isForeground = false
+    var activeCallBaseTimeMillis: Long? = null
+        private set
 
     fun markCurrentCallBlocked(number: String?) {
         isCurrentCallBlocked = true
@@ -60,6 +65,63 @@ class CallScreeningInCallService : InCallService() {
         markCurrentCallBlocked(number)
         blockManager.handleBlockedInCall(call, number)
         return true
+    }
+
+    fun promoteToForeground(notification: android.app.Notification) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NotificationHelper.NOTIFICATION_ID_CALL,
+                    notification,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
+                )
+            } else {
+                startForeground(NotificationHelper.NOTIFICATION_ID_CALL, notification)
+            }
+            isForeground = true
+            Log.i(TAG, "Service in foreground (phoneCall)")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to startForeground", e)
+        }
+    }
+
+    fun demoteFromForeground() {
+        if (isForeground) {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                }
+                isForeground = false
+                activeCallBaseTimeMillis = null
+                Log.i(TAG, "Service demoted from foreground")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to stopForeground", e)
+            }
+        }
+    }
+
+    fun updateOngoingNotification(
+        statusOverride: String? = null,
+        baseTimeMillis: Long? = activeCallBaseTimeMillis
+    ) {
+        val number = currentCallerNumber ?: "Unknown"
+        val name = currentCallerName
+        val sessionState = CallSessionManager.getInstance(applicationContext).sessionState.value
+        val isScreening = sessionState.status == CallStatus.SCREENING_ACTIVE
+        val notif = NotificationHelper.postOngoingCallNotification(
+            context = applicationContext,
+            callerNumber = number,
+            callerName = name,
+            isScreening = isScreening,
+            statusOverride = statusOverride,
+            baseTimeMillis = baseTimeMillis,
+            isMuted = sessionState.isMuted,
+            isSpeakerOn = sessionState.isSpeakerOn
+        )
+        promoteToForeground(notif)
     }
 
     private val callback = object : Call.Callback() {
@@ -104,21 +166,11 @@ class CallScreeningInCallService : InCallService() {
                     }
                     Call.STATE_DIALING -> {
                         CallSessionManager.getInstance(applicationContext).onCallDialing()
-                        NotificationHelper.postOngoingCallNotification(
-                            context = applicationContext,
-                            callerNumber = currentCallerNumber ?: extractPhoneNumber(call),
-                            callerName = currentCallerName,
-                            statusOverride = "Calling..."
-                        )
+                        updateOngoingNotification(statusOverride = "Calling...")
                     }
                     Call.STATE_CONNECTING -> {
                         CallSessionManager.getInstance(applicationContext).onCallDialing()
-                        NotificationHelper.postOngoingCallNotification(
-                            context = applicationContext,
-                            callerNumber = currentCallerNumber ?: extractPhoneNumber(call),
-                            callerName = currentCallerName,
-                            statusOverride = "Connecting..."
-                        )
+                        updateOngoingNotification(statusOverride = "Connecting...")
                     }
                     Call.STATE_ACTIVE -> {
                         Log.i(TAG, "Call is now ACTIVE")
@@ -129,30 +181,22 @@ class CallScreeningInCallService : InCallService() {
                         currentCallerNumber?.let {
                             NotificationHelper.cancelMissedCallNotification(applicationContext, it)
                         }
-                        val isScreening = CallSessionManager.getInstance(applicationContext).sessionState.value.status == CallStatus.SCREENING_ACTIVE
-                        NotificationHelper.postOngoingCallNotification(
-                            context = applicationContext,
-                            callerNumber = currentCallerNumber ?: extractPhoneNumber(call),
-                            callerName = currentCallerName,
-                            isScreening = isScreening,
-                            baseTimeMillis = System.currentTimeMillis()
-                        )
+                        if (activeCallBaseTimeMillis == null) {
+                            activeCallBaseTimeMillis = System.currentTimeMillis()
+                        }
+                        updateOngoingNotification(baseTimeMillis = activeCallBaseTimeMillis)
                         CallSessionManager.getInstance(applicationContext).onCallConnected()
                     }
                     Call.STATE_HOLDING -> {
                         Log.i(TAG, "Call on HOLD")
-                        NotificationHelper.postOngoingCallNotification(
-                            context = applicationContext,
-                            callerNumber = currentCallerNumber ?: extractPhoneNumber(call),
-                            callerName = currentCallerName,
-                            statusOverride = "Call on hold"
-                        )
+                        updateOngoingNotification(statusOverride = "Call on hold")
                     }
                     Call.STATE_DISCONNECTED -> {
                         Log.i(TAG, "Call DISCONNECTED")
                         RingtonePlayer.stop(applicationContext)
                         com.callscreener.app.telephony.CallVibrator.vibrateCallEnded(applicationContext)
                         DynamicCallCapsuleManager.dismissCapsule()
+                        demoteFromForeground()
                         NotificationHelper.cancelCallNotification(applicationContext)
                         if (isCurrentCallIncoming && !wasCallAnswered && !isCurrentCallBlocked) {
                             val number = currentCallerNumber ?: extractPhoneNumber(call)
@@ -179,6 +223,7 @@ class CallScreeningInCallService : InCallService() {
     override fun onDestroy() {
         super.onDestroy()
         RingtonePlayer.stop(applicationContext)
+        demoteFromForeground()
         NotificationHelper.cancelCallNotification(applicationContext)
         DynamicCallCapsuleManager.dismissCapsule()
         currentInstance = null
@@ -245,12 +290,8 @@ class CallScreeningInCallService : InCallService() {
                     startActivity(intent)
                 }
             } else {
-                NotificationHelper.postOngoingCallNotification(
-                    context = applicationContext,
-                    callerNumber = callerNumber,
-                    callerName = resolvedCallerName,
-                    statusOverride = if (call.state == Call.STATE_ACTIVE) "Active phone call" else "Calling..."
-                )
+                val initialStatus = if (call.state == Call.STATE_ACTIVE) null else "Calling..."
+                updateOngoingNotification(statusOverride = initialStatus)
                 val intent = Intent(this, ScreeningCallActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 }
@@ -270,6 +311,7 @@ class CallScreeningInCallService : InCallService() {
             if (calls.isEmpty()) {
                 RingtonePlayer.stop(applicationContext)
                 DynamicCallCapsuleManager.dismissCapsule()
+                demoteFromForeground()
                 NotificationHelper.cancelCallNotification(applicationContext)
             }
         } catch (t: Throwable) {
@@ -345,6 +387,24 @@ class CallScreeningInCallService : InCallService() {
 
         fun setSpeaker(on: Boolean) {
             currentInstance?.setSpeakerRoute(on)
+        }
+
+        fun syncNotification() {
+            currentInstance?.let { service ->
+                val sessionState = CallSessionManager.getInstance(service.applicationContext).sessionState.value
+                val statusText = when (sessionState.status) {
+                    CallStatus.DIALING -> "Calling..."
+                    CallStatus.RINGING -> "Ringing..."
+                    CallStatus.ON_HOLD -> "Call on hold"
+                    CallStatus.SCREENING_ACTIVE -> "AI Screening in progress..."
+                    CallStatus.USER_TALKING -> null
+                    else -> null
+                }
+                service.updateOngoingNotification(
+                    statusOverride = statusText,
+                    baseTimeMillis = service.activeCallBaseTimeMillis
+                )
+            }
         }
 
         fun isolateMicForAiRelay(isolate: Boolean) {

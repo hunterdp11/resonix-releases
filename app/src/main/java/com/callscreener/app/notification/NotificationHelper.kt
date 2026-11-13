@@ -1,5 +1,6 @@
 package com.callscreener.app.notification
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -34,7 +35,7 @@ object NotificationHelper {
     const val CHANNEL_INCOMING_CALLS = "incoming_calls_channel"
     private const val CHANNEL_INCOMING_NAME = "Incoming Calls"
 
-    const val CHANNEL_ONGOING_CALLS = "ongoing_calls_channel_v2"
+    const val CHANNEL_ONGOING_CALLS = "ongoing_calls_channel_v3"
     private const val CHANNEL_ONGOING_NAME = "Ongoing Calls"
 
     const val NOTIFICATION_ID_CALL = 20001
@@ -46,6 +47,7 @@ object NotificationHelper {
 
             try {
                 notificationManager.deleteNotificationChannel("ongoing_calls_channel")
+                notificationManager.deleteNotificationChannel("ongoing_calls_channel_v2")
             } catch (_: Exception) {}
 
             val missedCallChannel = NotificationChannel(
@@ -299,14 +301,16 @@ object NotificationHelper {
         } catch (_: Exception) {}
     }
 
-    fun postOngoingCallNotification(
+    fun buildOngoingCallNotification(
         context: Context,
         callerNumber: String,
         callerName: String? = null,
         isScreening: Boolean = false,
         statusOverride: String? = null,
-        baseTimeMillis: Long? = null
-    ) {
+        baseTimeMillis: Long? = null,
+        isMuted: Boolean = false,
+        isSpeakerOn: Boolean = false
+    ): Notification {
         initNotificationChannels(context)
 
         val cleanNumber = callerNumber.trim()
@@ -339,7 +343,27 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val statusText = statusOverride ?: if (isScreening) "AI Screening in progress..." else "Active phone call"
+        val muteIntent = Intent(context, CallNotificationReceiver::class.java).apply {
+            action = CallNotificationReceiver.ACTION_TOGGLE_MUTE
+        }
+        val mutePendingIntent = PendingIntent.getBroadcast(
+            context,
+            NOTIFICATION_ID_CALL + 4,
+            muteIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val speakerIntent = Intent(context, CallNotificationReceiver::class.java).apply {
+            action = CallNotificationReceiver.ACTION_TOGGLE_SPEAKER
+        }
+        val speakerPendingIntent = PendingIntent.getBroadcast(
+            context,
+            NOTIFICATION_ID_CALL + 5,
+            speakerIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val statusText = statusOverride ?: if (isScreening) "AI Screening in progress..." else "Active call"
         val largeAvatar = createAvatarBitmap(context, cleanNumber, displayName, isMissed = false)
 
         val person = Person.Builder()
@@ -362,10 +386,20 @@ object NotificationHelper {
             .setContentIntent(contentPendingIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setColor(0xFF1A73E8.toInt())
+            .addAction(
+                if (isMuted) R.drawable.ic_notification_unmute else R.drawable.ic_notification_mute,
+                if (isMuted) "Unmute" else "Mute",
+                mutePendingIntent
+            )
+            .addAction(
+                R.drawable.ic_notification_speaker,
+                if (isSpeakerOn) "Earpiece" else "Speaker",
+                speakerPendingIntent
+            )
             .addAction(
                 R.drawable.ic_notification_hangup,
                 "Hang Up",
@@ -379,10 +413,34 @@ object NotificationHelper {
             builder.setShowWhen(false)
         }
 
+        return builder.build()
+    }
+
+    fun postOngoingCallNotification(
+        context: Context,
+        callerNumber: String,
+        callerName: String? = null,
+        isScreening: Boolean = false,
+        statusOverride: String? = null,
+        baseTimeMillis: Long? = null,
+        isMuted: Boolean = false,
+        isSpeakerOn: Boolean = false
+    ): Notification {
+        val notification = buildOngoingCallNotification(
+            context,
+            callerNumber,
+            callerName,
+            isScreening,
+            statusOverride,
+            baseTimeMillis,
+            isMuted,
+            isSpeakerOn
+        )
         try {
             val notificationManager = NotificationManagerCompat.from(context)
-            notificationManager.notify(NOTIFICATION_ID_CALL, builder.build())
+            notificationManager.notify(NOTIFICATION_ID_CALL, notification)
         } catch (_: Exception) {}
+        return notification
     }
 
     fun cancelCallNotification(context: Context) {

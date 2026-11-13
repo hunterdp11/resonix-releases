@@ -998,6 +998,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
                         }
                     }
                 }
+                CallScreeningInCallService.syncNotification()
             } catch (e: Exception) {
                 Log.e(TAG, "Error applying mute state", e)
             }
@@ -1009,6 +1010,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
         _sessionState.update { it.copy(isSpeakerOn = newSpeaker) }
         scope.launch(Dispatchers.IO) {
             setSpeakerphone(newSpeaker)
+            CallScreeningInCallService.syncNotification()
         }
     }
 

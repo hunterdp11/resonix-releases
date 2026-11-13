@@ -44,6 +44,14 @@ class CallNotificationReceiver : BroadcastReceiver() {
                 }
                 context.startActivity(callIntent)
             }
+            ACTION_TOGGLE_MUTE -> {
+                Log.i(TAG, "Notification Mute action clicked")
+                sessionManager.toggleMute()
+            }
+            ACTION_TOGGLE_SPEAKER -> {
+                Log.i(TAG, "Notification Speaker action clicked")
+                sessionManager.toggleSpeaker()
+            }
         }
     }
 
@@ -52,5 +60,7 @@ class CallNotificationReceiver : BroadcastReceiver() {
         const val ACTION_DECLINE = "com.callscreener.app.ACTION_DECLINE_CALL"
         const val ACTION_ANSWER = "com.callscreener.app.ACTION_ANSWER_CALL"
         const val ACTION_SCREEN = "com.callscreener.app.ACTION_SCREEN_CALL"
+        const val ACTION_TOGGLE_MUTE = "com.callscreener.app.ACTION_TOGGLE_MUTE"
+        const val ACTION_TOGGLE_SPEAKER = "com.callscreener.app.ACTION_TOGGLE_SPEAKER"
     }
 }
