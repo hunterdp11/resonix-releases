@@ -818,7 +818,16 @@ fun MaterialYouAssistantScreeningScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(monetColors.surface)
+            .background(
+                Brush.verticalGradient(
+                    colorStops = arrayOf(
+                        0.0f to monetColors.primary.copy(alpha = 0.22f),
+                        0.35f to monetColors.secondaryContainer.copy(alpha = 0.14f),
+                        0.65f to monetColors.surface,
+                        1.0f to monetColors.surfaceContainerLowest
+                    )
+                )
+            )
     ) {
         Column(
             modifier = Modifier
