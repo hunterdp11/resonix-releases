@@ -3315,8 +3315,30 @@ fun OemIncomingCallScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(monetColors.surface)
+            .background(
+                Brush.verticalGradient(
+                    colorStops = arrayOf(
+                        0.0f to monetColors.primary.copy(alpha = 0.28f),
+                        0.38f to monetColors.primaryContainer.copy(alpha = 0.18f),
+                        0.70f to monetColors.surface,
+                        1.0f to monetColors.surfaceContainerLowest
+                    )
+                )
+            )
     ) {
+        // Radial glow behind avatar area
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        monetColors.primary.copy(alpha = 0.18f),
+                        Color.Transparent
+                    ),
+                    center = Offset(size.width / 2f, size.height * 0.26f),
+                    radius = size.width * 0.72f
+                )
+            )
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -4071,17 +4093,30 @@ fun StandardInCallScreen(
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    listOf(
-                        monetColors.surface,
-                        Color(0xFF0E1117),
-                        monetColors.surfaceContainerLowest,
-                        Color(0xFF080A0E)
+                    colorStops = arrayOf(
+                        0.0f to monetColors.primary.copy(alpha = 0.22f),
+                        0.30f to monetColors.secondaryContainer.copy(alpha = 0.14f),
+                        0.60f to monetColors.surface,
+                        1.0f to monetColors.surfaceContainerLowest
                     )
                 )
             )
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
+        // Subtle top-center radial glow (Material You accent)
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        monetColors.primary.copy(alpha = 0.14f),
+                        Color.Transparent
+                    ),
+                    center = Offset(size.width / 2f, size.height * 0.18f),
+                    radius = size.width * 0.65f
+                )
+            )
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
