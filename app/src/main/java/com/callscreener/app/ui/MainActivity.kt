@@ -2374,16 +2374,18 @@ fun ContactDetailsSheet(
                             }
                         )
 
-                        ContactHeroActionPill(
-                            icon = Icons.Rounded.Security,
-                            label = "Screen",
-                            accentColor = monetColors.onPrimaryContainer,
-                            buttonBg = monetColors.primaryContainer,
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onScreen(contact.number, contact.name)
-                            }
-                        )
+                        if (RootPrivilegeManager.isRootModeActive(context)) {
+                            ContactHeroActionPill(
+                                icon = Icons.Rounded.Security,
+                                label = "Screen",
+                                accentColor = monetColors.onPrimaryContainer,
+                                buttonBg = monetColors.primaryContainer,
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onScreen(contact.number, contact.name)
+                                }
+                            )
+                        }
 
                         ContactHeroActionPill(
                             painter = painterResource(id = com.callscreener.app.R.drawable.ic_whatsapp),
@@ -5894,7 +5896,7 @@ fun GlassRootPowerCard() {
     val coroutineScope = rememberCoroutineScope()
     var isRootAvailable by remember { mutableStateOf(RootPrivilegeManager.isRootAvailable()) }
     var isPrivileged by remember { mutableStateOf(RootPrivilegeManager.isPrivilegedApp(context)) }
-    var isModuleInstalled by remember { mutableStateOf(RootPrivilegeManager.isMagiskModuleInstalled()) }
+    var isModuleInstalled by remember { mutableStateOf(RootPrivilegeManager.isMagiskModuleInstalled(context)) }
     var installStatus by remember { mutableStateOf<String?>(null) }
     var isInstalling by remember { mutableStateOf(false) }
 
@@ -7510,7 +7512,7 @@ fun DialerSettingsSheet(
     var showBlockedNumbersScreen by remember { mutableStateOf(false) }
     var rootAvailable by remember { mutableStateOf(RootPrivilegeManager.isRootAvailable()) }
     var isPrivileged by remember { mutableStateOf(RootPrivilegeManager.isPrivilegedApp(context)) }
-    var isModuleInstalled by remember { mutableStateOf(RootPrivilegeManager.isMagiskModuleInstalled()) }
+    var isModuleInstalled by remember { mutableStateOf(RootPrivilegeManager.isMagiskModuleInstalled(context)) }
     var isInstalling by remember { mutableStateOf(false) }
 
     val otaCheckStatus by OtaUpdateManager.checkStatus.collectAsState()
@@ -8012,8 +8014,8 @@ fun DialerSettingsSheet(
                                                 onSelectMode(AppOperationMode.ROOT_ENHANCED)
                                                 coroutineScope.launch {
                                                     rootAvailable = RootPrivilegeManager.isRootAvailable()
-                                                    isPrivileged = RootPrivilegeManager.isPrivilegedApp(context)
-                                                    isModuleInstalled = RootPrivilegeManager.isMagiskModuleInstalled()
+                                                    isPrivileged = RootPrivilegeManager.isPrivilegedApp(context, forceRefresh = true)
+                                                    isModuleInstalled = RootPrivilegeManager.isMagiskModuleInstalled(context, forceRefresh = true)
                                                 }
                                             },
                                         contentAlignment = Alignment.Center
@@ -8125,9 +8127,11 @@ fun DialerSettingsSheet(
                                         OutlinedButton(
                                             onClick = {
                                                 coroutineScope.launch {
-                                                    val result = RootPrivilegeManager.uninstallSystemModule()
-                                                    isModuleInstalled = RootPrivilegeManager.isMagiskModuleInstalled()
-                                                    isPrivileged = RootPrivilegeManager.isPrivilegedApp(context)
+                                                    val result = RootPrivilegeManager.uninstallSystemModule(context)
+                                                    onSelectMode(AppOperationMode.STANDARD)
+                                                    isModuleInstalled = false
+                                                    isPrivileged = false
+                                                    rootAvailable = RootPrivilegeManager.isRootAvailable()
                                                     Toast.makeText(context, result.second, Toast.LENGTH_SHORT).show()
                                                 }
                                             },
@@ -8159,8 +8163,8 @@ fun DialerSettingsSheet(
                                                 coroutineScope.launch {
                                                     val result = RootPrivilegeManager.installSystemModule(context)
                                                     isInstalling = false
-                                                    isModuleInstalled = RootPrivilegeManager.isMagiskModuleInstalled()
-                                                    isPrivileged = RootPrivilegeManager.isPrivilegedApp(context)
+                                                    isModuleInstalled = RootPrivilegeManager.isMagiskModuleInstalled(context, forceRefresh = true)
+                                                    isPrivileged = RootPrivilegeManager.isPrivilegedApp(context, forceRefresh = true)
                                                     Toast.makeText(context, result.second, Toast.LENGTH_LONG).show()
                                                 }
                                             },
@@ -8182,8 +8186,11 @@ fun DialerSettingsSheet(
                                             OutlinedButton(
                                                 onClick = {
                                                     coroutineScope.launch {
-                                                        val result = RootPrivilegeManager.uninstallSystemModule()
-                                                        isModuleInstalled = RootPrivilegeManager.isMagiskModuleInstalled()
+                                                        val result = RootPrivilegeManager.uninstallSystemModule(context)
+                                                        onSelectMode(AppOperationMode.STANDARD)
+                                                        isModuleInstalled = false
+                                                        isPrivileged = false
+                                                        rootAvailable = RootPrivilegeManager.isRootAvailable()
                                                         Toast.makeText(context, result.second, Toast.LENGTH_SHORT).show()
                                                     }
                                                 },

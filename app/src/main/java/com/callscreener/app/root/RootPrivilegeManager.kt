@@ -29,13 +29,24 @@ object RootPrivilegeManager {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val saved = prefs.getString(KEY_OPERATION_MODE, null)
         if (saved != null) {
-            return try {
+            val mode = try {
                 AppOperationMode.valueOf(saved)
             } catch (_: Exception) {
                 AppOperationMode.STANDARD
             }
+            if (mode == AppOperationMode.ROOT_ENHANCED) {
+                val hasRoot = isRootAvailable()
+                val isPriv = isPrivilegedApp(context)
+                val hasModule = hasModuleFilesOnDisk()
+                if (!hasRoot || (!isPriv && !hasModule)) {
+                    setOperationMode(context, AppOperationMode.STANDARD)
+                    return AppOperationMode.STANDARD
+                }
+            }
+            return mode
         }
-        return if (isRootAvailable() || isPrivilegedApp(context)) {
+        val hasModule = hasModuleFilesOnDisk() || isPrivilegedApp(context)
+        return if (hasModule && isRootAvailable()) {
             AppOperationMode.ROOT_ENHANCED
         } else {
             AppOperationMode.STANDARD
@@ -87,7 +98,11 @@ object RootPrivilegeManager {
     }
 
     fun isRootModeActive(context: Context): Boolean {
-        return getOperationMode(context) == AppOperationMode.ROOT_ENHANCED && isRootAvailable()
+        if (getOperationMode(context) != AppOperationMode.ROOT_ENHANCED) return false
+        val root = isRootAvailable()
+        val priv = isPrivilegedApp(context)
+        val hasModule = hasModuleFilesOnDisk()
+        return root && (priv || hasModule)
     }
 
     fun isRootAvailable(): Boolean {
@@ -119,8 +134,9 @@ object RootPrivilegeManager {
                             sourceDir.startsWith("/system_ext/priv-app") ||
                             sourceDir.startsWith("/product/priv-app")
             val hasCaptureAudio = context.checkSelfPermission("android.permission.CAPTURE_AUDIO_OUTPUT") == PackageManager.PERMISSION_GRANTED
+            val onDisk = hasModuleFilesOnDisk()
 
-            val result = hasCaptureAudio || (isSystem && inPrivApp)
+            val result = (hasCaptureAudio || (isSystem && inPrivApp)) && (onDisk || isSystem)
             cachedPrivilegedApp = result
             result
         } catch (e: Exception) {
@@ -146,6 +162,11 @@ object RootPrivilegeManager {
         if (!forceRefresh) {
             cachedModuleInstalled?.let { return it }
         }
+        val onDisk = hasModuleFilesOnDisk()
+        if (!onDisk) {
+            cachedModuleInstalled = false
+            return false
+        }
         if (context != null && isPrivilegedApp(context, forceRefresh)) {
             cachedModuleInstalled = true
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -158,14 +179,14 @@ object RootPrivilegeManager {
         if (context != null) {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val pendingReboot = prefs.getBoolean(KEY_MODULE_PENDING_REBOOT, false)
-            if (pendingReboot && hasModuleFilesOnDisk()) {
+            if (pendingReboot && onDisk) {
                 cachedModuleInstalled = true
                 return true
             }
         }
 
-        cachedModuleInstalled = false
-        return false
+        cachedModuleInstalled = onDisk
+        return onDisk
     }
 
     fun executeAsync(block: suspend () -> Unit) {
@@ -241,7 +262,7 @@ name=Resonix Audio & Telephony Priv-App
 version=1.0.0
 versionCode=1
 author=DpXarma
-description=Systemless mount of Resonix into /system/priv-app with direct native audio routing & HAL capture privileges by DpXarma.
+description=Systemless mount of Resonix into /system/priv-app with direct native audio routing & HAL capture privileges.
 EOF
             chmod 644 "${'$'}MODULE_DIR/module.prop"
             rm -f "${'$'}MODULE_DIR/disable"
@@ -272,20 +293,19 @@ EOF
     suspend fun uninstallSystemModule(context: Context? = null): Pair<Boolean, String> = withContext(Dispatchers.IO) {
         val script = "rm -rf /data/adb/modules/resonix /data/adb/modules/call_screener"
         val result = executeSuCommand(script)
-        if (result.first) {
-            context?.let { ctx ->
-                val prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                prefs.edit()
-                    .putBoolean(KEY_MODULE_PENDING_REBOOT, false)
-                    .remove(KEY_MODULE_INSTALL_TIME)
-                    .remove(KEY_MODULE_APK_PATH)
-                    .apply()
-            }
-            invalidateCache()
-            Pair(true, "Module removed cleanly. Reboot to complete uninstallation.")
-        } else {
-            Pair(false, "Failed to remove module: ${result.second}")
+        context?.let { ctx ->
+            val prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit()
+                .putBoolean(KEY_MODULE_PENDING_REBOOT, false)
+                .remove(KEY_MODULE_INSTALL_TIME)
+                .remove(KEY_MODULE_APK_PATH)
+                .putString(KEY_OPERATION_MODE, AppOperationMode.STANDARD.name)
+                .apply()
         }
+        invalidateCache()
+        cachedModuleInstalled = false
+        cachedPrivilegedApp = false
+        Pair(true, "Module uninstalled cleanly. Switched to Standard mode.")
     }
 
     suspend fun rebootDevice(): Pair<Boolean, String> = withContext(Dispatchers.IO) {

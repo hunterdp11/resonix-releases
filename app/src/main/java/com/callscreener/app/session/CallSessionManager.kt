@@ -328,7 +328,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
         val isSim = _sessionState.value.isSimulated
         speechManager.isSimulatorMode = isSim
 
-        val isPrivileged = (RootPrivilegeManager.isPrivilegedApp(appContext) || RootPrivilegeManager.isRootAvailable()) && !isSim
+        val isPrivileged = RootPrivilegeManager.isRootModeActive(appContext) && !isSim
         speechManager.useDirectRootInjection = isPrivileged
 
         CallScreeningInCallService.isolateMicForAiRelay(true)
@@ -446,7 +446,9 @@ class CallSessionManager private constructor(private val appContext: Context) {
     fun setOperationMode(mode: AppOperationMode) {
         RootPrivilegeManager.setOperationMode(appContext, mode)
         _sessionState.update { it.copy(operationMode = mode) }
-        Log.i(TAG, "Switched app operation mode to: $mode")
+        val isRoot = mode == AppOperationMode.ROOT_ENHANCED && RootPrivilegeManager.isRootModeActive(appContext)
+        speechManager.useDirectRootInjection = isRoot
+        Log.i(TAG, "Switched app operation mode to: $mode (isRootActive=$isRoot)")
     }
 
     fun startRecording(): File? {
@@ -462,7 +464,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
                 )
             }
             startRecordingTimer()
-            val msg = if (_sessionState.value.operationMode == AppOperationMode.ROOT_ENHANCED) {
+            val msg = if (RootPrivilegeManager.isRootModeActive(appContext)) {
                 "Dual-side call recording active (Root HAL audio capture)"
             } else {
                 "Call recording active (Standard Microphone capture)"
@@ -573,7 +575,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
         val isSim = _sessionState.value.isSimulated
         speechManager.isSimulatorMode = isSim
 
-        val isPrivileged = (RootPrivilegeManager.isPrivilegedApp(appContext) || RootPrivilegeManager.isRootAvailable()) && !isSim
+        val isPrivileged = RootPrivilegeManager.isRootModeActive(appContext) && !isSim
         speechManager.useDirectRootInjection = isPrivileged
 
         if (!isSim) {
@@ -656,7 +658,7 @@ class CallSessionManager private constructor(private val appContext: Context) {
         val isSim = _sessionState.value.isSimulated
         speechManager.isSimulatorMode = isSim
 
-        val isPrivileged = (RootPrivilegeManager.isPrivilegedApp(appContext) || RootPrivilegeManager.isRootAvailable()) && !isSim
+        val isPrivileged = RootPrivilegeManager.isRootModeActive(appContext) && !isSim
         speechManager.useDirectRootInjection = isPrivileged
 
         if (!isSim) {

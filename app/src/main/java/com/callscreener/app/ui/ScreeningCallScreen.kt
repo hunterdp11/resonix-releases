@@ -184,6 +184,7 @@ import com.callscreener.app.model.MessageSender
 import com.callscreener.app.model.QuickReply
 import com.callscreener.app.model.VoicePersona
 import com.callscreener.app.root.AppOperationMode
+import com.callscreener.app.root.RootPrivilegeManager
 import com.callscreener.app.ui.theme.VibrantAmber
 import com.callscreener.app.ui.theme.VibrantAmberGlassFill
 import com.callscreener.app.ui.theme.VibrantBlue
@@ -346,6 +347,8 @@ fun ScreeningCallScreen(
         ) { mode ->
             when (mode) {
                 CallDisplayMode.INCOMING_RINGING -> {
+                    val isScreenCallAvailable = state.operationMode == AppOperationMode.ROOT_ENHANCED &&
+                        RootPrivilegeManager.isRootModeActive(context)
                     OemIncomingCallScreen(
                         callerName = effectiveCallerName,
                         callerNumber = state.callerNumber,
@@ -355,10 +358,13 @@ fun ScreeningCallScreen(
                         onAnswer = onAnswerDirectly,
                         isDeclineHandledExternally = true,
                         isQuickReplyOpen = isQuickReplyOpen,
-                        onToggleQuickReply = { isQuickReplyOpen = it }
+                        onToggleQuickReply = { isQuickReplyOpen = it },
+                        isScreenCallAvailable = isScreenCallAvailable
                     )
                 }
                 CallDisplayMode.STANDARD_IN_CALL -> {
+                    val isScreenCallAvailable = state.operationMode == AppOperationMode.ROOT_ENHANCED &&
+                        RootPrivilegeManager.isRootModeActive(context)
                     StandardInCallScreen(
                         callerName = effectiveCallerName,
                         callerNumber = state.callerNumber,
@@ -392,7 +398,8 @@ fun ScreeningCallScreen(
                         isAddCallOpen = isAddCallOpen,
                         onToggleAddCall = { isAddCallOpen = it },
                         monetColors = monetColors,
-                        isEndCallHandledExternally = true
+                        isEndCallHandledExternally = true,
+                        isScreenCallAvailable = isScreenCallAvailable
                     )
                 }
                 CallDisplayMode.ASSISTANT_SCREENING -> {
@@ -3169,7 +3176,8 @@ fun OemIncomingCallScreen(
     onAnswer: () -> Unit,
     isDeclineHandledExternally: Boolean = false,
     isQuickReplyOpen: Boolean = false,
-    onToggleQuickReply: ((Boolean) -> Unit)? = null
+    onToggleQuickReply: ((Boolean) -> Unit)? = null,
+    isScreenCallAvailable: Boolean = true
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -3510,7 +3518,8 @@ fun OemIncomingCallScreen(
                     .fillMaxWidth()
                     .padding(bottom = 16.dp)
             ) {
-                BoxWithConstraints(
+                if (isScreenCallAvailable) {
+                    BoxWithConstraints(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 24.dp)
@@ -3625,6 +3634,7 @@ fun OemIncomingCallScreen(
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
+            }
 
                 Box(
                     modifier = Modifier
@@ -4032,7 +4042,8 @@ fun StandardInCallScreen(
     isAddCallOpen: Boolean = false,
     onToggleAddCall: ((Boolean) -> Unit)? = null,
     monetColors: ColorScheme = getPixelMonetDarkColorScheme(),
-    isEndCallHandledExternally: Boolean = false
+    isEndCallHandledExternally: Boolean = false,
+    isScreenCallAvailable: Boolean = true
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -4618,7 +4629,7 @@ fun StandardInCallScreen(
             }
 
             AnimatedVisibility(
-                visible = !showKeypad && status != CallStatus.ENDED,
+                visible = isScreenCallAvailable && !showKeypad && status != CallStatus.ENDED,
                 enter = fadeIn(tween(200, delayMillis = 40)) + expandVertically(tween(240, easing = FastOutSlowInEasing)),
                 exit = fadeOut(tween(130)) + shrinkVertically(tween(180, easing = FastOutLinearInEasing))
             ) {
@@ -4762,9 +4773,9 @@ fun StandardInCallScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 3rd row: Screen Call (always visible when call is active, not in keypad mode)
+            // 3rd row: Screen Call (visible only when root/screen call is available and not in keypad mode)
             AnimatedVisibility(
-                visible = !showKeypad && status != CallStatus.ENDED,
+                visible = isScreenCallAvailable && !showKeypad && status != CallStatus.ENDED,
                 enter = fadeIn(tween(200, delayMillis = 60)) + expandVertically(tween(260, easing = FastOutSlowInEasing)),
                 exit = fadeOut(tween(130)) + shrinkVertically(tween(180, easing = FastOutLinearInEasing))
             ) {
@@ -4795,7 +4806,7 @@ fun StandardInCallScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(if (isScreenCallAvailable) 24.dp else 12.dp))
 
             val endCallInfiniteTransition = rememberInfiniteTransition(label = "endCallInfinite")
             val endCallAuraPulse by endCallInfiniteTransition.animateFloat(
