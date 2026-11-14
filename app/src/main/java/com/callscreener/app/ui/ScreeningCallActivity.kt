@@ -11,6 +11,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
 import com.callscreener.app.model.CallStatus
 import com.callscreener.app.session.CallSessionManager
 import com.callscreener.app.ui.theme.CallScreenerTheme
@@ -64,8 +66,11 @@ class ScreeningCallActivity : ComponentActivity() {
                 val state by sessionManager.sessionState.collectAsState()
                 val presets by sessionManager.presetManager.presets.collectAsState()
 
-                if (state.status == CallStatus.ENDED && state.messages.isEmpty()) {
-                    finish()
+                if (state.status == CallStatus.ENDED) {
+                    LaunchedEffect(Unit) {
+                        delay(600)
+                        finish()
+                    }
                 }
 
                 ScreeningCallScreen(
