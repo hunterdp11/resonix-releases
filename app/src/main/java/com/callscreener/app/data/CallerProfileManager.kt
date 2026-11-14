@@ -97,7 +97,52 @@ object CallerProfileManager {
 
     val photoVersionState = mutableIntStateOf(0)
 
+    private val profilesMemoryCache = java.util.concurrent.ConcurrentHashMap<String, CallerProfile>()
+    @Volatile
+    private var photoFilesCache: MutableMap<String, String>? = null
+
+    fun warmUp(context: Context) {
+        try {
+            getPhotoFilesMap(context)
+            val prefs = getPrefs(context)
+            for ((key, raw) in prefs.all) {
+                if (raw is String) {
+                    parseProfileJson(raw)?.let { profile ->
+                        profilesMemoryCache[key] = profile
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun getPhotoFilesMap(context: Context): Map<String, String> {
+        photoFilesCache?.let { return it }
+        synchronized(this) {
+            photoFilesCache?.let { return it }
+            val map = HashMap<String, String>()
+            val dir = File(context.filesDir, "contact_photos")
+            if (dir.exists()) {
+                val files = dir.listFiles()
+                if (files != null) {
+                    for (f in files) {
+                        if (f.name.startsWith("avatar_") && f.name.endsWith(".jpg") && f.length() > 0) {
+                            val key = f.name.removePrefix("avatar_").removeSuffix(".jpg").filter { it.isDigit() }
+                            if (key.isNotEmpty()) {
+                                map[key] = f.absolutePath
+                            }
+                        }
+                    }
+                }
+            }
+            photoFilesCache = map
+            return map
+        }
+    }
+
     fun notifyPhotoChanged() {
+        synchronized(this) {
+            photoFilesCache = null
+        }
         photoVersionState.intValue++
     }
 
@@ -130,23 +175,38 @@ object CallerProfileManager {
     fun getProfile(context: Context, number: String): CallerProfile? {
         val key = normalizeNumber(number)
         if (key.isBlank()) return null
-        val prefs = getPrefs(context)
-        val raw = prefs.getString(key, null)
-        if (raw != null) {
-            return parseProfileJson(raw)
-        }
+        profilesMemoryCache[key]?.let { return it }
+
         val digits = number.filter { it.isDigit() }
-        if (digits.isNotBlank() && digits != key) {
-            val rawDigits = prefs.getString(digits, null)
-            if (rawDigits != null) return parseProfileJson(rawDigits)
+        if (digits.isNotBlank()) {
+            profilesMemoryCache[digits]?.let { return it }
         }
         if (digits.length >= 7) {
             val tail7 = digits.takeLast(7)
-            for (entryKey in prefs.all.keys) {
+            for ((entryKey, profile) in profilesMemoryCache) {
                 val entryDigits = entryKey.filter { it.isDigit() }
                 if (entryDigits.length >= 7 && (entryDigits.takeLast(7) == tail7 || entryDigits == digits)) {
-                    val entryRaw = prefs.getString(entryKey, null) ?: continue
-                    return parseProfileJson(entryRaw)
+                    return profile
+                }
+            }
+        }
+
+        val prefs = getPrefs(context)
+        val raw = prefs.getString(key, null)
+        if (raw != null) {
+            val profile = parseProfileJson(raw)
+            if (profile != null) {
+                profilesMemoryCache[key] = profile
+                return profile
+            }
+        }
+        if (digits.isNotBlank() && digits != key) {
+            val rawDigits = prefs.getString(digits, null)
+            if (rawDigits != null) {
+                val profile = parseProfileJson(rawDigits)
+                if (profile != null) {
+                    profilesMemoryCache[digits] = profile
+                    return profile
                 }
             }
         }
@@ -156,6 +216,11 @@ object CallerProfileManager {
     fun saveProfile(context: Context, number: String, profile: CallerProfile) {
         val key = normalizeNumber(number)
         if (key.isBlank()) return
+        profilesMemoryCache[key] = profile
+        val digits = number.filter { it.isDigit() }
+        if (digits.isNotBlank()) {
+            profilesMemoryCache[digits] = profile
+        }
         val json = JSONObject().apply {
             put("category", profile.category)
             put("note", profile.note)
@@ -184,6 +249,11 @@ object CallerProfileManager {
     fun deleteProfile(context: Context, number: String) {
         val key = normalizeNumber(number)
         if (key.isBlank()) return
+        profilesMemoryCache.remove(key)
+        val digits = number.filter { it.isDigit() }
+        if (digits.isNotBlank()) {
+            profilesMemoryCache.remove(digits)
+        }
         removeCustomPhoto(context, number)
         getPrefs(context).edit().remove(key).apply()
     }
@@ -196,38 +266,29 @@ object CallerProfileManager {
 
     fun getCustomPhotoPath(context: Context, number: String): String? {
         if (number.isBlank()) return null
-        val key = normalizeNumber(number)
-        val profile = getProfile(context, number)
-        if (!profile?.customPhotoPath.isNullOrBlank()) {
-            val file = File(profile!!.customPhotoPath!!)
-            if (file.exists() && file.length() > 0) return file.absolutePath
-        }
-        if (key.isNotBlank()) {
-            val defaultFile = getContactPhotoFile(context, number)
-            if (defaultFile.exists() && defaultFile.length() > 0) return defaultFile.absolutePath
-        }
         val digits = number.filter { it.isDigit() }
-        if (digits.isNotBlank() && digits != key) {
-            val dir = File(context.filesDir, "contact_photos")
-            val digitsFile = File(dir, "avatar_${digits}.jpg")
-            if (digitsFile.exists() && digitsFile.length() > 0) return digitsFile.absolutePath
-        }
-        if (digits.length >= 7) {
-            val tail7 = digits.takeLast(7)
-            val dir = File(context.filesDir, "contact_photos")
-            if (dir.exists()) {
-                val files = dir.listFiles()
-                if (files != null) {
-                    for (f in files) {
-                        if (f.name.startsWith("avatar_") && f.name.endsWith(".jpg") && f.length() > 0) {
-                            val fileNum = f.name.removePrefix("avatar_").removeSuffix(".jpg").filter { it.isDigit() }
-                            if (fileNum.length >= 7 && (fileNum.takeLast(7) == tail7 || fileNum == digits)) {
-                                return f.absolutePath
-                            }
-                        }
+        if (digits.isBlank()) return null
+        val key = if (digits.length >= 10) digits.takeLast(10) else digits
+
+        val photoMap = getPhotoFilesMap(context)
+        if (photoMap.isNotEmpty()) {
+            photoMap[key]?.let { return it }
+            photoMap[digits]?.let { return it }
+            if (digits.length >= 7) {
+                val tail7 = digits.takeLast(7)
+                for ((k, path) in photoMap) {
+                    if (k.length >= 7 && (k.takeLast(7) == tail7 || k == digits)) {
+                        return path
                     }
                 }
             }
+        }
+
+        val profile = getProfile(context, number)
+        val customPath = profile?.customPhotoPath
+        if (!customPath.isNullOrBlank()) {
+            val file = File(customPath)
+            if (file.exists() && file.length() > 0) return file.absolutePath
         }
         return null
     }

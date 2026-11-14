@@ -547,11 +547,16 @@ fun MainDashboard(
     LaunchedEffect(permissionTrigger, resumeTrigger) {
         if (PermissionHelper.hasContactsAndCallLogPermissions(context)) {
             withContext(Dispatchers.IO) {
+                CallerProfileManager.warmUp(context)
                 val freshContacts = DialerRepository.loadContacts(context)
                 val freshLogs = DialerRepository.loadCallLogs(context, freshContacts)
                 withContext(Dispatchers.Main) {
-                    contacts = freshContacts
-                    callLogs = freshLogs
+                    if (contacts != freshContacts) {
+                        contacts = freshContacts
+                    }
+                    if (callLogs != freshLogs) {
+                        callLogs = freshLogs
+                    }
                 }
             }
         }
@@ -597,49 +602,35 @@ fun MainDashboard(
                 targetState = currentTab,
                 transitionSpec = {
                     val isForward = targetState.ordinal > initialState.ordinal
-                    val slideDistance = { fullWidth: Int -> (fullWidth * 0.14f).toInt() }
+                    val slideDistance = { fullWidth: Int -> (fullWidth * 0.12f).toInt() }
 
                     (fadeIn(
                         animationSpec = tween(
-                            durationMillis = 200,
-                            delayMillis = 60,
+                            durationMillis = 180,
                             easing = LinearOutSlowInEasing
                         )
                     ) + slideInHorizontally(
-                        animationSpec = spring(
-                            dampingRatio = 0.82f,
-                            stiffness = Spring.StiffnessMediumLow
+                        animationSpec = tween(
+                            durationMillis = 200,
+                            easing = FastOutSlowInEasing
                         ),
                         initialOffsetX = { fullWidth ->
                             if (isForward) slideDistance(fullWidth) else -slideDistance(fullWidth)
                         }
-                    ) + scaleIn(
-                        animationSpec = tween(
-                            durationMillis = 200,
-                            delayMillis = 60,
-                            easing = FastOutSlowInEasing
-                        ),
-                        initialScale = 0.95f
                     )).togetherWith(
                         fadeOut(
                             animationSpec = tween(
-                                durationMillis = 110,
+                                durationMillis = 120,
                                 easing = FastOutLinearInEasing
                             )
                         ) + slideOutHorizontally(
-                            animationSpec = spring(
-                                dampingRatio = 0.82f,
-                                stiffness = Spring.StiffnessMediumLow
+                            animationSpec = tween(
+                                durationMillis = 160,
+                                easing = FastOutLinearInEasing
                             ),
                             targetOffsetX = { fullWidth ->
                                 if (isForward) -slideDistance(fullWidth) else slideDistance(fullWidth)
                             }
-                        ) + scaleOut(
-                            animationSpec = tween(
-                                durationMillis = 110,
-                                easing = FastOutLinearInEasing
-                            ),
-                            targetScale = 0.97f
                         )
                     )
                 },
@@ -3127,8 +3118,9 @@ fun ContactsScreen(
             return if (digits.length >= 7) digits.takeLast(10) else digits
         }
 
+        val recentLogs = if (callLogs.size > 100) callLogs.take(100) else callLogs
         val callStats = mutableMapOf<String, Pair<Int, Long>>()
-        for (log in callLogs) {
+        for (log in recentLogs) {
             val n = norm(log.number)
             if (n.isNotEmpty()) {
                 val (count, latest) = callStats[n] ?: Pair(0, 0L)
