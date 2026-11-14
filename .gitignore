@@ -14,3 +14,6 @@
 output.json
 .system_generated
 
+# Local environment & runner scripts
+run.ps1
+*.log
