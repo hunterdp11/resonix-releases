@@ -1,5 +1,13 @@
 # Resonix v1.0.0 — Official Release
 
+<p align="center">
+  <a href="https://android.com"><img src="https://img.shields.io/badge/Platform-Android%208.0%2B%20(API%2026%2B)-3DDC84?logo=android&logoColor=white" alt="Platform" /></a>
+  <a href="https://developer.android.com"><img src="https://img.shields.io/badge/Target%20SDK-Android%2017-34A853?logo=android&logoColor=white" alt="Target SDK" /></a>
+  <a href="https://kotlinlang.org"><img src="https://img.shields.io/badge/Language-Kotlin-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin" /></a>
+  <a href="https://developer.android.com/jetpack/compose"><img src="https://img.shields.io/badge/UI-Jetpack%20Compose%20%2F%20Material%203-4285F4?logo=jetpackcompose&logoColor=white" alt="Compose" /></a>
+  <a href="https://github.com/hunterdp11/resonix-releases/releases"><img src="https://img.shields.io/github/v/release/hunterdp11/resonix-releases?color=orange&logo=github" alt="Release" /></a>
+</p>
+
 Next-generation Android dialer and smart call screening system built with Kotlin and Jetpack Compose, featuring Material You expressive design, dual-mode root and non-root architecture, and intelligent telephony management.
 
 ---
@@ -61,10 +69,20 @@ Unlockable when granted superuser access via an automated system module mounting
 
 ---
 
+## Technology Stack
+
+* **Language:** Kotlin with Coroutines and StateFlow for reactive state management.
+* **UI Toolkit:** Jetpack Compose with Material 3, custom Canvas animations, and Monet color extraction.
+* **Target SDK:** Android 17 (Backward compatible with Android 8.0+ / API 26+).
+* **Telephony:** Android Telecom InCallService and CallScreeningService.
+* **Audio Engineering:** Direct 16-bit 16kHz linear PCM digital audio injection into cellular uplink mixer.
+
+---
+
 ## Download and Installation
 
 * **Release APK:** `Resonix-v1.0.0-release.apk`
-* **Requirements:** Android 8.0 (API 26) or higher. Target SDK: Android 14 (API 34).
+* **Requirements:** Android 8.0 (API 26) or higher. Target SDK: Android 17.
 * **Setup:**
   1. Download and install `Resonix-v1.0.0-release.apk`.
   2. Open Resonix and grant the requested Phone and Call Screening permissions.
