@@ -41,7 +41,6 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Headphones
@@ -258,53 +257,6 @@ fun SpeechJammerDialog(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     contentPadding = PaddingValues(top = 8.dp, bottom = 28.dp)
                 ) {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(colors.surfaceContainerHigh.copy(alpha = 0.50f))
-                                .padding(16.dp)
-                        ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(26.dp)
-                                            .clip(CircleShape)
-                                            .background(colors.primaryContainer),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Bolt,
-                                            contentDescription = null,
-                                            tint = colors.onPrimaryContainer,
-                                            modifier = Modifier.size(15.dp)
-                                        )
-                                    }
-                                    Text(
-                                        text = "HOW ACOUSTIC DISRUPTION WORKS",
-                                        color = colors.primary,
-                                        fontSize = 11.sp,
-                                        fontFamily = AppFont,
-                                        fontWeight = FontWeight.Bold,
-                                        letterSpacing = 0.8.sp
-                                    )
-                                }
-                                Text(
-                                    text = "Human speech requires auditory feedback to monitor cadence. By reflecting the caller's voice back with a ~200ms delay, their brain experiences a timing collision—inducing immediate stuttering, slurred speech, and total verbal confusion.",
-                                    color = colors.onSurfaceVariant,
-                                    fontSize = 12.5.sp,
-                                    fontFamily = AppFont,
-                                    lineHeight = 17.sp
-                                )
-                            }
-                        }
-                    }
-
                     item {
                         Box(
                             modifier = Modifier
