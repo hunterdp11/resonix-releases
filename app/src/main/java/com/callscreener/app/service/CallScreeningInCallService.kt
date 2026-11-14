@@ -107,9 +107,17 @@ class CallScreeningInCallService : InCallService() {
         statusOverride: String? = null,
         baseTimeMillis: Long? = activeCallBaseTimeMillis
     ) {
-        val number = currentCallerNumber ?: "Unknown"
-        val name = currentCallerName
         val sessionState = CallSessionManager.getInstance(applicationContext).sessionState.value
+        val number = when {
+            sessionState.isConference -> "Conference"
+            sessionState.callerNumber.isNotBlank() -> sessionState.callerNumber
+            else -> currentCallerNumber ?: "Unknown"
+        }
+        val name = when {
+            sessionState.isConference -> "Conference Call"
+            !sessionState.callerName.isNullOrBlank() -> sessionState.callerName
+            else -> currentCallerName
+        }
         val isScreening = sessionState.status == CallStatus.SCREENING_ACTIVE
         val notif = NotificationHelper.postOngoingCallNotification(
             context = applicationContext,
@@ -133,79 +141,135 @@ class CallScreeningInCallService : InCallService() {
                     Log.i(TAG, "onDetailsChanged: Intercepted blocked call from '$number'")
                 }
             }
+            if (details.hasProperty(Call.Details.PROPERTY_CONFERENCE)) {
+                CallSessionManager.getInstance(applicationContext).setConference(true)
+            }
+        }
+
+        override fun onConferenceableCallsChanged(call: Call, conferenceableCalls: MutableList<Call>?) {
+            super.onConferenceableCallsChanged(call, conferenceableCalls)
+            val hasConferenceables = !conferenceableCalls.isNullOrEmpty()
+            Log.d(TAG, "onConferenceableCallsChanged: hasConferenceables=$hasConferenceables")
+            CallSessionManager.getInstance(applicationContext).setConferenceable(hasConferenceables)
+        }
+
+        override fun onChildrenChanged(call: Call, children: MutableList<Call>?) {
+            super.onChildrenChanged(call, children)
+            val hasChildren = !children.isNullOrEmpty()
+            Log.d(TAG, "onChildrenChanged: hasChildren=$hasChildren")
+            if (hasChildren) {
+                CallSessionManager.getInstance(applicationContext).setConference(true)
+            }
         }
 
         override fun onStateChanged(call: Call, state: Int) {
             try {
                 super.onStateChanged(call, state)
-                Log.d(TAG, "Call state changed: $state")
+                Log.d(TAG, "Call state changed: $call -> state: $state")
+                val sessionManager = CallSessionManager.getInstance(applicationContext)
+                val isCurrentActiveCall = (sessionManager.currentCall == null || sessionManager.currentCall == call)
+
                 when (state) {
                     Call.STATE_RINGING -> {
-                        val number = currentCallerNumber ?: extractPhoneNumber(call)
+                        val number = extractPhoneNumber(call)
                         if (isCurrentCallIncoming && handleBlockedCallIfApplicable(call, number)) {
                             return
                         }
-                        RingtonePlayer.start(applicationContext)
+                        if (!sessionManager.hasActiveCall()) {
+                            RingtonePlayer.start(applicationContext)
 
-                        val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
-                        val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
-                        val isUserUsingPhone = (powerManager?.isInteractive == true) && (keyguardManager?.isKeyguardLocked == false)
+                            val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+                            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+                            val isUserUsingPhone = (powerManager?.isInteractive == true) && (keyguardManager?.isKeyguardLocked == false)
 
-                        NotificationHelper.postIncomingCallNotification(
-                            context = applicationContext,
-                            callerNumber = number,
-                            callerName = currentCallerName
-                        )
-                        if (!isUserUsingPhone) {
-                            val intent = Intent(this@CallScreeningInCallService, ScreeningCallActivity::class.java).apply {
-                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                            NotificationHelper.postIncomingCallNotification(
+                                context = applicationContext,
+                                callerNumber = number,
+                                callerName = currentCallerName
+                            )
+                            if (!isUserUsingPhone) {
+                                val intent = Intent(this@CallScreeningInCallService, ScreeningCallActivity::class.java).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                                }
+                                startActivity(intent)
                             }
-                            startActivity(intent)
+                            sessionManager.onCallRinging()
+                        } else {
+                            // Call Waiting: secondary incoming call while already in call
+                            Log.i(TAG, "Call Waiting incoming: $number")
+                            val contactName = DialerRepository.lookupContactName(applicationContext, number) ?: call.details.callerDisplayName
+                            sessionManager.attachCall(call, number, contactName, isIncoming = true)
+                            NotificationHelper.postIncomingCallNotification(
+                                context = applicationContext,
+                                callerNumber = number,
+                                callerName = contactName
+                            )
                         }
-                        CallSessionManager.getInstance(applicationContext).onCallRinging()
                     }
                     Call.STATE_DIALING -> {
-                        CallSessionManager.getInstance(applicationContext).onCallDialing()
-                        updateOngoingNotification(statusOverride = "Calling...")
+                        if (isCurrentActiveCall) {
+                            sessionManager.onCallDialing()
+                            updateOngoingNotification(statusOverride = "Calling...")
+                        }
                     }
                     Call.STATE_CONNECTING -> {
-                        CallSessionManager.getInstance(applicationContext).onCallDialing()
-                        updateOngoingNotification(statusOverride = "Connecting...")
+                        if (isCurrentActiveCall) {
+                            sessionManager.onCallDialing()
+                            updateOngoingNotification(statusOverride = "Connecting...")
+                        }
                     }
                     Call.STATE_ACTIVE -> {
-                        Log.i(TAG, "Call is now ACTIVE")
+                        Log.i(TAG, "Call is now ACTIVE: $call")
                         wasCallAnswered = true
                         RingtonePlayer.stop(applicationContext)
                         com.callscreener.app.telephony.CallVibrator.vibrateCallConnected(applicationContext)
                         DynamicCallCapsuleManager.dismissCapsule()
-                        currentCallerNumber?.let {
-                            NotificationHelper.cancelMissedCallNotification(applicationContext, it)
+                        val num = extractPhoneNumber(call)
+                        if (num.isNotBlank()) {
+                            NotificationHelper.cancelMissedCallNotification(applicationContext, num)
                         }
                         if (activeCallBaseTimeMillis == null) {
                             activeCallBaseTimeMillis = System.currentTimeMillis()
                         }
-                        updateOngoingNotification(baseTimeMillis = activeCallBaseTimeMillis)
-                        CallSessionManager.getInstance(applicationContext).onCallConnected()
+                        if (isCurrentActiveCall) {
+                            sessionManager.onCallConnected()
+                            updateOngoingNotification(baseTimeMillis = activeCallBaseTimeMillis)
+                        } else {
+                            syncNotification()
+                        }
                     }
                     Call.STATE_HOLDING -> {
-                        Log.i(TAG, "Call on HOLD")
-                        updateOngoingNotification(statusOverride = "Call on hold")
+                        Log.i(TAG, "Call on HOLD: $call")
+                        val otherAliveCalls = calls.filter { it != call && it.state != Call.STATE_DISCONNECTED }
+                        if (otherAliveCalls.isEmpty()) {
+                            updateOngoingNotification(statusOverride = "Call on hold")
+                        } else {
+                            syncNotification()
+                        }
                     }
                     Call.STATE_DISCONNECTED -> {
-                        Log.i(TAG, "Call DISCONNECTED")
-                        RingtonePlayer.stop(applicationContext)
-                        com.callscreener.app.telephony.CallVibrator.vibrateCallEnded(applicationContext)
-                        DynamicCallCapsuleManager.dismissCapsule()
-                        demoteFromForeground()
-                        NotificationHelper.cancelCallNotification(applicationContext)
-                        if (isCurrentCallIncoming && !wasCallAnswered && !isCurrentCallBlocked) {
-                            val number = currentCallerNumber ?: extractPhoneNumber(call)
-                            val name = currentCallerName ?: DialerRepository.lookupContactName(applicationContext, number) ?: call.details.callerDisplayName
-                            if (!number.isNullOrBlank()) {
-                                NotificationHelper.postMissedCallNotification(applicationContext, number, name)
+                        Log.i(TAG, "Call DISCONNECTED: $call")
+                        val otherAliveCalls = calls.filter { it != call && it.state != Call.STATE_DISCONNECTED }
+                        if (otherAliveCalls.isNotEmpty()) {
+                            Log.i(TAG, "Remaining active calls: ${otherAliveCalls.size}. Keeping notification active.")
+                            sessionManager.onCallRemoved(call)
+                            syncNotification()
+                        } else {
+                            Log.i(TAG, "All calls disconnected. Ending session and dismissing notification.")
+                            RingtonePlayer.stop(applicationContext)
+                            com.callscreener.app.telephony.CallVibrator.vibrateCallEnded(applicationContext)
+                            DynamicCallCapsuleManager.dismissCapsule()
+                            demoteFromForeground()
+                            NotificationHelper.cancelCallNotification(applicationContext)
+                            if (isCurrentCallIncoming && !wasCallAnswered && !isCurrentCallBlocked) {
+                                val number = currentCallerNumber ?: extractPhoneNumber(call)
+                                val name = currentCallerName ?: DialerRepository.lookupContactName(applicationContext, number) ?: call.details.callerDisplayName
+                                if (!number.isNullOrBlank()) {
+                                    NotificationHelper.postMissedCallNotification(applicationContext, number, name)
+                                }
                             }
+                            sessionManager.onCallEnded()
                         }
-                        CallSessionManager.getInstance(applicationContext).onCallEnded()
                     }
                 }
             } catch (t: Throwable) {
@@ -274,14 +338,17 @@ class CallScreeningInCallService : InCallService() {
             val isUserUsingPhone = (powerManager?.isInteractive == true) && (keyguardManager?.isKeyguardLocked == false)
 
             if (isIncoming && call.state == Call.STATE_RINGING) {
-                RingtonePlayer.start(applicationContext)
+                val isAlreadyInCall = sessionManager.hasActiveCall()
+                if (!isAlreadyInCall) {
+                    RingtonePlayer.start(applicationContext)
+                }
                 NotificationHelper.postIncomingCallNotification(
                     context = applicationContext,
                     callerNumber = callerNumber,
                     callerName = resolvedCallerName
                 )
-                if (isUserUsingPhone) {
-                    Log.i(TAG, "User actively using phone: presenting minimal incoming call heads-up banner like Google Dialer")
+                if (isUserUsingPhone || isAlreadyInCall) {
+                    Log.i(TAG, "User actively in call or using phone: presenting minimal incoming call heads-up banner")
                 } else {
                     Log.i(TAG, "Device locked or screen off: presenting full-screen incoming call view")
                     val intent = Intent(this, ScreeningCallActivity::class.java).apply {
@@ -307,8 +374,14 @@ class CallScreeningInCallService : InCallService() {
             super.onCallRemoved(call)
             Log.d(TAG, "onCallRemoved: $call")
             call.unregisterCallback(callback)
-            CallSessionManager.getInstance(applicationContext).onCallRemoved(call)
-            if (calls.isEmpty()) {
+            val otherAliveCalls = calls.filter { it != call && it.state != Call.STATE_DISCONNECTED }
+            if (otherAliveCalls.isNotEmpty()) {
+                Log.i(TAG, "onCallRemoved: Active calls remaining: ${otherAliveCalls.size}. Keeping session and notification active.")
+                CallSessionManager.getInstance(applicationContext).onCallRemoved(call)
+                syncNotification()
+            } else {
+                Log.i(TAG, "onCallRemoved: All calls ended.")
+                CallSessionManager.getInstance(applicationContext).onCallRemoved(call)
                 RingtonePlayer.stop(applicationContext)
                 DynamicCallCapsuleManager.dismissCapsule()
                 demoteFromForeground()
@@ -392,12 +465,14 @@ class CallScreeningInCallService : InCallService() {
         fun syncNotification() {
             currentInstance?.let { service ->
                 val sessionState = CallSessionManager.getInstance(service.applicationContext).sessionState.value
-                val statusText = when (sessionState.status) {
-                    CallStatus.DIALING -> "Calling..."
-                    CallStatus.RINGING -> "Ringing..."
-                    CallStatus.ON_HOLD -> "Call on hold"
-                    CallStatus.SCREENING_ACTIVE -> "AI Screening in progress..."
-                    CallStatus.USER_TALKING -> null
+                val statusText = when {
+                    sessionState.isConference -> "Conference call"
+                    sessionState.hasSecondaryCall -> "Active (1 on hold)"
+                    sessionState.status == CallStatus.DIALING -> "Calling..."
+                    sessionState.status == CallStatus.RINGING -> "Ringing..."
+                    sessionState.status == CallStatus.ON_HOLD -> "Call on hold"
+                    sessionState.status == CallStatus.SCREENING_ACTIVE -> "AI Screening in progress..."
+                    sessionState.status == CallStatus.USER_TALKING -> null
                     else -> null
                 }
                 service.updateOngoingNotification(

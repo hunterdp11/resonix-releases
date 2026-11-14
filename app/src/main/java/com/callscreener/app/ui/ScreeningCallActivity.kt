@@ -85,8 +85,12 @@ class ScreeningCallActivity : ComponentActivity() {
                     onSendReply = { replyText -> sessionManager.sendUserReply(replyText) },
                     onTakeOver = { sessionManager.takeOverCall() },
                     onHangUp = {
-                        sessionManager.hangUp()
-                        finish()
+                        if (sessionManager.hasSecondaryCall()) {
+                            sessionManager.hangUpCurrentCall()
+                        } else {
+                            sessionManager.hangUp()
+                            finish()
+                        }
                     },
                     onToggleMute = { sessionManager.toggleMute() },
                     onToggleSpeaker = { sessionManager.toggleSpeaker() },

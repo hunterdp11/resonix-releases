@@ -286,6 +286,16 @@ fun ScreeningCallScreen(
         }
     }
 
+    val effectiveSecondaryCallerName = remember(state.secondaryCallerNumber, state.secondaryCallerName) {
+        val num = state.secondaryCallerNumber
+        if (!num.isNullOrBlank()) {
+            val saved = DialerRepository.lookupContactName(context, num)
+            if (!saved.isNullOrBlank()) saved else state.secondaryCallerName ?: num
+        } else {
+            state.secondaryCallerName
+        }
+    }
+
     val isRootActiveForMode = state.operationMode == AppOperationMode.ROOT_ENHANCED &&
         RootPrivilegeManager.isRootModeActive(context)
 
@@ -391,7 +401,7 @@ fun ScreeningCallScreen(
                         onHangUp = onHangUp,
                         hasSecondaryCall = state.hasSecondaryCall,
                         secondaryCallerNumber = state.secondaryCallerNumber,
-                        secondaryCallerName = state.secondaryCallerName,
+                        secondaryCallerName = effectiveSecondaryCallerName,
                         isConference = state.isConference,
                         canMergeCalls = state.canMergeCalls,
                         canSwapCalls = state.canSwapCalls,
@@ -4269,7 +4279,7 @@ fun StandardInCallScreen(
             }
 
             AnimatedVisibility(
-                visible = hasSecondaryCall,
+                visible = hasSecondaryCall && !isConference,
                 enter = fadeIn() + expandVertically(),
                 exit = fadeOut() + shrinkVertically()
             ) {
@@ -4732,21 +4742,36 @@ fun StandardInCallScreen(
                         }
 
                         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                            InCallActionButton(
-                                icon = if (status == CallStatus.ON_HOLD) Icons.Filled.PlayArrow else Icons.Filled.Pause,
-                                label = if (status == CallStatus.ON_HOLD) "Unhold" else "Hold",
-                                isActive = status == CallStatus.ON_HOLD,
-                                activeColor = VibrantAmber,
-                                monetColors = monetColors,
-                                onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    onToggleHold()
-                                }
-                            )
+                            if (hasSecondaryCall && !isConference) {
+                                InCallActionButton(
+                                    icon = Icons.Rounded.SwapCalls,
+                                    label = "Swap",
+                                    isActive = true,
+                                    activeColor = monetColors.primary,
+                                    monetColors = monetColors,
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onSwapCalls()
+                                    }
+                                )
+                            } else {
+                                InCallActionButton(
+                                    icon = if (status == CallStatus.ON_HOLD) Icons.Filled.PlayArrow else Icons.Filled.Pause,
+                                    label = if (status == CallStatus.ON_HOLD) "Unhold" else "Hold",
+                                    isActive = status == CallStatus.ON_HOLD,
+                                    activeColor = VibrantAmber,
+                                    monetColors = monetColors,
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onToggleHold()
+                                    }
+                                )
+                            }
                         }
 
                         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                            if (canMergeCalls) {
+                            val shouldShowMerge = (canMergeCalls || hasSecondaryCall) && !isConference
+                            if (shouldShowMerge) {
                                 InCallActionButton(
                                     icon = Icons.AutoMirrored.Rounded.CallMerge,
                                     label = "Merge",
