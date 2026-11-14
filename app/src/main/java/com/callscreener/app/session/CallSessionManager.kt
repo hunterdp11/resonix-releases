@@ -46,11 +46,19 @@ class CallSessionManager private constructor(private val appContext: Context) {
     private var activeTelecomCall: Call? = null
     private var secondaryTelecomCall: Call? = null
 
-    fun hasActiveCall(): Boolean = activeTelecomCall != null &&
-            _sessionState.value.status != CallStatus.ENDED &&
-            _sessionState.value.status != CallStatus.IDLE
+    fun hasActiveCall(): Boolean {
+        val call = activeTelecomCall
+        val isCallAlive = call != null && call.state != Call.STATE_DISCONNECTED
+        val isStateActive = _sessionState.value.status != CallStatus.ENDED &&
+                _sessionState.value.status != CallStatus.IDLE
+        return isCallAlive && isStateActive
+    }
 
-    fun hasSecondaryCall(): Boolean = secondaryTelecomCall != null || _sessionState.value.hasSecondaryCall
+    fun hasSecondaryCall(): Boolean {
+        val sec = secondaryTelecomCall
+        val isSecAlive = sec != null && sec.state != Call.STATE_DISCONNECTED
+        return isSecAlive || _sessionState.value.hasSecondaryCall
+    }
 
     val currentCall: Call?
         get() = activeTelecomCall
@@ -1012,9 +1020,22 @@ class CallSessionManager private constructor(private val appContext: Context) {
 
         try {
             activeTelecomCall?.disconnect()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error disconnecting active call", e)
+        }
+        try {
             secondaryTelecomCall?.disconnect()
         } catch (e: Exception) {
-            Log.e(TAG, "Error disconnecting calls", e)
+            Log.e(TAG, "Error disconnecting secondary call", e)
+        }
+        try {
+            CallScreeningInCallService.currentInstance?.calls?.forEach { call ->
+                try {
+                    call.disconnect()
+                } catch (_: Exception) {}
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error disconnecting InCallService calls", e)
         }
         activeTelecomCall = null
         secondaryTelecomCall = null
@@ -1024,6 +1045,13 @@ class CallSessionManager private constructor(private val appContext: Context) {
     }
 
     fun onCallRemoved(call: Call) {
+        Log.i(TAG, "onCallRemoved called for $call (active=$activeTelecomCall, secondary=$secondaryTelecomCall)")
+
+        val inCallService = CallScreeningInCallService.currentInstance
+        val remainingAliveTelecomCalls = inCallService?.calls?.filter {
+            it != call && it.state != Call.STATE_DISCONNECTED
+        } ?: emptyList()
+
         if (call == secondaryTelecomCall) {
             secondaryTelecomCall = null
             _sessionState.update {
@@ -1035,33 +1063,83 @@ class CallSessionManager private constructor(private val appContext: Context) {
                     canSwapCalls = false
                 )
             }
-            Log.i(TAG, "Secondary call disconnected; maintaining active primary call")
+            Log.i(TAG, "Secondary call disconnected; maintaining active primary call ($activeTelecomCall)")
             CallScreeningInCallService.syncNotification()
-        } else if (call == activeTelecomCall && secondaryTelecomCall != null) {
-            activeTelecomCall = secondaryTelecomCall
-            secondaryTelecomCall = null
-            val promotedNum = _sessionState.value.secondaryCallerNumber ?: ""
-            val promotedName = _sessionState.value.secondaryCallerName
-            try {
-                activeTelecomCall?.unhold()
-            } catch (_: Exception) {}
-            _sessionState.update {
-                it.copy(
-                    callerNumber = promotedNum,
-                    callerName = promotedName,
-                    hasSecondaryCall = false,
-                    secondaryCallerNumber = null,
-                    secondaryCallerName = null,
-                    canMergeCalls = false,
-                    canSwapCalls = false,
-                    status = CallStatus.USER_TALKING
-                )
-            }
-            Log.i(TAG, "Primary call disconnected; unheld and promoted secondary call to active: $promotedNum ($promotedName)")
-            CallScreeningInCallService.syncNotification()
-        } else {
-            onCallEnded()
+            return
         }
+
+        if (call == activeTelecomCall) {
+            if (secondaryTelecomCall != null) {
+                activeTelecomCall = secondaryTelecomCall
+                secondaryTelecomCall = null
+                val promotedNum = _sessionState.value.secondaryCallerNumber ?: ""
+                val promotedName = _sessionState.value.secondaryCallerName
+                try {
+                    activeTelecomCall?.unhold()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error unholding promoted secondary call", e)
+                }
+                _sessionState.update {
+                    it.copy(
+                        callerNumber = promotedNum,
+                        callerName = promotedName,
+                        hasSecondaryCall = false,
+                        secondaryCallerNumber = null,
+                        secondaryCallerName = null,
+                        canMergeCalls = false,
+                        canSwapCalls = false,
+                        status = CallStatus.USER_TALKING
+                    )
+                }
+                Log.i(TAG, "Primary call disconnected; unheld and promoted secondary call to active: $promotedNum ($promotedName)")
+                CallScreeningInCallService.syncNotification()
+                return
+            } else if (remainingAliveTelecomCalls.isNotEmpty()) {
+                val nextCall = remainingAliveTelecomCalls.first()
+                activeTelecomCall = nextCall
+                secondaryTelecomCall = null
+                val num = inCallService?.extractPhoneNumber(nextCall) ?: ""
+                val name = DialerRepository.lookupContactName(appContext, num) ?: nextCall.details?.callerDisplayName
+                try {
+                    nextCall.unhold()
+                } catch (_: Exception) {}
+                _sessionState.update {
+                    it.copy(
+                        callerNumber = num,
+                        callerName = name,
+                        hasSecondaryCall = false,
+                        secondaryCallerNumber = null,
+                        secondaryCallerName = null,
+                        canMergeCalls = false,
+                        canSwapCalls = false,
+                        status = CallStatus.USER_TALKING
+                    )
+                }
+                Log.i(TAG, "Adopted remaining alive Telecom call: $num ($name)")
+                CallScreeningInCallService.syncNotification()
+                return
+            } else {
+                Log.i(TAG, "Active call ended and no remaining alive calls in Telecom. Ending session.")
+                onCallEnded()
+                return
+            }
+        }
+
+        // Stale or duplicate removal of a call that is already not activeTelecomCall
+        if (remainingAliveTelecomCalls.isNotEmpty() || (activeTelecomCall != null && activeTelecomCall?.state != Call.STATE_DISCONNECTED)) {
+            Log.i(TAG, "Call $call removed, but an active call is still present. Ignoring duplicate removal.")
+            if (secondaryTelecomCall?.state == Call.STATE_DISCONNECTED) {
+                secondaryTelecomCall = null
+                _sessionState.update {
+                    it.copy(hasSecondaryCall = false, secondaryCallerNumber = null, secondaryCallerName = null)
+                }
+            }
+            CallScreeningInCallService.syncNotification()
+            return
+        }
+
+        Log.i(TAG, "No active or remaining calls alive. Ending session.")
+        onCallEnded()
     }
 
     fun onCallEnded() {

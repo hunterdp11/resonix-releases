@@ -23,8 +23,12 @@ class CallNotificationReceiver : BroadcastReceiver() {
         when (action) {
             ACTION_DECLINE -> {
                 Log.i(TAG, "Notification Decline action clicked")
-                sessionManager.hangUp()
-                NotificationHelper.cancelCallNotification(context.applicationContext)
+                if (sessionManager.hasSecondaryCall()) {
+                    sessionManager.hangUpCurrentCall()
+                } else {
+                    sessionManager.hangUp()
+                    NotificationHelper.cancelCallNotification(context.applicationContext)
+                }
             }
             ACTION_ANSWER -> {
                 Log.i(TAG, "Notification Answer action clicked")

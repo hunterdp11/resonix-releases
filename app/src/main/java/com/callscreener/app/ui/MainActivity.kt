@@ -375,6 +375,16 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         isDefaultDialerState.value = isDefaultDialer()
         resumeCounter.intValue++
+
+        val sessionManager = com.callscreener.app.session.CallSessionManager.getInstance(applicationContext)
+        val inCallService = com.callscreener.app.service.CallScreeningInCallService.currentInstance
+        val hasAliveCalls = inCallService?.calls?.any { it.state != android.telecom.Call.STATE_DISCONNECTED } == true
+        if (sessionManager.hasActiveCall() || hasAliveCalls) {
+            val intent = Intent(this, ScreeningCallActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            startActivity(intent)
+        }
     }
 
     private fun isDefaultDialer(): Boolean {
@@ -10055,13 +10065,4 @@ fun SavedRecordingsDialog(
                                                     modifier = Modifier
                                                         .clip(RoundedCornerShape(8.dp))
                                                         .background(monetColors.surfaceContainerHighest)
-                                                        .padding(horizontal = 7.dp, vertical = 3.dp)
-                                                ) {
-                                                    Text(
-                                                        text = item.fileSizeFormatted,
-                                                        color = monetColors.onSurfaceVariant,
-                                                        fontSize = 10.5.sp,
-                                                        fontFamily = AppFont
-                                                    )
-                                                }
 ... [truncated for diff preview]

@@ -249,10 +249,10 @@ class CallScreeningInCallService : InCallService() {
                     }
                     Call.STATE_DISCONNECTED -> {
                         Log.i(TAG, "Call DISCONNECTED: $call")
+                        sessionManager.onCallRemoved(call)
                         val otherAliveCalls = calls.filter { it != call && it.state != Call.STATE_DISCONNECTED }
-                        if (otherAliveCalls.isNotEmpty()) {
-                            Log.i(TAG, "Remaining active calls: ${otherAliveCalls.size}. Keeping notification active.")
-                            sessionManager.onCallRemoved(call)
+                        if (otherAliveCalls.isNotEmpty() || sessionManager.hasActiveCall()) {
+                            Log.i(TAG, "Remaining active calls present. Keeping notification active.")
                             syncNotification()
                         } else {
                             Log.i(TAG, "All calls disconnected. Ending session and dismissing notification.")
@@ -263,12 +263,11 @@ class CallScreeningInCallService : InCallService() {
                             NotificationHelper.cancelCallNotification(applicationContext)
                             if (isCurrentCallIncoming && !wasCallAnswered && !isCurrentCallBlocked) {
                                 val number = currentCallerNumber ?: extractPhoneNumber(call)
-                                val name = currentCallerName ?: DialerRepository.lookupContactName(applicationContext, number) ?: call.details.callerDisplayName
+                                val name = currentCallerName ?: DialerRepository.lookupContactName(applicationContext, number) ?: call.details?.callerDisplayName
                                 if (!number.isNullOrBlank()) {
                                     NotificationHelper.postMissedCallNotification(applicationContext, number, name)
                                 }
                             }
-                            sessionManager.onCallEnded()
                         }
                     }
                 }
@@ -374,14 +373,14 @@ class CallScreeningInCallService : InCallService() {
             super.onCallRemoved(call)
             Log.d(TAG, "onCallRemoved: $call")
             call.unregisterCallback(callback)
+            val sessionManager = CallSessionManager.getInstance(applicationContext)
+            sessionManager.onCallRemoved(call)
             val otherAliveCalls = calls.filter { it != call && it.state != Call.STATE_DISCONNECTED }
-            if (otherAliveCalls.isNotEmpty()) {
+            if (otherAliveCalls.isNotEmpty() || sessionManager.hasActiveCall()) {
                 Log.i(TAG, "onCallRemoved: Active calls remaining: ${otherAliveCalls.size}. Keeping session and notification active.")
-                CallSessionManager.getInstance(applicationContext).onCallRemoved(call)
                 syncNotification()
             } else {
                 Log.i(TAG, "onCallRemoved: All calls ended.")
-                CallSessionManager.getInstance(applicationContext).onCallRemoved(call)
                 RingtonePlayer.stop(applicationContext)
                 DynamicCallCapsuleManager.dismissCapsule()
                 demoteFromForeground()
@@ -439,13 +438,8 @@ class CallScreeningInCallService : InCallService() {
         }
     }
 
-    private fun extractPhoneNumber(call: Call): String {
-        return try {
-            val handle: Uri? = call.details.handle
-            handle?.schemeSpecificPart ?: "Unknown Caller"
-        } catch (e: Exception) {
-            "Unknown Caller"
-        }
+    fun extractPhoneNumber(call: Call): String {
+        return Companion.extractPhoneNumber(call)
     }
 
     companion object {
@@ -453,6 +447,15 @@ class CallScreeningInCallService : InCallService() {
         var currentInstance: CallScreeningInCallService? = null
         var isTelecomMuted: Boolean = false
             private set
+
+        fun extractPhoneNumber(call: Call): String {
+            return try {
+                val handle: Uri? = call.details?.handle
+                handle?.schemeSpecificPart ?: "Unknown Caller"
+            } catch (e: Exception) {
+                "Unknown Caller"
+            }
+        }
 
         fun markCallBlocked(number: String?) {
             currentInstance?.markCurrentCallBlocked(number)
