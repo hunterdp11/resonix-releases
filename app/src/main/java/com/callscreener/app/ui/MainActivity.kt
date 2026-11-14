@@ -583,6 +583,7 @@ fun MainDashboard(
     val presets by sessionManager.presetManager.presets.collectAsState()
 
     val monetColors: ColorScheme = rememberPixelMonetColorScheme()
+    val isDark = ThemeManager.isDarkTheme()
 
     Box(
         modifier = Modifier
@@ -1241,6 +1242,7 @@ fun RecentsScreen(
     )
 
     val monetColors: ColorScheme = rememberPixelMonetColorScheme()
+    val isDark = ThemeManager.isDarkTheme()
 
     val contactsPhotoMap = remember(contacts, CallerProfileManager.photoVersionState.intValue) {
         val map = HashMap<String, String>()
@@ -1769,13 +1771,14 @@ fun RecentsScreen(
                     },
                     menuRotation = menuRotation,
                     menuContent = {
+                        val isDark = ThemeManager.isDarkTheme()
                         DropdownMenu(
                             expanded = isMenuExpanded,
                             onDismissRequest = { isMenuExpanded = false },
                             offset = androidx.compose.ui.unit.DpOffset(x = 0.dp, y = 6.dp),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(20.dp))
-                                .background(Color(0xF0181B22))
+                                .background(monetColors.surfaceContainerHigh)
                                 .border(1.dp, monetColors.outlineVariant.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
                                 .padding(vertical = 4.dp)
                         ) {
@@ -1801,7 +1804,7 @@ fun RecentsScreen(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                                         ) {
-                                            Icon(Icons.Rounded.Tune, contentDescription = null, tint = VibrantAmber, modifier = Modifier.size(18.dp))
+                                            Icon(Icons.Rounded.Tune, contentDescription = null, tint = if (isDark) VibrantAmber else Color(0xFFC46500), modifier = Modifier.size(18.dp))
                                             Text("Audio Presets & Personas", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = AppFont)
                                         }
                                     },
@@ -1852,6 +1855,7 @@ fun ContactDetailsSheet(
     }
 
     val monetColors: ColorScheme = rememberPixelMonetColorScheme()
+    val isDark = ThemeManager.isDarkTheme()
 
     val (avatarBg, avatarFg) = remember(contact.name) {
         getMonetAvatarColors(contact.name, monetColors)
@@ -2331,6 +2335,7 @@ fun ContactDetailsSheet(
                             label = "Call",
                             accentColor = Color.White,
                             buttonBg = Color(0xFF2EAA55),
+                            textColor = monetColors.onSurface,
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 onCall(contact.number)
@@ -2342,6 +2347,7 @@ fun ContactDetailsSheet(
                             label = "Message",
                             accentColor = monetColors.onSurface,
                             buttonBg = monetColors.surfaceContainerHighest,
+                            textColor = monetColors.onSurface,
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 DialerRepository.sendSms(context, contact.number)
@@ -2354,6 +2360,7 @@ fun ContactDetailsSheet(
                                 label = "Screen",
                                 accentColor = monetColors.onPrimaryContainer,
                                 buttonBg = monetColors.primaryContainer,
+                                textColor = monetColors.onSurface,
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     onScreen(contact.number, contact.name)
@@ -2365,6 +2372,7 @@ fun ContactDetailsSheet(
                             painter = painterResource(id = com.callscreener.app.R.drawable.ic_whatsapp),
                             label = "WhatsApp",
                             buttonBg = monetColors.surfaceContainerHighest,
+                            textColor = monetColors.onSurface,
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 val digits = contact.number.filter { it.isDigit() }
@@ -2796,6 +2804,7 @@ fun ContactHeroActionPill(
     label: String,
     accentColor: Color,
     buttonBg: Color = Color(0x1EFFFFFF),
+    textColor: Color = Color.Unspecified,
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -2805,6 +2814,8 @@ fun ContactHeroActionPill(
         animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
         label = "heroActionScale"
     )
+    val isDark = ThemeManager.isDarkTheme()
+    val resolvedTextColor = if (textColor != Color.Unspecified) textColor else (if (isDark) Color(0xFFE2E2E6) else Color(0xFF1F1F1F))
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -2833,7 +2844,7 @@ fun ContactHeroActionPill(
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = label,
-            color = Color(0xFFE2E2E6),
+            color = resolvedTextColor,
             fontSize = 11.5.sp,
             fontFamily = AppFont,
             fontWeight = FontWeight.Medium
@@ -2847,6 +2858,7 @@ fun ContactHeroActionPill(
     label: String,
     accentColor: Color = Color.Unspecified,
     buttonBg: Color = Color(0x1EFFFFFF),
+    textColor: Color = Color.Unspecified,
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -2856,6 +2868,8 @@ fun ContactHeroActionPill(
         animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
         label = "heroActionScalePainter"
     )
+    val isDark = ThemeManager.isDarkTheme()
+    val resolvedTextColor = if (textColor != Color.Unspecified) textColor else (if (isDark) Color(0xFFE2E2E6) else Color(0xFF1F1F1F))
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -2884,7 +2898,7 @@ fun ContactHeroActionPill(
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = label,
-            color = Color(0xFFE2E2E6),
+            color = resolvedTextColor,
             fontSize = 11.5.sp,
             fontFamily = AppFont,
             fontWeight = FontWeight.Medium
@@ -3063,6 +3077,7 @@ fun ContactsScreen(
     var isScrubbing by remember { mutableStateOf(false) }
 
     val monetColors: ColorScheme = rememberPixelMonetColorScheme()
+    val isDark = ThemeManager.isDarkTheme()
 
     val filteredContacts = remember(contacts, searchQuery) {
         if (searchQuery.isBlank()) {
@@ -3789,12 +3804,13 @@ fun ContactsScreen(
                             )
                         }
 
+                        val isDark = ThemeManager.isDarkTheme()
                         DropdownMenu(
                             expanded = isMenuExpanded,
                             onDismissRequest = { isMenuExpanded = false },
                             modifier = Modifier
                                 .clip(RoundedCornerShape(20.dp))
-                                .background(Color(0xF0181B22))
+                                .background(monetColors.surfaceContainerHigh)
                                 .border(1.dp, monetColors.outlineVariant.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
                                 .padding(vertical = 4.dp)
                         ) {
@@ -3820,7 +3836,7 @@ fun ContactsScreen(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                                         ) {
-                                            Icon(Icons.Rounded.Tune, contentDescription = null, tint = VibrantAmber, modifier = Modifier.size(18.dp))
+                                            Icon(Icons.Rounded.Tune, contentDescription = null, tint = if (isDark) VibrantAmber else Color(0xFFC46500), modifier = Modifier.size(18.dp))
                                             Text("Audio Presets & Personas", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = AppFont)
                                         }
                                     },
@@ -4288,6 +4304,7 @@ fun KeypadScreen(
     var isMenuExpanded by remember { mutableStateOf(false) }
 
     val monetColors: ColorScheme = rememberPixelMonetColorScheme()
+    val isDark = ThemeManager.isDarkTheme()
 
     val toneGenerator = remember {
         try { ToneGenerator(AudioManager.STREAM_DTMF, 70) } catch (_: Exception) { null }
@@ -4411,13 +4428,14 @@ fun KeypadScreen(
                 },
                 menuRotation = menuRotation,
                 menuContent = {
+                    val isDark = ThemeManager.isDarkTheme()
                     DropdownMenu(
                         expanded = isMenuExpanded,
                         onDismissRequest = { isMenuExpanded = false },
                         offset = androidx.compose.ui.unit.DpOffset(x = 0.dp, y = 6.dp),
                         modifier = Modifier
                             .clip(RoundedCornerShape(20.dp))
-                            .background(Color(0xF0181B22))
+                            .background(monetColors.surfaceContainerHigh)
                             .border(1.dp, monetColors.outlineVariant.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
                             .padding(vertical = 4.dp)
                     ) {
@@ -4443,7 +4461,7 @@ fun KeypadScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
-                                        Icon(Icons.Rounded.Tune, contentDescription = null, tint = VibrantAmber, modifier = Modifier.size(18.dp))
+                                        Icon(Icons.Rounded.Tune, contentDescription = null, tint = if (isDark) VibrantAmber else Color(0xFFC46500), modifier = Modifier.size(18.dp))
                                         Text("Audio Presets & Personas", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = AppFont)
                                     }
                                 },
@@ -4458,7 +4476,7 @@ fun KeypadScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
-                                        Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = Color(0xFF2EAA55), modifier = Modifier.size(18.dp))
+                                        Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = if (isDark) Color(0xFF2EAA55) else Color(0xFF1E8E3E), modifier = Modifier.size(18.dp))
                                         Text("AI Screening Studio", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = AppFont)
                                     }
                                 },
@@ -5345,6 +5363,7 @@ fun AssistantTabScreen(
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     val monetColors: ColorScheme = rememberPixelMonetColorScheme()
+    val isDark = ThemeManager.isDarkTheme()
 
     Column(
         modifier = Modifier
@@ -7637,6 +7656,7 @@ fun DialerSettingsSheet(
     val haptic = LocalHapticFeedback.current
 
     val monetColors: ColorScheme = rememberPixelMonetColorScheme()
+    val isDark = ThemeManager.isDarkTheme()
 
     var showCallStatsScreen by remember { mutableStateOf(false) }
     val isRootActive = remember(context) { RootPrivilegeManager.isRootModeActive(context) }
@@ -7755,10 +7775,11 @@ fun DialerSettingsSheet(
                     ) {
                         SettingsSectionHeader(title = "CALL HANDLING & SCREENING", monetColors = monetColors)
                         SettingsGroupCard(monetColors = monetColors) {
+                            val activeGreen = if (isDark) Color(0xFF81C995) else Color(0xFF1E8E3E)
                             SettingsItemRow(
                                 icon = if (isDefaultDialer) Icons.Rounded.PhoneInTalk else Icons.Filled.Warning,
-                                iconTint = if (isDefaultDialer) Color(0xFF81C995) else monetColors.error,
-                                iconBgColor = if (isDefaultDialer) Color(0xFF81C995).copy(alpha = 0.16f) else monetColors.error.copy(alpha = 0.16f),
+                                iconTint = if (isDefaultDialer) activeGreen else monetColors.error,
+                                iconBgColor = (if (isDefaultDialer) activeGreen else monetColors.error).copy(alpha = 0.16f),
                                 title = "Default Phone App",
                                 subtitle = if (isDefaultDialer)
                                     "Active • Managing incoming & outgoing carrier calls"
@@ -7770,7 +7791,7 @@ fun DialerSettingsSheet(
                                         Box(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(10.dp))
-                                                .background(Color(0xFF81C995).copy(alpha = 0.18f))
+                                                .background(activeGreen.copy(alpha = 0.18f))
                                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                                         ) {
                                             Row(
@@ -7780,12 +7801,12 @@ fun DialerSettingsSheet(
                                                 Icon(
                                                     imageVector = Icons.Rounded.Check,
                                                     contentDescription = null,
-                                                    tint = Color(0xFF81C995),
+                                                    tint = activeGreen,
                                                     modifier = Modifier.size(13.dp)
                                                 )
                                                 Text(
                                                     text = "ACTIVE",
-                                                    color = Color(0xFF81C995),
+                                                    color = activeGreen,
                                                     fontSize = 10.5.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     fontFamily = AppFont
@@ -8091,10 +8112,11 @@ fun DialerSettingsSheet(
                                 val jammerEngine = remember { com.callscreener.app.engine.SpeechJammerEngine.getInstance(context) }
                                 var isJammerEnabled by remember { mutableStateOf(jammerEngine.isEnabled) }
 
+                                val jammerPurple = if (isDark) Color(0xFFD0BCFF) else monetColors.tertiary
                                 SettingsItemRow(
                                     icon = Icons.Rounded.Psychology,
-                                    iconTint = Color(0xFFD0BCFF),
-                                    iconBgColor = Color(0xFFD0BCFF).copy(alpha = 0.16f),
+                                    iconTint = jammerPurple,
+                                    iconBgColor = jammerPurple.copy(alpha = 0.16f),
                                     title = "Speech Jammer (DAF)",
                                     subtitle = if (isJammerEnabled)
                                         "Acoustic DAF Active: disrupts caller with ${jammerEngine.delayMs}ms delayed feedback"
@@ -8110,8 +8132,8 @@ fun DialerSettingsSheet(
                                                 jammerEngine.isEnabled = it
                                             },
                                             colors = SwitchDefaults.colors(
-                                                checkedThumbColor = Color(0xFFD0BCFF),
-                                                checkedTrackColor = Color(0xFF6750A4),
+                                                checkedThumbColor = if (isDark) Color(0xFFD0BCFF) else monetColors.onTertiary,
+                                                checkedTrackColor = if (isDark) Color(0xFF6750A4) else monetColors.tertiary,
                                                 uncheckedThumbColor = monetColors.outline,
                                                 uncheckedTrackColor = monetColors.surfaceVariant
                                             )
@@ -8121,10 +8143,14 @@ fun DialerSettingsSheet(
 
                                 SettingsDivider(monetColors = monetColors)
 
+                                val tuneTint = if (isDark) Color(0xFFD0BCFF) else monetColors.tertiary
+                                val tuneBg = if (isDark) Color(0xFFE8DEF8).copy(alpha = 0.16f) else monetColors.tertiaryContainer
+                                val tuneBadgeText = if (isDark) Color(0xFFD0BCFF) else monetColors.onTertiaryContainer
+                                val tuneBadgeBg = if (isDark) Color(0xFFD0BCFF).copy(alpha = 0.2f) else monetColors.tertiaryContainer
                                 SettingsItemRow(
                                     icon = Icons.Rounded.Tune,
-                                    iconTint = Color(0xFFE8DEF8),
-                                    iconBgColor = Color(0xFFE8DEF8).copy(alpha = 0.16f),
+                                    iconTint = tuneTint,
+                                    iconBgColor = tuneBg,
                                     title = "Configure & Live Test Lab",
                                     subtitle = "Adjust 160-240ms delay, intensity gain, or test on your own voice",
                                     monetColors = monetColors,
@@ -8136,7 +8162,7 @@ fun DialerSettingsSheet(
                                         Box(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(12.dp))
-                                                .background(Color(0xFFD0BCFF).copy(alpha = 0.2f))
+                                                .background(tuneBadgeBg)
                                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                                         ) {
                                             Row(
@@ -8145,7 +8171,7 @@ fun DialerSettingsSheet(
                                             ) {
                                                 Text(
                                                     text = "Tune / Test",
-                                                    color = Color(0xFFD0BCFF),
+                                                    color = tuneBadgeText,
                                                     fontSize = 11.5.sp,
                                                     fontWeight = FontWeight.SemiBold,
                                                     fontFamily = AppFont
@@ -8153,7 +8179,7 @@ fun DialerSettingsSheet(
                                                 Icon(
                                                     imageVector = Icons.Rounded.ChevronRight,
                                                     contentDescription = null,
-                                                    tint = Color(0xFFD0BCFF),
+                                                    tint = tuneBadgeText,
                                                     modifier = Modifier.size(14.dp)
                                                 )
                                             }
@@ -8170,7 +8196,8 @@ fun DialerSettingsSheet(
                                     .fillMaxWidth()
                                     .padding(horizontal = 14.dp, vertical = 10.dp)
                                     .clip(RoundedCornerShape(18.dp))
-                                    .background(monetColors.surfaceVariant.copy(alpha = 0.45f))
+                                    .background(if (isDark) monetColors.surfaceVariant.copy(alpha = 0.45f) else monetColors.surfaceContainerHigh)
+                                    .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(18.dp))
                                     .padding(4.dp)
                             ) {
                                 Row(modifier = Modifier.fillMaxWidth()) {
@@ -8180,7 +8207,11 @@ fun DialerSettingsSheet(
                                             .weight(1f)
                                             .height(40.dp)
                                             .clip(RoundedCornerShape(14.dp))
-                                            .background(if (isStandard) monetColors.surfaceContainerHighest else Color.Transparent)
+                                            .background(
+                                                if (isStandard) {
+                                                    if (isDark) monetColors.surfaceContainerHighest else monetColors.primaryContainer
+                                                } else Color.Transparent
+                                            )
                                             .clickable {
                                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                                 onSelectMode(AppOperationMode.STANDARD)
@@ -8194,12 +8225,16 @@ fun DialerSettingsSheet(
                                             Icon(
                                                 imageVector = Icons.Filled.Call,
                                                 contentDescription = null,
-                                                tint = if (isStandard) monetColors.primary else monetColors.onSurfaceVariant,
+                                                tint = if (isStandard) {
+                                                    if (isDark) monetColors.primary else monetColors.onPrimaryContainer
+                                                } else monetColors.onSurfaceVariant,
                                                 modifier = Modifier.size(15.dp)
                                             )
                                             Text(
                                                 text = "Standard",
-                                                color = if (isStandard) monetColors.onSurface else monetColors.onSurfaceVariant,
+                                                color = if (isStandard) {
+                                                    if (isDark) monetColors.onSurface else monetColors.onPrimaryContainer
+                                                } else monetColors.onSurfaceVariant,
                                                 fontSize = 13.sp,
                                                 fontWeight = if (isStandard) FontWeight.SemiBold else FontWeight.Medium,
                                                 fontFamily = AppFont
@@ -8208,12 +8243,15 @@ fun DialerSettingsSheet(
                                     }
 
                                     val isRoot = operationMode == AppOperationMode.ROOT_ENHANCED
+                                    val rootAmber = if (isDark) Color(0xFFFFB74D) else Color(0xFFC46500)
+                                    val rootBg = if (isDark) monetColors.surfaceContainerHighest else Color(0xFFFFE0B2)
+                                    val rootText = if (isDark) monetColors.onSurface else Color(0xFF6D3600)
                                     Box(
                                         modifier = Modifier
                                             .weight(1f)
                                             .height(40.dp)
                                             .clip(RoundedCornerShape(14.dp))
-                                            .background(if (isRoot) monetColors.surfaceContainerHighest else Color.Transparent)
+                                            .background(if (isRoot) rootBg else Color.Transparent)
                                             .clickable {
                                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                                 onSelectMode(AppOperationMode.ROOT_ENHANCED)
@@ -8232,12 +8270,12 @@ fun DialerSettingsSheet(
                                             Icon(
                                                 imageVector = Icons.Rounded.Security,
                                                 contentDescription = null,
-                                                tint = if (isRoot) Color(0xFFFFB74D) else monetColors.onSurfaceVariant,
+                                                tint = if (isRoot) rootAmber else monetColors.onSurfaceVariant,
                                                 modifier = Modifier.size(15.dp)
                                             )
                                             Text(
                                                 text = "Root Enhanced",
-                                                color = if (isRoot) monetColors.onSurface else monetColors.onSurfaceVariant,
+                                                color = if (isRoot) rootText else monetColors.onSurfaceVariant,
                                                 fontSize = 13.sp,
                                                 fontWeight = if (isRoot) FontWeight.SemiBold else FontWeight.Medium,
                                                 fontFamily = AppFont
@@ -8249,11 +8287,12 @@ fun DialerSettingsSheet(
 
                             SettingsDivider(monetColors = monetColors)
 
+                            val standardGreen = if (isDark) Color(0xFF81C995) else Color(0xFF1E8E3E)
                             if (operationMode == AppOperationMode.STANDARD) {
                                 SettingsItemRow(
                                     icon = Icons.Rounded.Check,
-                                    iconTint = Color(0xFF81C995),
-                                    iconBgColor = Color(0xFF81C995).copy(alpha = 0.14f),
+                                    iconTint = standardGreen,
+                                    iconBgColor = standardGreen.copy(alpha = 0.14f),
                                     title = "Standard Telecom Profile",
                                     subtitle = "Direct microphone audio • Works on all devices • Zero root required",
                                     monetColors = monetColors,
@@ -8275,10 +8314,11 @@ fun DialerSettingsSheet(
                                     }
                                 )
                             } else {
+                                val rootIconColor = if (isPrivileged) standardGreen else (if (isDark) Color(0xFFFFB74D) else Color(0xFFC46500))
                                 SettingsItemRow(
                                     icon = Icons.Rounded.Extension,
-                                    iconTint = if (isPrivileged) Color(0xFF81C995) else Color(0xFFFFB74D),
-                                    iconBgColor = (if (isPrivileged) Color(0xFF81C995) else Color(0xFFFFB74D)).copy(alpha = 0.14f),
+                                    iconTint = rootIconColor,
+                                    iconBgColor = rootIconColor.copy(alpha = 0.14f),
                                     title = when {
                                         isPrivileged -> "System Priv-App Active"
                                         isModuleInstalled -> "Reboot Required"
@@ -8300,8 +8340,8 @@ fun DialerSettingsSheet(
                                             else -> "NO ROOT"
                                         }
                                         val badgeColor = when {
-                                            isPrivileged -> Color(0xFF81C995)
-                                            isModuleInstalled -> Color(0xFFFFB74D)
+                                            isPrivileged -> standardGreen
+                                            isModuleInstalled -> if (isDark) Color(0xFFFFB74D) else Color(0xFFC46500)
                                             rootAvailable -> monetColors.primary
                                             else -> monetColors.error
                                         }
@@ -10032,145 +10072,4 @@ fun SavedRecordingsDialog(
                                                         .clip(CircleShape)
                                                         .background(
                                                             if (isPlaying) monetColors.primary
-                                                            else monetColors.surfaceContainerHighest
-                                                        )
-                                                        .border(
-                                                            0.8.dp,
-                                                            if (isPlaying) monetColors.primary.copy(alpha = 0.5f)
-                                                            else monetColors.outlineVariant.copy(alpha = 0.35f),
-                                                            CircleShape
-                                                        )
-                                                        .clickable {
-                                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                            if (isPlaying) {
-                                                                try {
-                                                                    mediaPlayer?.pause()
-                                                                    playingId = null
-                                                                } catch (_: Exception) {}
-                                                            } else {
-                                                                try {
-                                                                    mediaPlayer?.release()
-                                                                    mediaPlayer = MediaPlayer().apply {
-                                                                        setDataSource(item.file.absolutePath)
-                                                                        prepare()
-                                                                        start()
-                                                                        setOnCompletionListener {
-                                                                            playingId = null
-                                                                        }
-                                                                    }
-                                                                    playingId = item.id
-                                                                } catch (e: Exception) {
-                                                                    Toast.makeText(context, "Cannot play recording", Toast.LENGTH_SHORT).show()
-                                                                }
-                                                            }
-                                                        },
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Icon(
-                                                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                                        contentDescription = if (isPlaying) "Pause" else "Play",
-                                                        tint = if (isPlaying) monetColors.onPrimary else monetColors.onSurface,
-                                                        modifier = Modifier.size(18.dp)
-                                                    )
-                                                }
-
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(36.dp)
-                                                        .clip(CircleShape)
-                                                        .background(monetColors.surfaceContainerHighest)
-                                                        .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.35f), CircleShape)
-                                                        .clickable {
-                                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                            try {
-                                                                val uri = FileProvider.getUriForFile(
-                                                                    context,
-                                                                    "${context.packageName}.fileprovider",
-                                                                    item.file
-                                                                )
-                                                                val intent = Intent(Intent.ACTION_SEND).apply {
-                                                                    type = "audio/wav"
-                                                                    putExtra(Intent.EXTRA_STREAM, uri)
-                                                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                                }
-                                                                context.startActivity(Intent.createChooser(intent, "Share Call Recording"))
-                                                            } catch (e: Exception) {
-                                                                Toast.makeText(context, "Error sharing recording: ${e.message}", Toast.LENGTH_SHORT).show()
-                                                            }
-                                                        },
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Filled.Share,
-                                                        contentDescription = "Share",
-                                                        tint = monetColors.onSurfaceVariant,
-                                                        modifier = Modifier.size(15.dp)
-                                                    )
-                                                }
-
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(36.dp)
-                                                        .clip(CircleShape)
-                                                        .background(Color(0xFFFF2D55).copy(alpha = 0.12f))
-                                                        .border(0.8.dp, Color(0xFFFF2D55).copy(alpha = 0.35f), CircleShape)
-                                                        .clickable {
-                                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                            if (isPlaying) {
-                                                                try { mediaPlayer?.stop() } catch (_: Exception) {}
-                                                                playingId = null
-                                                            }
-                                                            scope.launch {
-                                                                sessionManager.recordingEngine.deleteRecording(item.file)
-                                                                recordings = sessionManager.recordingEngine.getSavedRecordings()
-                                                            }
-                                                        },
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Filled.Delete,
-                                                        contentDescription = "Delete",
-                                                        tint = Color(0xFFFF2D55),
-                                                        modifier = Modifier.size(15.dp)
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-}
-
-@Composable
-fun GlassArchitectureCard() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(elevation = 14.dp, shape = RoundedCornerShape(26.dp), spotColor = Color(0x60000000), ambientColor = Color(0x40000000))
-            .clip(RoundedCornerShape(26.dp))
-            .background(FrostedGlassFillSubtle)
-            .border(1.2.dp, FrostedGlassBorderSubtle, RoundedCornerShape(26.dp))
-            .padding(18.dp)
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = "System Priv-App Architecture",
-                color = TextPrimary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = "Standard Android security isolates cellular voice channels from 3rd-party user apps. System priv-app installation mounts this package into /system/priv-app with CAPTURE_AUDIO_OUTPUT permissions, bypassing loudspeaker audio loopback.",
-                color = TextTertiary,
-                fontSize = 11.sp,
-                lineHeight = 15.sp
-            )
-        }
-    }
-}
+... [truncated for diff preview]
