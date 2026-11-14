@@ -16,6 +16,7 @@ class CallScreenerApp : Application() {
         com.callscreener.app.engine.StealthBlockAudioEngine.prewarm(this)
         com.callscreener.app.root.RootPrivilegeManager.warmUp(this)
         com.callscreener.app.data.DialerRepository.prewarmCache(this)
+        com.callscreener.app.ui.theme.ThemeManager.init(this)
     }
 
     private fun createNotificationChannels() {

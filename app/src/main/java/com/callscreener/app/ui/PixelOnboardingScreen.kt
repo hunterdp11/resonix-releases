@@ -90,6 +90,7 @@ import androidx.compose.ui.unit.sp
 import com.callscreener.app.root.AppOperationMode
 import com.callscreener.app.root.RootPrivilegeManager
 import com.callscreener.app.ui.theme.AppFont
+import com.callscreener.app.ui.theme.rememberPixelMonetColorScheme
 import kotlinx.coroutines.launch
 
 @Composable
@@ -102,17 +103,7 @@ fun PixelOnboardingScreen(
     val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
 
-    val monetColors: ColorScheme = remember(context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            try {
-                dynamicDarkColorScheme(context)
-            } catch (_: Exception) {
-                getPixelMonetDarkColorScheme()
-            }
-        } else {
-            getPixelMonetDarkColorScheme()
-        }
-    }
+    val monetColors: ColorScheme = rememberPixelMonetColorScheme()
 
     var currentStep by remember { mutableIntStateOf(0) }
     var selectedMode by remember { mutableStateOf(RootPrivilegeManager.getOperationMode(context)) }
@@ -145,7 +136,7 @@ fun PixelOnboardingScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0F1218))
+            .background(monetColors.background)
     ) {
         Box(
             modifier = Modifier
@@ -155,7 +146,7 @@ fun PixelOnboardingScreen(
                         colors = listOf(
                             monetColors.primary.copy(alpha = 0.12f),
                             Color.Transparent,
-                            Color(0xFF090B0E)
+                            monetColors.surfaceContainerLowest
                         )
                     )
                 )
@@ -193,7 +184,7 @@ fun PixelOnboardingScreen(
                         Icon(
                             imageVector = Icons.Rounded.ChevronLeft,
                             contentDescription = "Back",
-                            tint = Color.White,
+                            tint = monetColors.onSurface,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -403,7 +394,7 @@ private fun OnboardingFeaturesStep(monetColors: ColorScheme) {
             text = "Welcome to Resonix",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.White,
+            color = monetColors.onSurface,
             fontFamily = AppFont,
             textAlign = TextAlign.Center
         )
@@ -477,7 +468,7 @@ private fun OnboardingArchitectureStep(
             text = "Choose Your Setup",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.White,
+            color = monetColors.onSurface,
             fontFamily = AppFont
         )
 
@@ -520,7 +511,7 @@ private fun OnboardingArchitectureStep(
                         text = if (isDeviceRooted) "Root Privileges Detected" else "Standard Device Detected",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = monetColors.onSurface,
                         fontFamily = AppFont
                     )
                     Text(
@@ -589,7 +580,7 @@ private fun OnboardingModuleStep(
             text = "Magisk / KernelSU Module",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.White,
+            color = monetColors.onSurface,
             fontFamily = AppFont
         )
 
@@ -642,7 +633,7 @@ private fun OnboardingModuleStep(
                             text = if (isModuleInstalled) "Module Installed • Reboot Pending" else "Module Not Installed",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
+                            color = monetColors.onSurface,
                             fontFamily = AppFont
                         )
                         Text(
@@ -672,7 +663,7 @@ private fun OnboardingModuleStep(
                     ) {
                         if (isInstalling) {
                             CircularProgressIndicator(
-                                color = Color.White,
+                                color = monetColors.onPrimary,
                                 strokeWidth = 2.dp,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -771,7 +762,7 @@ private fun OnboardingPermissionsStep(
             text = if (isDefaultDialer) "Default Phone App Active" else "Set as default phone app",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.White,
+            color = monetColors.onSurface,
             fontFamily = AppFont,
             textAlign = TextAlign.Center
         )
@@ -845,7 +836,7 @@ private fun OnboardingPermissionsStep(
                     Text(
                         text = "Tap below to open the Android system default app dialog and select Resonix.",
                         fontSize = 12.sp,
-                        color = Color.White,
+                        color = monetColors.onSurface,
                         fontFamily = AppFont,
                         lineHeight = 16.sp
                     )
@@ -874,7 +865,7 @@ private fun OnboardingPermissionsStep(
                         text = "Verified: Resonix is active as your default phone app.",
                         fontSize = 12.5.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
+                        color = monetColors.onSurface,
                         fontFamily = AppFont
                     )
                 }
@@ -896,7 +887,7 @@ private fun OnboardingPermissionBenefitRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xFF161922))
+            .background(monetColors.surfaceContainer)
             .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.25f), RoundedCornerShape(18.dp))
             .padding(14.dp)
     ) {
@@ -924,7 +915,7 @@ private fun OnboardingPermissionBenefitRow(
                     text = title,
                     fontSize = 13.5.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = monetColors.onSurface,
                     fontFamily = AppFont
                 )
                 Spacer(modifier = Modifier.height(2.dp))
@@ -952,7 +943,7 @@ private fun OnboardingFeatureCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xFF161922))
+            .background(monetColors.surfaceContainer)
             .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.25f), RoundedCornerShape(18.dp))
             .padding(14.dp)
     ) {
@@ -980,7 +971,7 @@ private fun OnboardingFeatureCard(
                     text = title,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = monetColors.onSurface,
                     fontFamily = AppFont
                 )
                 Spacer(modifier = Modifier.height(2.dp))
@@ -1013,7 +1004,7 @@ private fun OnboardingModeOptionCard(
     )
     val bgColor by animateColorAsState(
         targetValue = if (isSelected) monetColors.primaryContainer.copy(alpha = 0.28f)
-        else Color(0xFF161922),
+        else monetColors.surfaceContainer,
         animationSpec = tween(180),
         label = "modeBg"
     )
@@ -1037,7 +1028,7 @@ private fun OnboardingModeOptionCard(
                     text = title,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = monetColors.onSurface,
                     fontFamily = AppFont
                 )
 
@@ -1059,7 +1050,7 @@ private fun OnboardingModeOptionCard(
                         Icon(
                             imageVector = Icons.Filled.Check,
                             contentDescription = null,
-                            tint = Color.White,
+                            tint = monetColors.onPrimary,
                             modifier = Modifier.size(14.dp)
                         )
                     }

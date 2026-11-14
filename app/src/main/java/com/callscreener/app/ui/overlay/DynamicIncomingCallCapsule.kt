@@ -77,7 +77,7 @@ import androidx.compose.ui.unit.sp
 import com.callscreener.app.data.CallerProfileManager
 import com.callscreener.app.data.DialerRepository
 import com.callscreener.app.data.rememberContactPhotoBitmap
-import com.callscreener.app.ui.getPixelMonetDarkColorScheme
+import com.callscreener.app.ui.theme.rememberPixelMonetColorScheme
 import com.callscreener.app.ui.theme.AppFont
 import kotlin.math.roundToInt
 
@@ -94,17 +94,7 @@ fun DynamicIncomingCallCapsule(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
 
-    val monetColors = remember(context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            try {
-                dynamicDarkColorScheme(context)
-            } catch (_: Throwable) {
-                getPixelMonetDarkColorScheme()
-            }
-        } else {
-            getPixelMonetDarkColorScheme()
-        }
-    }
+    val monetColors = rememberPixelMonetColorScheme()
 
     var isVisible by remember { mutableStateOf(false) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }

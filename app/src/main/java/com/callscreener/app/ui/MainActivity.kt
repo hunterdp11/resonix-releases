@@ -265,6 +265,11 @@ import com.callscreener.app.ui.theme.TextSecondary
 import com.callscreener.app.ui.theme.TextTertiary
 import com.callscreener.app.ui.theme.GlassBackground
 import com.callscreener.app.ui.theme.AppFont
+import com.callscreener.app.ui.theme.ThemeManager
+import com.callscreener.app.ui.theme.AppThemeMode
+import com.callscreener.app.ui.theme.rememberPixelMonetColorScheme
+import com.callscreener.app.ui.theme.getPixelMonetLightColorScheme
+import com.callscreener.app.ui.theme.getPixelMonetDarkColorScheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.ui.text.TextStyle
@@ -290,10 +295,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
-        )
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -307,9 +309,6 @@ class MainActivity : ComponentActivity() {
         }
         window.statusBarColor = android.graphics.Color.TRANSPARENT
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
-        val insets = WindowCompat.getInsetsController(window, window.decorView)
-        insets.isAppearanceLightStatusBars = false
-        insets.isAppearanceLightNavigationBars = false
 
         isDefaultDialerState.value = isDefaultDialer()
 
@@ -583,17 +582,7 @@ fun MainDashboard(
     var isPresetManagerOpen by remember { mutableStateOf(false) }
     val presets by sessionManager.presetManager.presets.collectAsState()
 
-    val monetColors: ColorScheme = remember(context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            try {
-                dynamicDarkColorScheme(context)
-            } catch (_: Exception) {
-                getPixelMonetDarkColorScheme()
-            }
-        } else {
-            getPixelMonetDarkColorScheme()
-        }
-    }
+    val monetColors: ColorScheme = rememberPixelMonetColorScheme()
 
     Box(
         modifier = Modifier
@@ -1251,17 +1240,7 @@ fun RecentsScreen(
         label = "recentsMenuRotate"
     )
 
-    val monetColors: ColorScheme = remember(context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            try {
-                dynamicDarkColorScheme(context)
-            } catch (_: Exception) {
-                getPixelMonetDarkColorScheme()
-            }
-        } else {
-            getPixelMonetDarkColorScheme()
-        }
-    }
+    val monetColors: ColorScheme = rememberPixelMonetColorScheme()
 
     val contactsPhotoMap = remember(contacts, CallerProfileManager.photoVersionState.intValue) {
         val map = HashMap<String, String>()
@@ -1473,7 +1452,7 @@ fun RecentsScreen(
                                 .clip(RoundedCornerShape(20.dp))
                                 .background(
                                     if (isRowPressed) monetColors.primaryContainer.copy(alpha = 0.35f)
-                                    else Color(0xFF191C23)
+                                    else monetColors.surfaceContainer
                                 )
                                 .border(
                                     0.8.dp,
@@ -1872,17 +1851,7 @@ fun ContactDetailsSheet(
         mutableStateOf(contact.isStarred)
     }
 
-    val monetColors: ColorScheme = remember(context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            try {
-                dynamicDarkColorScheme(context)
-            } catch (_: Exception) {
-                getPixelMonetDarkColorScheme()
-            }
-        } else {
-            getPixelMonetDarkColorScheme()
-        }
-    }
+    val monetColors: ColorScheme = rememberPixelMonetColorScheme()
 
     val (avatarBg, avatarFg) = remember(contact.name) {
         getMonetAvatarColors(contact.name, monetColors)
@@ -2967,25 +2936,26 @@ fun PremiumGlassSearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
     placeholder: String = "Search contacts...",
+    monetColors: ColorScheme = rememberPixelMonetColorScheme(),
     modifier: Modifier = Modifier,
     onSearchFocused: (Boolean) -> Unit = {}
 ) {
     var isFocused by remember { mutableStateOf(false) }
 
     val borderColor by animateColorAsState(
-        targetValue = if (isFocused) Color(0x65FFFFFF) else Color(0x24FFFFFF),
+        targetValue = if (isFocused) monetColors.primary.copy(alpha = 0.65f) else monetColors.outlineVariant.copy(alpha = 0.35f),
         animationSpec = tween(durationMillis = 200),
         label = "searchBorderGlow"
     )
 
     val bgColor by animateColorAsState(
-        targetValue = if (isFocused) Color(0xFF1E2432) else Color(0xFF151924),
+        targetValue = if (isFocused) monetColors.surfaceContainerHighest else monetColors.surfaceContainerHigh,
         animationSpec = tween(durationMillis = 200),
         label = "searchBgColor"
     )
 
     val iconTint by animateColorAsState(
-        targetValue = if (isFocused) Color.White else Color(0x80FFFFFF),
+        targetValue = if (isFocused) monetColors.primary else monetColors.onSurfaceVariant,
         animationSpec = tween(durationMillis = 200),
         label = "searchIconTint"
     )
@@ -2994,9 +2964,9 @@ fun PremiumGlassSearchBar(
         modifier = modifier
             .fillMaxWidth()
             .shadow(
-                elevation = if (isFocused) 10.dp else 4.dp,
+                elevation = if (isFocused) 6.dp else 2.dp,
                 shape = RoundedCornerShape(16.dp),
-                spotColor = Color(0x60000000)
+                spotColor = Color(0x40000000)
             )
             .clip(RoundedCornerShape(16.dp))
             .background(bgColor)
@@ -3020,12 +2990,12 @@ fun PremiumGlassSearchBar(
                 value = query,
                 onValueChange = onQueryChange,
                 textStyle = TextStyle(
-                    color = Color.White,
+                    color = monetColors.onSurface,
                     fontSize = 14.5.sp,
                     fontFamily = AppFont,
                     fontWeight = FontWeight.Normal
                 ),
-                cursorBrush = SolidColor(Color.White),
+                cursorBrush = SolidColor(monetColors.primary),
                 singleLine = true,
                 modifier = Modifier
                     .weight(1f)
@@ -3037,7 +3007,7 @@ fun PremiumGlassSearchBar(
                     if (query.isEmpty()) {
                         Text(
                             text = placeholder,
-                            color = Color(0x66FFFFFF),
+                            color = monetColors.onSurfaceVariant.copy(alpha = 0.65f),
                             fontFamily = AppFont,
                             fontSize = 14.5.sp
                         )
@@ -3055,14 +3025,14 @@ fun PremiumGlassSearchBar(
                     modifier = Modifier
                         .size(22.dp)
                         .clip(CircleShape)
-                        .background(Color(0x28FFFFFF))
+                        .background(monetColors.surfaceContainerHighest)
                         .clickable { onQueryChange("") },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Clear,
                         contentDescription = "Clear",
-                        tint = Color.White,
+                        tint = monetColors.onSurfaceVariant,
                         modifier = Modifier.size(13.dp)
                     )
                 }
@@ -3092,17 +3062,7 @@ fun ContactsScreen(
     var scrubIndicatorY by remember { mutableFloatStateOf(0f) }
     var isScrubbing by remember { mutableStateOf(false) }
 
-    val monetColors: ColorScheme = remember(context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            try {
-                dynamicDarkColorScheme(context)
-            } catch (_: Exception) {
-                getPixelMonetDarkColorScheme()
-            }
-        } else {
-            getPixelMonetDarkColorScheme()
-        }
-    }
+    val monetColors: ColorScheme = rememberPixelMonetColorScheme()
 
     val filteredContacts = remember(contacts, searchQuery) {
         if (searchQuery.isBlank()) {
@@ -3497,7 +3457,7 @@ fun ContactsScreen(
                                 .clip(RoundedCornerShape(20.dp))
                                 .background(
                                     if (isPressed) monetColors.primaryContainer.copy(alpha = 0.35f)
-                                    else Color(0xFF191C23)
+                                    else monetColors.surfaceContainer
                                 )
                                 .border(
                                     0.8.dp,
@@ -4045,7 +4005,7 @@ fun PixelDialerSearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
     placeholder: String = "Search contacts & numbers...",
-    monetColors: ColorScheme = getPixelMonetDarkColorScheme(),
+    monetColors: ColorScheme = rememberPixelMonetColorScheme(),
     onMenuClick: () -> Unit = {},
     menuRotation: Float = 0f,
     modifier: Modifier = Modifier,
@@ -4160,7 +4120,7 @@ fun PixelDialerSearchBar(
 fun OemDialerKeyButton(
     digit: String,
     letters: String,
-    monetColors: ColorScheme = getPixelMonetDarkColorScheme(),
+    monetColors: ColorScheme = rememberPixelMonetColorScheme(),
     onClick: () -> Unit,
     onLongClick: () -> Unit = {}
 ) {
@@ -4248,7 +4208,7 @@ fun OemDialerKeyButton(
 
 @Composable
 fun OemCallButton(
-    monetColors: ColorScheme = getPixelMonetDarkColorScheme(),
+    monetColors: ColorScheme = rememberPixelMonetColorScheme(),
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -4327,17 +4287,7 @@ fun KeypadScreen(
     var keypadSearchQuery by remember { mutableStateOf("") }
     var isMenuExpanded by remember { mutableStateOf(false) }
 
-    val monetColors: ColorScheme = remember(context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            try {
-                dynamicDarkColorScheme(context)
-            } catch (_: Exception) {
-                getPixelMonetDarkColorScheme()
-            }
-        } else {
-            getPixelMonetDarkColorScheme()
-        }
-    }
+    val monetColors: ColorScheme = rememberPixelMonetColorScheme()
 
     val toneGenerator = remember {
         try { ToneGenerator(AudioManager.STREAM_DTMF, 70) } catch (_: Exception) { null }
@@ -5394,17 +5344,7 @@ fun AssistantTabScreen(
     val haptic = LocalHapticFeedback.current
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
-    val monetColors: ColorScheme = remember(context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            try {
-                dynamicDarkColorScheme(context)
-            } catch (_: Exception) {
-                getPixelMonetDarkColorScheme()
-            }
-        } else {
-            getPixelMonetDarkColorScheme()
-        }
-    }
+    val monetColors: ColorScheme = rememberPixelMonetColorScheme()
 
     Column(
         modifier = Modifier
@@ -6185,7 +6125,7 @@ fun GlassVoiceStudioCard(
     onSelectPersona: (VoicePersona) -> Unit,
     isLiveMicActive: Boolean = false,
     onToggleLiveMic: () -> Unit = {},
-    monetColors: ColorScheme = getPixelMonetDarkColorScheme()
+    monetColors: ColorScheme = rememberPixelMonetColorScheme()
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -6493,7 +6433,7 @@ fun GlassVoiceStudioCard(
 fun GlassAudioPresetsCard(
     presetManager: AudioPresetManager,
     onOpenManager: () -> Unit = {},
-    monetColors: ColorScheme = getPixelMonetDarkColorScheme()
+    monetColors: ColorScheme = rememberPixelMonetColorScheme()
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -7315,7 +7255,7 @@ fun DialerSystemSettingsCard(
 @Composable
 fun SettingsSectionHeader(
     title: String,
-    monetColors: ColorScheme = getPixelMonetDarkColorScheme()
+    monetColors: ColorScheme = rememberPixelMonetColorScheme()
 ) {
     Text(
         text = title,
@@ -7330,7 +7270,7 @@ fun SettingsSectionHeader(
 
 @Composable
 fun SettingsGroupCard(
-    monetColors: ColorScheme = getPixelMonetDarkColorScheme(),
+    monetColors: ColorScheme = rememberPixelMonetColorScheme(),
     content: @Composable ColumnScope.() -> Unit
 ) {
     Box(
@@ -7342,7 +7282,7 @@ fun SettingsGroupCard(
                 spotColor = Color(0x40000000)
             )
             .clip(RoundedCornerShape(22.dp))
-            .background(Color(0xFF191C23))
+            .background(monetColors.surfaceContainer)
             .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(22.dp))
             .padding(vertical = 4.dp)
     ) {
@@ -7356,14 +7296,17 @@ fun SettingsGroupCard(
 @Composable
 fun SettingsItemRow(
     icon: ImageVector,
-    iconTint: Color = Color.White,
-    iconBgColor: Color = Color(0x18FFFFFF),
+    iconTint: Color = Color.Unspecified,
+    iconBgColor: Color = Color.Unspecified,
     title: String,
     subtitle: String,
     modifier: Modifier = Modifier,
-    monetColors: ColorScheme = getPixelMonetDarkColorScheme(),
+    monetColors: ColorScheme = rememberPixelMonetColorScheme(),
     trailingContent: @Composable () -> Unit
 ) {
+    val resolvedIconTint = if (iconTint != Color.Unspecified) iconTint else monetColors.primary
+    val resolvedIconBg = if (iconBgColor != Color.Unspecified) iconBgColor else monetColors.primary.copy(alpha = 0.14f)
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -7374,14 +7317,14 @@ fun SettingsItemRow(
             modifier = Modifier
                 .size(40.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(iconBgColor)
+                .background(resolvedIconBg)
                 .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = iconTint,
+                tint = resolvedIconTint,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -7418,7 +7361,7 @@ fun SettingsItemRow(
 
 @Composable
 fun SettingsDivider(
-    monetColors: ColorScheme = getPixelMonetDarkColorScheme()
+    monetColors: ColorScheme = rememberPixelMonetColorScheme()
 ) {
     Box(
         modifier = Modifier
@@ -7427,6 +7370,195 @@ fun SettingsDivider(
             .height(0.6.dp)
             .background(monetColors.outlineVariant.copy(alpha = 0.25f))
     )
+}
+
+@Composable
+fun PixelThemeSelectionDialog(
+    currentMode: AppThemeMode,
+    onSelectMode: (AppThemeMode) -> Unit,
+    onDismiss: () -> Unit,
+    monetColors: ColorScheme = rememberPixelMonetColorScheme()
+) {
+    val haptic = LocalHapticFeedback.current
+
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.55f))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onDismiss
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.88f)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(monetColors.surfaceContainerHigh)
+                    .border(
+                        width = 1.dp,
+                        color = monetColors.outlineVariant.copy(alpha = 0.4f),
+                        shape = RoundedCornerShape(28.dp)
+                    )
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {}
+                    )
+                    .padding(24.dp)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(monetColors.primaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Tune,
+                                contentDescription = null,
+                                tint = monetColors.onPrimaryContainer,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "Choose Theme",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = monetColors.onSurface,
+                                fontFamily = AppFont
+                            )
+                            Text(
+                                text = "Customize look and appearance",
+                                fontSize = 12.sp,
+                                color = monetColors.onSurfaceVariant,
+                                fontFamily = AppFont
+                            )
+                        }
+                    }
+
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val options = listOf(
+                            Triple(AppThemeMode.SYSTEM, "System default", "Follows system theme setting"),
+                            Triple(AppThemeMode.LIGHT, "Light theme", "Crisp Google Pixel Material You"),
+                            Triple(AppThemeMode.DARK, "Dark theme", "Deep AMOLED high-contrast dark")
+                        )
+
+                        options.forEach { (mode, label, desc) ->
+                            val isSelected = currentMode == mode
+                            val optBg = if (isSelected) monetColors.primaryContainer else monetColors.surfaceContainer
+                            val optBorder = if (isSelected) monetColors.primary else monetColors.outlineVariant.copy(alpha = 0.25f)
+                            val titleColor = if (isSelected) monetColors.onPrimaryContainer else monetColors.onSurface
+                            val subColor = if (isSelected) monetColors.onPrimaryContainer.copy(alpha = 0.75f) else monetColors.onSurfaceVariant
+                            val iconTint = if (isSelected) monetColors.onPrimaryContainer else monetColors.onSurfaceVariant
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(optBg)
+                                    .border(width = 1.dp, color = optBorder, shape = RoundedCornerShape(16.dp))
+                                    .clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onSelectMode(mode)
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (isSelected) monetColors.primary.copy(alpha = 0.25f)
+                                            else monetColors.surfaceContainerHigh
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = when (mode) {
+                                            AppThemeMode.SYSTEM -> Icons.Rounded.BrightnessAuto
+                                            AppThemeMode.LIGHT -> Icons.Rounded.LightMode
+                                            AppThemeMode.DARK -> Icons.Rounded.DarkMode
+                                        },
+                                        contentDescription = null,
+                                        tint = iconTint,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = label,
+                                        fontSize = 14.5.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = titleColor,
+                                        fontFamily = AppFont
+                                    )
+                                    Text(
+                                        text = desc,
+                                        fontSize = 11.5.sp,
+                                        color = subColor,
+                                        fontFamily = AppFont
+                                    )
+                                }
+
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.CheckCircle,
+                                        contentDescription = "Selected",
+                                        tint = monetColors.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        Text(
+                            text = "Cancel",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = monetColors.primary,
+                            fontFamily = AppFont,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { onDismiss() }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -7504,17 +7636,7 @@ fun DialerSettingsSheet(
     val coroutineScope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
 
-    val monetColors: ColorScheme = remember(context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            try {
-                dynamicDarkColorScheme(context)
-            } catch (_: Exception) {
-                getPixelMonetDarkColorScheme()
-            }
-        } else {
-            getPixelMonetDarkColorScheme()
-        }
-    }
+    val monetColors: ColorScheme = rememberPixelMonetColorScheme()
 
     var showCallStatsScreen by remember { mutableStateOf(false) }
     val isRootActive = remember(context) { RootPrivilegeManager.isRootModeActive(context) }
@@ -7819,6 +7941,76 @@ fun DialerSettingsSheet(
                                     }
                                 }
                             )
+                        }
+
+                        SettingsSectionHeader(title = "DISPLAY & THEME", monetColors = monetColors)
+                        SettingsGroupCard(monetColors = monetColors) {
+                            val currentThemeMode by ThemeManager.themeMode.collectAsState()
+                            var showThemeDialog by remember { mutableStateOf(false) }
+
+                            SettingsItemRow(
+                                icon = when (currentThemeMode) {
+                                    AppThemeMode.LIGHT -> Icons.Rounded.LightMode
+                                    AppThemeMode.DARK -> Icons.Rounded.DarkMode
+                                    AppThemeMode.SYSTEM -> Icons.Rounded.BrightnessAuto
+                                },
+                                iconTint = monetColors.primary,
+                                iconBgColor = monetColors.primary.copy(alpha = 0.16f),
+                                title = "App Theme",
+                                subtitle = when (currentThemeMode) {
+                                    AppThemeMode.SYSTEM -> "System default • Follows system theme"
+                                    AppThemeMode.LIGHT -> "Light mode • Crisp Material You"
+                                    AppThemeMode.DARK -> "Dark mode • Deep Pixel AMOLED"
+                                },
+                                monetColors = monetColors,
+                                modifier = Modifier.clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    showThemeDialog = true
+                                },
+                                trailingContent = {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(monetColors.secondaryContainer)
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Text(
+                                                text = when (currentThemeMode) {
+                                                    AppThemeMode.SYSTEM -> "System"
+                                                    AppThemeMode.LIGHT -> "Light"
+                                                    AppThemeMode.DARK -> "Dark"
+                                                },
+                                                color = monetColors.onSecondaryContainer,
+                                                fontSize = 11.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                fontFamily = AppFont
+                                            )
+                                            Icon(
+                                                imageVector = Icons.Rounded.ChevronRight,
+                                                contentDescription = null,
+                                                tint = monetColors.onSecondaryContainer,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            )
+
+                            if (showThemeDialog) {
+                                PixelThemeSelectionDialog(
+                                    currentMode = currentThemeMode,
+                                    onSelectMode = { mode ->
+                                        ThemeManager.setThemeMode(context, mode)
+                                        showThemeDialog = false
+                                    },
+                                    onDismiss = { showThemeDialog = false },
+                                    monetColors = monetColors
+                                )
+                            }
                         }
 
                         if (isRootActive) {
@@ -9401,7 +9593,7 @@ fun ContactMetricCard(
 @Composable
 fun SavedRecordingsDialog(
     onDismiss: () -> Unit,
-    monetColors: ColorScheme = getPixelMonetDarkColorScheme()
+    monetColors: ColorScheme = rememberPixelMonetColorScheme()
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current

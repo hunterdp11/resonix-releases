@@ -89,13 +89,14 @@ import com.callscreener.app.data.DialerRepository
 import com.callscreener.app.engine.BlockedContact
 import com.callscreener.app.engine.CallBlockManager
 import com.callscreener.app.ui.theme.AppFont
+import com.callscreener.app.ui.theme.rememberPixelMonetColorScheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
 fun PixelBlockedNumbersScreen(
     onDismiss: () -> Unit,
-    monetColors: ColorScheme = getPixelMonetDarkColorScheme()
+    monetColors: ColorScheme = rememberPixelMonetColorScheme()
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -151,7 +152,7 @@ fun PixelBlockedNumbersScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF0F1218))
+                .background(monetColors.background)
         ) {
             Column(
                 modifier = Modifier
@@ -177,7 +178,7 @@ fun PixelBlockedNumbersScreen(
                         Icon(
                             imageVector = Icons.Rounded.ChevronLeft,
                             contentDescription = "Back",
-                            tint = Color.White,
+                            tint = monetColors.onSurface,
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -188,7 +189,7 @@ fun PixelBlockedNumbersScreen(
                         text = "Blocked numbers",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = monetColors.onSurface,
                         fontFamily = AppFont
                     )
                 }
@@ -205,7 +206,7 @@ fun PixelBlockedNumbersScreen(
                                 .fillMaxWidth()
                                 .shadow(6.dp, RoundedCornerShape(22.dp), spotColor = Color(0x40000000))
                                 .clip(RoundedCornerShape(22.dp))
-                                .background(Color(0xFF191C23))
+                                .background(monetColors.surfaceContainer)
                                 .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(22.dp))
                                 .padding(vertical = 4.dp)
                         ) {
@@ -221,7 +222,7 @@ fun PixelBlockedNumbersScreen(
                                         text = "Unknown",
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = Color.White,
+                                        color = monetColors.onSurface,
                                         fontFamily = AppFont
                                     )
                                     Spacer(modifier = Modifier.height(2.dp))
@@ -288,7 +289,7 @@ fun PixelBlockedNumbersScreen(
                                         text = "Add a phone number",
                                         fontSize = 14.5.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = Color.White,
+                                        color = monetColors.onSurface,
                                         fontFamily = AppFont
                                     )
                                     Text(
@@ -346,7 +347,7 @@ fun PixelBlockedNumbersScreen(
                                         text = "Choose from contacts",
                                         fontSize = 14.5.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = Color.White,
+                                        color = monetColors.onSurface,
                                         fontFamily = AppFont
                                     )
                                     Text(
@@ -400,7 +401,7 @@ fun PixelBlockedNumbersScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(22.dp))
-                                    .background(Color(0xFF191C23))
+                                    .background(monetColors.surfaceContainer)
                                     .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.25f), RoundedCornerShape(22.dp))
                                     .padding(vertical = 40.dp, horizontal = 24.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -427,7 +428,7 @@ fun PixelBlockedNumbersScreen(
                                     text = "No blocked numbers",
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White,
+                                    color = monetColors.onSurface,
                                     fontFamily = AppFont
                                 )
 
@@ -507,7 +508,7 @@ private fun BlockedContactRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xFF191C23))
+            .background(monetColors.surfaceContainer)
             .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.25f), RoundedCornerShape(18.dp))
             .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
@@ -579,7 +580,7 @@ private fun BlockedContactRow(
                         text = contact.name ?: DialerRepository.formatPhoneNumber(contact.number),
                         fontSize = 14.5.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = monetColors.onSurface,
                         fontFamily = AppFont,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -631,7 +632,7 @@ private fun AddManualBlockDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(24.dp))
-                .background(Color(0xFF1E222B))
+                .background(monetColors.surfaceContainerHigh)
                 .border(1.dp, monetColors.outlineVariant.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
                 .padding(20.dp)
         ) {
@@ -640,7 +641,7 @@ private fun AddManualBlockDialog(
                     text = "Block a number",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = monetColors.onSurface,
                     fontFamily = AppFont
                 )
 
@@ -662,8 +663,8 @@ private fun AddManualBlockDialog(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = monetColors.primary,
                         unfocusedBorderColor = monetColors.outlineVariant.copy(alpha = 0.5f),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedTextColor = monetColors.onSurface,
+                        unfocusedTextColor = monetColors.onSurface
                     ),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -678,8 +679,8 @@ private fun AddManualBlockDialog(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = monetColors.primary,
                         unfocusedBorderColor = monetColors.outlineVariant.copy(alpha = 0.5f),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedTextColor = monetColors.onSurface,
+                        unfocusedTextColor = monetColors.onSurface
                     ),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -744,7 +745,7 @@ private fun BlockContactPickerModal(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF0F1218))
+                .background(monetColors.background)
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
@@ -764,7 +765,7 @@ private fun BlockContactPickerModal(
                         Icon(
                             imageVector = Icons.Rounded.ChevronLeft,
                             contentDescription = "Back",
-                            tint = Color.White,
+                            tint = monetColors.onSurface,
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -773,7 +774,7 @@ private fun BlockContactPickerModal(
                         text = "Select contact to block",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = monetColors.onSurface,
                         fontFamily = AppFont
                     )
                 }
@@ -784,7 +785,7 @@ private fun BlockContactPickerModal(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFF191C23))
+                        .background(monetColors.surfaceContainer)
                         .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
                         .padding(horizontal = 14.dp, vertical = 10.dp)
                 ) {
@@ -803,7 +804,7 @@ private fun BlockContactPickerModal(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
                             textStyle = TextStyle(
-                                color = Color.White,
+                                color = monetColors.onSurface,
                                 fontSize = 14.sp,
                                 fontFamily = AppFont
                             ),
@@ -850,7 +851,7 @@ private fun BlockContactPickerModal(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(14.dp))
-                                .background(Color(0xFF191C23))
+                                .background(monetColors.surfaceContainer)
                                 .clickable {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     onSelectContact(contact)
@@ -896,7 +897,7 @@ private fun BlockContactPickerModal(
                                     text = contact.name,
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = Color.White,
+                                    color = monetColors.onSurface,
                                     fontFamily = AppFont,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis

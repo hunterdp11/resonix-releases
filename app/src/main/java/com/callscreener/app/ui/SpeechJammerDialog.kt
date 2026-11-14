@@ -85,6 +85,7 @@ import androidx.compose.ui.unit.sp
 import com.callscreener.app.engine.JammerMode
 import com.callscreener.app.engine.SpeechJammerEngine
 import com.callscreener.app.ui.theme.AppFont
+import com.callscreener.app.ui.theme.rememberPixelMonetColorScheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -98,17 +99,7 @@ fun SpeechJammerDialog(
     val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
 
-    val colors: ColorScheme = monetColors ?: remember(context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            try {
-                dynamicDarkColorScheme(context)
-            } catch (_: Exception) {
-                getPixelMonetDarkColorScheme()
-            }
-        } else {
-            getPixelMonetDarkColorScheme()
-        }
-    }
+    val colors: ColorScheme = monetColors ?: rememberPixelMonetColorScheme()
 
     var isEnabled by remember { mutableStateOf(engine.isEnabled) }
     var selectedMode by remember { mutableStateOf(engine.mode) }

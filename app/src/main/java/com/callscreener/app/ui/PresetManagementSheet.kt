@@ -99,6 +99,7 @@ import com.callscreener.app.engine.QuickReplyManager
 import com.callscreener.app.model.AudioPreset
 import com.callscreener.app.model.QuickReply
 import com.callscreener.app.ui.theme.AppFont
+import com.callscreener.app.ui.theme.rememberPixelMonetColorScheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -174,17 +175,7 @@ fun PresetManagementScreen(
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
 
-    val colors: ColorScheme = monetColors ?: remember(context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            try {
-                dynamicDarkColorScheme(context)
-            } catch (_: Exception) {
-                getPixelMonetDarkColorScheme()
-            }
-        } else {
-            getPixelMonetDarkColorScheme()
-        }
-    }
+    val colors: ColorScheme = monetColors ?: rememberPixelMonetColorScheme()
 
     val presets by presetManager.presets.collectAsState()
     val quickReplies by quickReplyManager.quickReplies.collectAsState()

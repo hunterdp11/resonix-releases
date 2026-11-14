@@ -28,6 +28,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
 import com.callscreener.app.data.CallerProfileManager
 import com.callscreener.app.data.rememberContactPhotoBitmap
+import com.callscreener.app.ui.theme.rememberPixelMonetColorScheme
+import com.callscreener.app.ui.theme.ThemeManager
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -264,18 +266,8 @@ fun ScreeningCallScreen(
     }
 
     val context = LocalContext.current
-
-    val monetColors = remember(context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            try {
-                dynamicDarkColorScheme(context)
-            } catch (_: Throwable) {
-                getPixelMonetDarkColorScheme()
-            }
-        } else {
-            getPixelMonetDarkColorScheme()
-        }
-    }
+    val isDark = ThemeManager.isDarkTheme()
+    val monetColors = rememberPixelMonetColorScheme(isDark)
 
     val effectiveCallerName = remember(state.callerNumber, state.callerName) {
         val savedName = DialerRepository.lookupContactName(context, state.callerNumber)
@@ -314,10 +306,18 @@ fun ScreeningCallScreen(
     var isAddCallOpen by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
+    val callBg = if (isDark) GlassBackgroundGradient else Brush.verticalGradient(
+        listOf(
+            monetColors.surface,
+            monetColors.surfaceContainerLow,
+            monetColors.surface
+        )
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(GlassBackgroundGradient)
+            .background(callBg)
     ) {
         AmbientLiquidBackdrop(isRinging = currentDisplayMode == CallDisplayMode.INCOMING_RINGING)
 
@@ -2785,7 +2785,7 @@ fun SmartJammerControl(
     isEchoUserVoice: Boolean = false,
     onToggleEchoUserVoice: () -> Unit = {},
     modifier: Modifier = Modifier,
-    monetColors: ColorScheme = getPixelMonetDarkColorScheme()
+    monetColors: ColorScheme = rememberPixelMonetColorScheme()
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -3004,6 +3004,8 @@ fun WaveBar(heightDp: Float, color: Color) {
 
 @Composable
 fun AmbientLiquidBackdrop(isRinging: Boolean = false) {
+    val isDark = ThemeManager.isDarkTheme()
+    val monetColors = rememberPixelMonetColorScheme(isDark)
     val infiniteTransition = rememberInfiniteTransition(label = "auroraShift")
 
     val phase1 by infiniteTransition.animateFloat(
@@ -3045,10 +3047,12 @@ fun AmbientLiquidBackdrop(isRinging: Boolean = false) {
         label = "ringPulse"
     )
 
+    val baseBg = if (isDark) Color(0xFF04060A) else monetColors.surface
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF04060A))
+            .background(baseBg)
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val width = size.width
@@ -3060,14 +3064,25 @@ fun AmbientLiquidBackdrop(isRinging: Boolean = false) {
             val orb1Y = (height * 0.28f) + (height * 0.12f * Math.cos(rad1).toFloat())
             val orb1Radius = width * 0.72f * breathingPulse
 
+            val orb1Colors = if (isDark) {
+                listOf(
+                    Color(0x38007AFF),
+                    Color(0x2200D2FF),
+                    Color(0x0C0044BB),
+                    Color.Transparent
+                )
+            } else {
+                listOf(
+                    monetColors.primary.copy(alpha = 0.18f),
+                    monetColors.secondary.copy(alpha = 0.12f),
+                    monetColors.primaryContainer.copy(alpha = 0.05f),
+                    Color.Transparent
+                )
+            }
+
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(
-                        Color(0x38007AFF),
-                        Color(0x2200D2FF),
-                        Color(0x0C0044BB),
-                        Color.Transparent
-                    ),
+                    colors = orb1Colors,
                     center = Offset(orb1X, orb1Y),
                     radius = orb1Radius
                 ),
@@ -3079,14 +3094,24 @@ fun AmbientLiquidBackdrop(isRinging: Boolean = false) {
             val orb2Y = (height * 0.58f) + (height * 0.14f * Math.sin(rad2).toFloat())
             val orb2Radius = width * 0.76f * (2.05f - breathingPulse)
 
+            val orb2Colors = if (isDark) {
+                listOf(
+                    Color(0x325856D6),
+                    Color(0x1EAF52DE),
+                    Color(0x08331166),
+                    Color.Transparent
+                )
+            } else {
+                listOf(
+                    monetColors.tertiary.copy(alpha = 0.14f),
+                    monetColors.secondaryContainer.copy(alpha = 0.08f),
+                    Color.Transparent
+                )
+            }
+
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(
-                        Color(0x325856D6),
-                        Color(0x1EAF52DE),
-                        Color(0x08331166),
-                        Color.Transparent
-                    ),
+                    colors = orb2Colors,
                     center = Offset(orb2X, orb2Y),
                     radius = orb2Radius
                 ),
@@ -3096,17 +3121,20 @@ fun AmbientLiquidBackdrop(isRinging: Boolean = false) {
 
             val orb3Y = height * 0.86f
             val orb3Radius = width * 0.62f * breathingPulse
-            val orb3Colors = if (isRinging) {
-                listOf(
+            val orb3Colors = when {
+                isRinging -> listOf(
                     Color(0x3830D158).copy(alpha = ringPulse * 0.55f),
                     Color(0x2200C7BE).copy(alpha = ringPulse * 0.38f),
-                    Color(0x0A004D40),
                     Color.Transparent
                 )
-            } else {
-                listOf(
+                isDark -> listOf(
                     Color(0x2000B4D8),
                     Color(0x0E0077B6),
+                    Color.Transparent
+                )
+                else -> listOf(
+                    monetColors.primary.copy(alpha = 0.12f),
+                    monetColors.primaryContainer.copy(alpha = 0.06f),
                     Color.Transparent
                 )
             }
@@ -3122,61 +3150,45 @@ fun AmbientLiquidBackdrop(isRinging: Boolean = false) {
             )
         }
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(360.dp)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color(0x18FFFFFF),
-                            Color(0x07FFFFFF),
-                            Color.Transparent
+        if (isDark) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(360.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color(0x18FFFFFF),
+                                Color(0x07FFFFFF),
+                                Color.Transparent
+                            )
                         )
                     )
-                )
-        )
+            )
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color.Transparent,
-                            Color(0x1A000000),
-                            Color(0x45000000)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.Transparent,
+                                Color(0x1A000000),
+                                Color(0x45000000)
+                            )
                         )
                     )
-                )
-        )
+            )
+        }
     }
 }
 
 internal fun getPixelMonetDarkColorScheme(): ColorScheme {
-    return darkColorScheme(
-        primary = Color(0xFFA8C7FA),
-        onPrimary = Color(0xFF042E69),
-        primaryContainer = Color(0xFF234479),
-        onPrimaryContainer = Color(0xFFD3E3FD),
-        secondary = Color(0xFFC2E7FF),
-        secondaryContainer = Color(0xFF2A4257),
-        onSecondaryContainer = Color(0xFFD4E4F7),
-        tertiary = Color(0xFFD0BCFF),
-        tertiaryContainer = Color(0xFF4A4458),
-        onTertiaryContainer = Color(0xFFE8DEF8),
-        surface = Color(0xFF111318),
-        surfaceContainer = Color(0xFF1E2025),
-        surfaceContainerHigh = Color(0xFF282A2F),
-        surfaceContainerHighest = Color(0xFF33353A),
-        onSurface = Color(0xFFE2E2E6),
-        onSurfaceVariant = Color(0xFFC4C6D0),
-        outline = Color(0xFF8E9099),
-        outlineVariant = Color(0xFF44474F),
-        error = Color(0xFFFFB4AB),
-        errorContainer = Color(0xFF93000A),
-        onErrorContainer = Color(0xFFFFDAD6)
-    )
+    return com.callscreener.app.ui.theme.getPixelMonetDarkColorScheme()
+}
+
+internal fun getPixelMonetLightColorScheme(): ColorScheme {
+    return com.callscreener.app.ui.theme.getPixelMonetLightColorScheme()
 }
 
 @Composable
@@ -3195,17 +3207,8 @@ fun OemIncomingCallScreen(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
 
-    val monetColors = remember(context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            try {
-                dynamicDarkColorScheme(context)
-            } catch (_: Throwable) {
-                getPixelMonetDarkColorScheme()
-            }
-        } else {
-            getPixelMonetDarkColorScheme()
-        }
-    }
+    val isDark = ThemeManager.isDarkTheme()
+    val monetColors = rememberPixelMonetColorScheme(isDark)
 
     var localQuickReplySheet by remember { mutableStateOf(false) }
     val effectiveQuickReplyOpen = if (onToggleQuickReply != null) isQuickReplyOpen else localQuickReplySheet
@@ -4054,7 +4057,7 @@ fun StandardInCallScreen(
     onSwapCalls: () -> Unit = {},
     isAddCallOpen: Boolean = false,
     onToggleAddCall: ((Boolean) -> Unit)? = null,
-    monetColors: ColorScheme = getPixelMonetDarkColorScheme(),
+    monetColors: ColorScheme = rememberPixelMonetColorScheme(),
     isEndCallHandledExternally: Boolean = false,
     isScreenCallAvailable: Boolean = true
 ) {
@@ -5409,7 +5412,7 @@ fun InCallActionButton(
     label: String,
     isActive: Boolean,
     activeColor: Color = Color.Unspecified,
-    monetColors: ColorScheme = getPixelMonetDarkColorScheme(),
+    monetColors: ColorScheme = rememberPixelMonetColorScheme(),
     isAssistantSpecial: Boolean = false,
     onClick: () -> Unit
 ) {
@@ -5535,7 +5538,7 @@ fun InCallActionButton(
 fun InCallDtmfKey(
     digit: Char,
     letters: String,
-    monetColors: ColorScheme = getPixelMonetDarkColorScheme(),
+    monetColors: ColorScheme = rememberPixelMonetColorScheme(),
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
