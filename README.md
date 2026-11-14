@@ -34,10 +34,10 @@ Resonix features an expressive Material You interface with fluid animations, dyn
 | <img src="screenshots/1.PNG" width="240" alt="1. Incoming Call Screen" /> | <img src="screenshots/2.PNG" width="240" alt="2. In-Call Controls Suite" /> | <img src="screenshots/3.PNG" width="240" alt="3. Live AI Call Screening Studio" /> |
 | **Incoming Call Screen**<br>Ambient liquid backdrop, caller ID verification, spam protection badge, and one-tap AI screening invocation. | **In-Call Controls Suite**<br>Active call timer, direct audio path indicators, hold, mute, speaker, keypad, record, add call, and speech jammer. | **Live AI Screening Studio**<br>Real-time speech-to-text live transcripts, instant contextual quick replies, natural voice relay, and direct take-over. |
 
-| 4. Contact Details & Rules | 5. Smart T9 Keypad & Dialer | 6. Telephony Settings & Theme | 7. Recents & History |
-| :---: | :---: | :---: | :---: |
-| <img src="screenshots/4.PNG" width="240" alt="4. Contact Details & Screening Rules" /> | <img src="screenshots/5.PNG" width="240" alt="5. Smart T9 Keypad & Dialer" /> | <img src="screenshots/6.PNG" width="240" alt="6. Telephony Settings & Theme" /> | <img src="screenshots/7.PNG" width="240" alt="7. Recents & Call History" /> |
-| **Contact Info & Rules**<br>Profile management, direct actions, per-caller automated screening rules, VIP exemptions, and custom voice personas. | **Smart T9 Keypad & Dialer**<br>Rapid T9 contact search suggestions, tactile dialpad keys with haptic feedback, and fluid bottom navigation. | **Settings & Theme Engine**<br>Default Phone app handler, spam filters, statistics, call recording engine, and dynamic light/dark theme switch. | **Recents & Call History**<br>Filterable call logs by all and missed calls, integrated search bar, and contact linking. |
+| 4. Contact Details & Rules | 5. Smart T9 Keypad & Dialer | 6. Telephony Settings & Theme |
+| :---: | :---: | :---: |
+| <img src="screenshots/4.PNG" width="240" alt="4. Contact Details & Screening Rules" /> | <img src="screenshots/5.PNG" width="240" alt="5. Smart T9 Keypad & Dialer" /> | <img src="screenshots/6.PNG" width="240" alt="6. Telephony Settings & Theme" /> |
+| **Contact Info & Rules**<br>Profile management, direct actions, per-caller automated screening rules, VIP exemptions, and custom voice personas. | **Smart T9 Keypad & Dialer**<br>Rapid T9 contact search suggestions, tactile dialpad keys with haptic feedback, and fluid bottom navigation. | **Settings & Theme Engine**<br>Default Phone app handler, spam filters, statistics, call recording engine, and dynamic light/dark theme switch. |
 
 ---
 
