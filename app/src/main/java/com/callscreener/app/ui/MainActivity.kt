@@ -505,6 +505,13 @@ fun MainDashboard(
         }
     }
     var currentTab by remember { mutableStateOf(initialTab) }
+    val isRootActive = remember(resumeTrigger) { RootPrivilegeManager.isRootModeActive(context) }
+
+    LaunchedEffect(isRootActive) {
+        if (!isRootActive && currentTab == DialerTab.ASSISTANT) {
+            currentTab = DialerTab.KEYPAD
+        }
+    }
 
     DisposableEffect(Unit) {
         val activity = context as? androidx.activity.ComponentActivity
@@ -693,6 +700,7 @@ fun MainDashboard(
             currentTab = currentTab,
             onTabSelected = { currentTab = it },
             monetColors = monetColors,
+            isRootActive = isRootActive,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
@@ -838,26 +846,30 @@ fun FrostedGlassBottomBar(
     currentTab: DialerTab,
     onTabSelected: (DialerTab) -> Unit,
     monetColors: ColorScheme,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isRootActive: Boolean = RootPrivilegeManager.isRootModeActive(LocalContext.current)
 ) {
     val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current
 
-    val tabs = remember {
-        listOf(
-            Triple(DialerTab.RECENTS, Icons.Rounded.History, "Recents"),
-            Triple(DialerTab.CONTACTS, Icons.Rounded.People, "Contacts"),
-            Triple(DialerTab.KEYPAD, Icons.Rounded.Dialpad, "Keypad"),
-            Triple(DialerTab.ASSISTANT, Icons.Rounded.GraphicEq, "Assistant")
-        )
+    val tabs = remember(isRootActive) {
+        if (isRootActive) {
+            listOf(
+                Triple(DialerTab.RECENTS, Icons.Rounded.History, "Recents"),
+                Triple(DialerTab.CONTACTS, Icons.Rounded.People, "Contacts"),
+                Triple(DialerTab.KEYPAD, Icons.Rounded.Dialpad, "Keypad"),
+                Triple(DialerTab.ASSISTANT, Icons.Rounded.GraphicEq, "Assistant")
+            )
+        } else {
+            listOf(
+                Triple(DialerTab.RECENTS, Icons.Rounded.History, "Recents"),
+                Triple(DialerTab.CONTACTS, Icons.Rounded.People, "Contacts"),
+                Triple(DialerTab.KEYPAD, Icons.Rounded.Dialpad, "Keypad")
+            )
+        }
     }
 
-    val selectedIndex = when (currentTab) {
-        DialerTab.RECENTS -> 0
-        DialerTab.CONTACTS -> 1
-        DialerTab.KEYPAD -> 2
-        DialerTab.ASSISTANT -> 3
-    }
+    val selectedIndex = tabs.indexOfFirst { it.first == currentTab }.let { if (it >= 0) it else 0 }
 
     var isSwiping by remember { mutableStateOf(false) }
     var swipeOffsetPx by remember { mutableFloatStateOf(0f) }
@@ -1803,21 +1815,23 @@ fun RecentsScreen(
                                     onOpenSettings()
                                 }
                             )
-                            DropdownMenuItem(
-                                text = {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-                                        Icon(Icons.Rounded.Tune, contentDescription = null, tint = VibrantAmber, modifier = Modifier.size(18.dp))
-                                        Text("Audio Presets & Personas", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = AppFont)
+                            if (RootPrivilegeManager.isRootModeActive(context)) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            Icon(Icons.Rounded.Tune, contentDescription = null, tint = VibrantAmber, modifier = Modifier.size(18.dp))
+                                            Text("Audio Presets & Personas", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = AppFont)
+                                        }
+                                    },
+                                    onClick = {
+                                        isMenuExpanded = false
+                                        onOpenPresetManager()
                                     }
-                                },
-                                onClick = {
-                                    isMenuExpanded = false
-                                    onOpenPresetManager()
-                                }
-                            )
+                                )
+                            }
                         }
                     }
                 )
@@ -3839,21 +3853,23 @@ fun ContactsScreen(
                                     onOpenSettings()
                                 }
                             )
-                            DropdownMenuItem(
-                                text = {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-                                        Icon(Icons.Rounded.Tune, contentDescription = null, tint = VibrantAmber, modifier = Modifier.size(18.dp))
-                                        Text("Audio Presets & Personas", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = AppFont)
+                            if (RootPrivilegeManager.isRootModeActive(context)) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            Icon(Icons.Rounded.Tune, contentDescription = null, tint = VibrantAmber, modifier = Modifier.size(18.dp))
+                                            Text("Audio Presets & Personas", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = AppFont)
+                                        }
+                                    },
+                                    onClick = {
+                                        isMenuExpanded = false
+                                        onOpenPresetManager()
                                     }
-                                },
-                                onClick = {
-                                    isMenuExpanded = false
-                                    onOpenPresetManager()
-                                }
-                            )
+                                )
+                            }
                         }
                     }
                 }
@@ -4470,36 +4486,38 @@ fun KeypadScreen(
                                 onOpenSettings()
                             }
                         )
-                        DropdownMenuItem(
-                            text = {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Icon(Icons.Rounded.Tune, contentDescription = null, tint = VibrantAmber, modifier = Modifier.size(18.dp))
-                                    Text("Audio Presets & Personas", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = AppFont)
+                        if (RootPrivilegeManager.isRootModeActive(context)) {
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Icon(Icons.Rounded.Tune, contentDescription = null, tint = VibrantAmber, modifier = Modifier.size(18.dp))
+                                        Text("Audio Presets & Personas", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = AppFont)
+                                    }
+                                },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    onOpenPresetManager()
                                 }
-                            },
-                            onClick = {
-                                isMenuExpanded = false
-                                onOpenPresetManager()
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = Color(0xFF2EAA55), modifier = Modifier.size(18.dp))
-                                    Text("AI Screening Studio", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = AppFont)
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = Color(0xFF2EAA55), modifier = Modifier.size(18.dp))
+                                        Text("AI Screening Studio", color = monetColors.onSurface, fontSize = 14.sp, fontFamily = AppFont)
+                                    }
+                                },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    onSwitchTab(DialerTab.ASSISTANT)
                                 }
-                            },
-                            onClick = {
-                                isMenuExpanded = false
-                                onSwitchTab(DialerTab.ASSISTANT)
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             )
@@ -7499,6 +7517,7 @@ fun DialerSettingsSheet(
     }
 
     var showCallStatsScreen by remember { mutableStateOf(false) }
+    val isRootActive = remember(context) { RootPrivilegeManager.isRootModeActive(context) }
     var showRecordingsDialog by remember { mutableStateOf(false) }
     var showSpeechJammerDialog by remember { mutableStateOf(false) }
     var showBlockedNumbersScreen by remember { mutableStateOf(false) }
@@ -7802,152 +7821,154 @@ fun DialerSettingsSheet(
                             )
                         }
 
-                        SettingsSectionHeader(title = "CALL RECORDING ENGINE", monetColors = monetColors)
-                        SettingsGroupCard(monetColors = monetColors) {
-                            SettingsItemRow(
-                                icon = Icons.Filled.Mic,
-                                iconTint = Color(0xFFF28B82),
-                                iconBgColor = Color(0xFFF28B82).copy(alpha = 0.14f),
-                                title = "Auto-Record Calls",
-                                subtitle = if (isAutoRecordEnabled)
-                                    "Dual-side capture: records caller and mic directly"
-                                else
-                                    "Manual recording: tap in-call REC button anytime",
-                                monetColors = monetColors,
-                                trailingContent = {
-                                    Switch(
-                                        checked = isAutoRecordEnabled,
-                                        onCheckedChange = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            onToggleAutoRecord(it)
-                                        },
-                                        colors = SwitchDefaults.colors(
-                                            checkedThumbColor = monetColors.onPrimary,
-                                            checkedTrackColor = monetColors.primary,
-                                            uncheckedThumbColor = monetColors.outline,
-                                            uncheckedTrackColor = monetColors.surfaceVariant
+                        if (isRootActive) {
+                            SettingsSectionHeader(title = "CALL RECORDING ENGINE", monetColors = monetColors)
+                            SettingsGroupCard(monetColors = monetColors) {
+                                SettingsItemRow(
+                                    icon = Icons.Filled.Mic,
+                                    iconTint = Color(0xFFF28B82),
+                                    iconBgColor = Color(0xFFF28B82).copy(alpha = 0.14f),
+                                    title = "Auto-Record Calls",
+                                    subtitle = if (isAutoRecordEnabled)
+                                        "Dual-side capture: records caller and mic directly"
+                                    else
+                                        "Manual recording: tap in-call REC button anytime",
+                                    monetColors = monetColors,
+                                    trailingContent = {
+                                        Switch(
+                                            checked = isAutoRecordEnabled,
+                                            onCheckedChange = {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                onToggleAutoRecord(it)
+                                            },
+                                            colors = SwitchDefaults.colors(
+                                                checkedThumbColor = monetColors.onPrimary,
+                                                checkedTrackColor = monetColors.primary,
+                                                uncheckedThumbColor = monetColors.outline,
+                                                uncheckedTrackColor = monetColors.surfaceVariant
+                                            )
                                         )
-                                    )
-                                }
-                            )
+                                    }
+                                )
 
-                            SettingsDivider(monetColors = monetColors)
+                                SettingsDivider(monetColors = monetColors)
 
-                            SettingsItemRow(
-                                icon = Icons.Rounded.GraphicEq,
-                                iconTint = monetColors.tertiary,
-                                iconBgColor = monetColors.tertiary.copy(alpha = 0.14f),
-                                title = "Saved Recordings",
-                                subtitle = "Playback audio, share WAV files, or manage storage",
-                                monetColors = monetColors,
-                                modifier = Modifier.clickable {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    showRecordingsDialog = true
-                                },
-                                trailingContent = {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(monetColors.surfaceVariant.copy(alpha = 0.7f))
-                                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                SettingsItemRow(
+                                    icon = Icons.Rounded.GraphicEq,
+                                    iconTint = monetColors.tertiary,
+                                    iconBgColor = monetColors.tertiary.copy(alpha = 0.14f),
+                                    title = "Saved Recordings",
+                                    subtitle = "Playback audio, share WAV files, or manage storage",
+                                    monetColors = monetColors,
+                                    modifier = Modifier.clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        showRecordingsDialog = true
+                                    },
+                                    trailingContent = {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(monetColors.surfaceVariant.copy(alpha = 0.7f))
+                                                .padding(horizontal = 10.dp, vertical = 6.dp)
                                         ) {
-                                            Text(
-                                                text = "Manage",
-                                                color = monetColors.onSurface,
-                                                fontSize = 11.5.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                fontFamily = AppFont
-                                            )
-                                            Icon(
-                                                imageVector = Icons.Rounded.ChevronRight,
-                                                contentDescription = null,
-                                                tint = monetColors.onSurfaceVariant,
-                                                modifier = Modifier.size(14.dp)
-                                            )
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Text(
+                                                    text = "Manage",
+                                                    color = monetColors.onSurface,
+                                                    fontSize = 11.5.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    fontFamily = AppFont
+                                                )
+                                                Icon(
+                                                    imageVector = Icons.Rounded.ChevronRight,
+                                                    contentDescription = null,
+                                                    tint = monetColors.onSurfaceVariant,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
                                         }
                                     }
-                                }
-                            )
-                        }
+                                )
+                            }
 
-                        SettingsSectionHeader(title = "SPEECH JAMMER (ACOUSTIC DAF ENGINE)", monetColors = monetColors)
-                        SettingsGroupCard(monetColors = monetColors) {
-                            val jammerEngine = remember { com.callscreener.app.engine.SpeechJammerEngine.getInstance(context) }
-                            var isJammerEnabled by remember { mutableStateOf(jammerEngine.isEnabled) }
+                            SettingsSectionHeader(title = "SPEECH JAMMER (ACOUSTIC DAF ENGINE)", monetColors = monetColors)
+                            SettingsGroupCard(monetColors = monetColors) {
+                                val jammerEngine = remember { com.callscreener.app.engine.SpeechJammerEngine.getInstance(context) }
+                                var isJammerEnabled by remember { mutableStateOf(jammerEngine.isEnabled) }
 
-                            SettingsItemRow(
-                                icon = Icons.Rounded.Psychology,
-                                iconTint = Color(0xFFD0BCFF),
-                                iconBgColor = Color(0xFFD0BCFF).copy(alpha = 0.16f),
-                                title = "Speech Jammer (DAF)",
-                                subtitle = if (isJammerEnabled)
-                                    "Acoustic DAF Active: disrupts caller with ${jammerEngine.delayMs}ms delayed feedback"
-                                else
-                                    "Disabled: in-call Speech Jammer controls hidden",
-                                monetColors = monetColors,
-                                trailingContent = {
-                                    Switch(
-                                        checked = isJammerEnabled,
-                                        onCheckedChange = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            isJammerEnabled = it
-                                            jammerEngine.isEnabled = it
-                                        },
-                                        colors = SwitchDefaults.colors(
-                                            checkedThumbColor = Color(0xFFD0BCFF),
-                                            checkedTrackColor = Color(0xFF6750A4),
-                                            uncheckedThumbColor = monetColors.outline,
-                                            uncheckedTrackColor = monetColors.surfaceVariant
+                                SettingsItemRow(
+                                    icon = Icons.Rounded.Psychology,
+                                    iconTint = Color(0xFFD0BCFF),
+                                    iconBgColor = Color(0xFFD0BCFF).copy(alpha = 0.16f),
+                                    title = "Speech Jammer (DAF)",
+                                    subtitle = if (isJammerEnabled)
+                                        "Acoustic DAF Active: disrupts caller with ${jammerEngine.delayMs}ms delayed feedback"
+                                    else
+                                        "Disabled: in-call Speech Jammer controls hidden",
+                                    monetColors = monetColors,
+                                    trailingContent = {
+                                        Switch(
+                                            checked = isJammerEnabled,
+                                            onCheckedChange = {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                isJammerEnabled = it
+                                                jammerEngine.isEnabled = it
+                                            },
+                                            colors = SwitchDefaults.colors(
+                                                checkedThumbColor = Color(0xFFD0BCFF),
+                                                checkedTrackColor = Color(0xFF6750A4),
+                                                uncheckedThumbColor = monetColors.outline,
+                                                uncheckedTrackColor = monetColors.surfaceVariant
+                                            )
                                         )
-                                    )
-                                }
-                            )
+                                    }
+                                )
 
-                            SettingsDivider(monetColors = monetColors)
+                                SettingsDivider(monetColors = monetColors)
 
-                            SettingsItemRow(
-                                icon = Icons.Rounded.Tune,
-                                iconTint = Color(0xFFE8DEF8),
-                                iconBgColor = Color(0xFFE8DEF8).copy(alpha = 0.16f),
-                                title = "Configure & Live Test Lab",
-                                subtitle = "Adjust 160-240ms delay, intensity gain, or test on your own voice",
-                                monetColors = monetColors,
-                                modifier = Modifier.clickable {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    showSpeechJammerDialog = true
-                                },
-                                trailingContent = {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(Color(0xFFD0BCFF).copy(alpha = 0.2f))
-                                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                SettingsItemRow(
+                                    icon = Icons.Rounded.Tune,
+                                    iconTint = Color(0xFFE8DEF8),
+                                    iconBgColor = Color(0xFFE8DEF8).copy(alpha = 0.16f),
+                                    title = "Configure & Live Test Lab",
+                                    subtitle = "Adjust 160-240ms delay, intensity gain, or test on your own voice",
+                                    monetColors = monetColors,
+                                    modifier = Modifier.clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        showSpeechJammerDialog = true
+                                    },
+                                    trailingContent = {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(Color(0xFFD0BCFF).copy(alpha = 0.2f))
+                                                .padding(horizontal = 10.dp, vertical = 6.dp)
                                         ) {
-                                            Text(
-                                                text = "Tune / Test",
-                                                color = Color(0xFFD0BCFF),
-                                                fontSize = 11.5.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                fontFamily = AppFont
-                                            )
-                                            Icon(
-                                                imageVector = Icons.Rounded.ChevronRight,
-                                                contentDescription = null,
-                                                tint = Color(0xFFD0BCFF),
-                                                modifier = Modifier.size(14.dp)
-                                            )
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Text(
+                                                    text = "Tune / Test",
+                                                    color = Color(0xFFD0BCFF),
+                                                    fontSize = 11.5.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    fontFamily = AppFont
+                                                )
+                                                Icon(
+                                                    imageVector = Icons.Rounded.ChevronRight,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFFD0BCFF),
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
                                         }
                                     }
-                                }
-                            )
+                                )
+                            }
                         }
 
                         SettingsSectionHeader(title = "OPERATING PROFILE & PRIVILEGES", monetColors = monetColors)

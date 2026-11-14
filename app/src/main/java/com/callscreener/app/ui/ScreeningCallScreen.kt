@@ -4715,18 +4715,20 @@ fun StandardInCallScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                            InCallActionButton(
-                                icon = Icons.Rounded.GraphicEq,
-                                label = if (isRecording) "Recording" else "Record",
-                                isActive = isRecording,
-                                activeColor = VibrantRed,
-                                monetColors = monetColors,
-                                onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    onToggleRecording()
-                                }
-                            )
+                        if (isScreenCallAvailable) {
+                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                InCallActionButton(
+                                    icon = Icons.Rounded.GraphicEq,
+                                    label = if (isRecording) "Recording" else "Record",
+                                    isActive = isRecording,
+                                    activeColor = VibrantRed,
+                                    monetColors = monetColors,
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onToggleRecording()
+                                    }
+                                )
+                            }
                         }
 
                         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
