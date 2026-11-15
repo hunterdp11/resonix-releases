@@ -173,6 +173,33 @@ class CallSessionManager private constructor(private val appContext: Context) {
     }
 
     fun attachCall(call: Call, callerNumber: String, callerName: String?, isIncoming: Boolean) {
+        val isConf = call.details?.hasProperty(Call.Details.PROPERTY_CONFERENCE) == true ||
+                !call.children.isNullOrEmpty()
+        if (isConf) {
+            Log.i(TAG, "attachCall: Conference call detected: $call")
+            setConference(true, call)
+            return
+        }
+        if (call.parent != null) {
+            Log.i(TAG, "attachCall: Child of conference detected: $call (parent=${call.parent})")
+            try {
+                if (call.state == Call.STATE_HOLDING) {
+                    call.unhold()
+                }
+            } catch (_: Exception) {}
+            return
+        }
+        if (_sessionState.value.isConference) {
+            Log.i(TAG, "attachCall: Already in conference. Merging new call $call into conference")
+            try {
+                activeTelecomCall?.conference(call)
+            } catch (_: Exception) {}
+            try {
+                if (call.state == Call.STATE_HOLDING) call.unhold()
+            } catch (_: Exception) {}
+            return
+        }
+
         if (hasActiveCall() && activeTelecomCall != call) {
             if (isIncoming && call.state == Call.STATE_RINGING) {
                 attachCallWaiting(call, callerNumber, callerName)
@@ -293,13 +320,58 @@ class CallSessionManager private constructor(private val appContext: Context) {
         _sessionState.update { it.copy(canMergeCalls = canMerge) }
     }
 
-    fun setConference(isConf: Boolean) {
+    fun setConference(isConf: Boolean, conferenceCall: Call? = null) {
+        if (isConf) {
+            if (conferenceCall != null) {
+                activeTelecomCall = conferenceCall
+                secondaryTelecomCall = null
+            } else if (activeTelecomCall?.details?.hasProperty(Call.Details.PROPERTY_CONFERENCE) != true) {
+                val inCallService = CallScreeningInCallService.currentInstance
+                val confCall = inCallService?.calls?.firstOrNull {
+                    it.details?.hasProperty(Call.Details.PROPERTY_CONFERENCE) == true || !it.children.isNullOrEmpty()
+                }
+                if (confCall != null) {
+                    activeTelecomCall = confCall
+                    secondaryTelecomCall = null
+                }
+            }
+
+            // Ensure conference call, all children, and any held calls are unheld so all participants hear voice
+            try {
+                if (activeTelecomCall?.state == Call.STATE_HOLDING) {
+                    activeTelecomCall?.unhold()
+                }
+            } catch (_: Exception) {}
+
+            activeTelecomCall?.children?.forEach { child ->
+                try {
+                    if (child.state == Call.STATE_HOLDING) {
+                        Log.i(TAG, "setConference: unholding child $child")
+                        child.unhold()
+                    }
+                } catch (_: Exception) {}
+            }
+
+            CallScreeningInCallService.currentInstance?.calls?.forEach { c ->
+                try {
+                    if (c.state == Call.STATE_HOLDING) {
+                        Log.i(TAG, "setConference: unholding call $c")
+                        c.unhold()
+                    }
+                } catch (_: Exception) {}
+            }
+
+            CallScreeningInCallService.setCallMute(false)
+            CallScreeningInCallService.isolateMicForAiRelay(false)
+        }
+
         _sessionState.update {
             it.copy(
                 isConference = isConf,
                 canMergeCalls = false,
                 canSwapCalls = false,
-                hasSecondaryCall = false
+                hasSecondaryCall = false,
+                status = if (isConf) CallStatus.USER_TALKING else it.status
             )
         }
         CallScreeningInCallService.syncNotification()
@@ -311,7 +383,29 @@ class CallSessionManager private constructor(private val appContext: Context) {
             val call2 = secondaryTelecomCall
             Log.i(TAG, "mergeConferenceCalls: call1=$call1, call2=$call2")
             var merged = false
-            if (call1 != null && call2 != null) {
+
+            // 1. If either call supports CAPABILITY_MERGE_CONFERENCE, trigger it
+            if (call1?.details?.can(Call.Details.CAPABILITY_MERGE_CONFERENCE) == true) {
+                try {
+                    call1.mergeConference()
+                    merged = true
+                    Log.i(TAG, "call1.mergeConference() executed successfully")
+                } catch (e: Exception) {
+                    Log.w(TAG, "call1.mergeConference() failed", e)
+                }
+            }
+            if (!merged && call2?.details?.can(Call.Details.CAPABILITY_MERGE_CONFERENCE) == true) {
+                try {
+                    call2.mergeConference()
+                    merged = true
+                    Log.i(TAG, "call2.mergeConference() executed successfully")
+                } catch (e: Exception) {
+                    Log.w(TAG, "call2.mergeConference() failed", e)
+                }
+            }
+
+            // 2. Try direct call.conference(otherCall)
+            if (!merged && call1 != null && call2 != null) {
                 try {
                     call1.conference(call2)
                     merged = true
@@ -327,6 +421,8 @@ class CallSessionManager private constructor(private val appContext: Context) {
                     }
                 }
             }
+
+            // 3. Try conferenceableCalls lists
             if (!merged) {
                 val confList1 = call1?.conferenceableCalls
                 if (!confList1.isNullOrEmpty()) {
@@ -342,17 +438,38 @@ class CallSessionManager private constructor(private val appContext: Context) {
                     }
                 }
             }
-            if (merged) {
-                _sessionState.update {
-                    it.copy(
-                        isConference = true,
-                        canMergeCalls = false,
-                        canSwapCalls = false,
-                        hasSecondaryCall = false
-                    )
+
+            // 4. Critical: Unhold both calls and all child calls so every participant hears sound!
+            try {
+                if (call1?.state == Call.STATE_HOLDING) {
+                    Log.i(TAG, "Unholding call1 during merge: $call1")
+                    call1.unhold()
                 }
-                CallScreeningInCallService.syncNotification()
+            } catch (e: Exception) {
+                Log.w(TAG, "Error unholding call1", e)
             }
+            try {
+                if (call2?.state == Call.STATE_HOLDING) {
+                    Log.i(TAG, "Unholding call2 during merge: $call2")
+                    call2.unhold()
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error unholding call2", e)
+            }
+            CallScreeningInCallService.currentInstance?.calls?.forEach { c ->
+                try {
+                    if (c.state == Call.STATE_HOLDING) {
+                        Log.i(TAG, "Unholding call in InCallService calls: $c")
+                        c.unhold()
+                    }
+                } catch (_: Exception) {}
+            }
+
+            // Ensure microphone audio path is not muted
+            CallScreeningInCallService.setCallMute(false)
+            CallScreeningInCallService.isolateMicForAiRelay(false)
+
+            setConference(true)
         } catch (e: Exception) {
             Log.e(TAG, "Error merging conference calls", e)
         }
@@ -1051,6 +1168,44 @@ class CallSessionManager private constructor(private val appContext: Context) {
         val remainingAliveTelecomCalls = inCallService?.calls?.filter {
             it != call && it.state != Call.STATE_DISCONNECTED
         } ?: emptyList()
+
+        if (_sessionState.value.isConference) {
+            val aliveCalls = remainingAliveTelecomCalls
+            if (aliveCalls.size <= 1) {
+                if (aliveCalls.isNotEmpty()) {
+                    val remaining = aliveCalls.first()
+                    activeTelecomCall = remaining
+                    secondaryTelecomCall = null
+                    val num = inCallService?.extractPhoneNumber(remaining) ?: ""
+                    val name = DialerRepository.lookupContactName(appContext, num) ?: remaining.details?.callerDisplayName
+                    try { remaining.unhold() } catch (_: Exception) {}
+                    _sessionState.update {
+                        it.copy(
+                            isConference = false,
+                            callerNumber = num,
+                            callerName = name,
+                            hasSecondaryCall = false,
+                            secondaryCallerNumber = null,
+                            secondaryCallerName = null,
+                            canMergeCalls = false,
+                            canSwapCalls = false,
+                            status = CallStatus.USER_TALKING
+                        )
+                    }
+                    Log.i(TAG, "Conference reduced to single call: $num ($name)")
+                    CallScreeningInCallService.syncNotification()
+                    return
+                } else {
+                    Log.i(TAG, "Conference ended. No remaining alive calls.")
+                    onCallEnded()
+                    return
+                }
+            } else {
+                Log.i(TAG, "Conference participant disconnected; remaining alive calls: ${aliveCalls.size}")
+                CallScreeningInCallService.syncNotification()
+                return
+            }
+        }
 
         if (call == secondaryTelecomCall) {
             secondaryTelecomCall = null

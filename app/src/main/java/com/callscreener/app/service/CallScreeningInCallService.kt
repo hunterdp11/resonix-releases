@@ -142,7 +142,8 @@ class CallScreeningInCallService : InCallService() {
                 }
             }
             if (details.hasProperty(Call.Details.PROPERTY_CONFERENCE)) {
-                CallSessionManager.getInstance(applicationContext).setConference(true)
+                Log.i(TAG, "onDetailsChanged: PROPERTY_CONFERENCE detected on call $call")
+                CallSessionManager.getInstance(applicationContext).setConference(true, call)
             }
         }
 
@@ -156,9 +157,20 @@ class CallScreeningInCallService : InCallService() {
         override fun onChildrenChanged(call: Call, children: MutableList<Call>?) {
             super.onChildrenChanged(call, children)
             val hasChildren = !children.isNullOrEmpty()
-            Log.d(TAG, "onChildrenChanged: hasChildren=$hasChildren")
+            Log.d(TAG, "onChildrenChanged: hasChildren=$hasChildren, children=$children")
             if (hasChildren) {
-                CallSessionManager.getInstance(applicationContext).setConference(true)
+                val sessionManager = CallSessionManager.getInstance(applicationContext)
+                sessionManager.setConference(true, call)
+                children?.forEach { child ->
+                    try {
+                        if (child.state == Call.STATE_HOLDING) {
+                            Log.i(TAG, "onChildrenChanged: Unholding child call $child")
+                            child.unhold()
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Error unholding child call in onChildrenChanged", e)
+                    }
+                }
             }
         }
 
@@ -240,11 +252,20 @@ class CallScreeningInCallService : InCallService() {
                     }
                     Call.STATE_HOLDING -> {
                         Log.i(TAG, "Call on HOLD: $call")
-                        val otherAliveCalls = calls.filter { it != call && it.state != Call.STATE_DISCONNECTED }
-                        if (otherAliveCalls.isEmpty()) {
-                            updateOngoingNotification(statusOverride = "Call on hold")
+                        if (sessionManager.sessionState.value.isConference) {
+                            Log.i(TAG, "Call $call went to HOLDING during active conference; automatically unholding to maintain conference audio")
+                            try {
+                                call.unhold()
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Failed auto-unholding call in conference", e)
+                            }
                         } else {
-                            syncNotification()
+                            val otherAliveCalls = calls.filter { it != call && it.state != Call.STATE_DISCONNECTED }
+                            if (otherAliveCalls.isEmpty()) {
+                                updateOngoingNotification(statusOverride = "Call on hold")
+                            } else {
+                                syncNotification()
+                            }
                         }
                     }
                     Call.STATE_DISCONNECTED -> {
@@ -301,6 +322,33 @@ class CallScreeningInCallService : InCallService() {
             call.registerCallback(callback)
 
             val sessionManager = CallSessionManager.getInstance(applicationContext)
+
+            val isConference = call.details?.hasProperty(Call.Details.PROPERTY_CONFERENCE) == true ||
+                    !call.children.isNullOrEmpty()
+            val isConferenceChild = call.parent != null
+            if (isConference) {
+                Log.i(TAG, "onCallAdded: Conference call detected: $call")
+                sessionManager.setConference(true, call)
+                call.children?.forEach { child ->
+                    try {
+                        if (child.state == Call.STATE_HOLDING) {
+                            Log.i(TAG, "onCallAdded: Unholding child call $child")
+                            child.unhold()
+                        }
+                    } catch (_: Exception) {}
+                }
+                syncNotification()
+                return
+            }
+            if (isConferenceChild) {
+                Log.i(TAG, "onCallAdded: Child call of conference detected: $call")
+                try {
+                    if (call.state == Call.STATE_HOLDING) {
+                        call.unhold()
+                    }
+                } catch (_: Exception) {}
+                return
+            }
 
             val callerNumber = extractPhoneNumber(call)
             val networkCallerName = call.details.callerDisplayName

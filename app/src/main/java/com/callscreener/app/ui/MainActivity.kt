@@ -10065,4 +10065,113 @@ fun SavedRecordingsDialog(
                                                     modifier = Modifier
                                                         .clip(RoundedCornerShape(8.dp))
                                                         .background(monetColors.surfaceContainerHighest)
-... [truncated for diff preview]
+                                                        .padding(horizontal = 7.dp, vertical = 3.dp)
+                                                ) {
+                                                    Text(
+                                                        text = item.fileSizeFormatted,
+                                                        color = monetColors.onSurfaceVariant,
+                                                        fontSize = 10.5.sp,
+                                                        fontFamily = AppFont
+                                                    )
+                                                }
+
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(36.dp)
+                                                        .clip(CircleShape)
+                                                        .background(monetColors.surfaceContainerHighest)
+                                                        .border(0.8.dp, monetColors.outlineVariant.copy(alpha = 0.35f), CircleShape)
+                                                        .clickable {
+                                                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                             try {
+                                                                 val uri = FileProvider.getUriForFile(
+                                                                     context,
+                                                                     "${context.packageName}.fileprovider",
+                                                                     item.file
+                                                                 )
+                                                                 val intent = Intent(Intent.ACTION_SEND).apply {
+                                                                     type = "audio/wav"
+                                                                     putExtra(Intent.EXTRA_STREAM, uri)
+                                                                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                                 }
+                                                                 context.startActivity(Intent.createChooser(intent, "Share Call Recording"))
+                                                             } catch (e: Exception) {
+                                                                 Toast.makeText(context, "Error sharing recording: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                             }
+                                                         },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.Share,
+                                                        contentDescription = "Share",
+                                                        tint = monetColors.onSurfaceVariant,
+                                                        modifier = Modifier.size(15.dp)
+                                                    )
+                                                }
+
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(36.dp)
+                                                        .clip(CircleShape)
+                                                        .background(Color(0xFFFF2D55).copy(alpha = 0.12f))
+                                                        .border(0.8.dp, Color(0xFFFF2D55).copy(alpha = 0.35f), CircleShape)
+                                                        .clickable {
+                                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                            if (isPlaying) {
+                                                                try { mediaPlayer?.stop() } catch (_: Exception) {}
+                                                                playingId = null
+                                                            }
+                                                            scope.launch {
+                                                                sessionManager.recordingEngine.deleteRecording(item.file)
+                                                                recordings = sessionManager.recordingEngine.getSavedRecordings()
+                                                            }
+                                                        },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.Delete,
+                                                        contentDescription = "Delete",
+                                                        tint = Color(0xFFFF2D55),
+                                                        modifier = Modifier.size(15.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+}
+
+@Composable
+fun GlassArchitectureCard() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(elevation = 14.dp, shape = RoundedCornerShape(26.dp), spotColor = Color(0x60000000), ambientColor = Color(0x40000000))
+            .clip(RoundedCornerShape(26.dp))
+            .background(FrostedGlassFillSubtle)
+            .border(1.2.dp, FrostedGlassBorderSubtle, RoundedCornerShape(26.dp))
+            .padding(18.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "System Priv-App Architecture",
+                color = TextPrimary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = "Standard Android security isolates cellular voice channels from 3rd-party user apps. System priv-app installation mounts this package into /system/priv-app with CAPTURE_AUDIO_OUTPUT permissions, bypassing loudspeaker audio loopback.",
+                color = TextTertiary,
+                fontSize = 11.sp,
+                lineHeight = 15.sp
+            )
+        }
+    }
+}
