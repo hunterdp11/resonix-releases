@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="assets/icon.svg" width="96" height="96" alt="Resonix Icon" />
+  <img src="assets/icon.png" width="96" height="96" alt="Resonix Icon" />
 </p>
 
 <h1 align="center">Resonix</h1>
 
 <p align="center">
-  <strong>Next-Generation Android Dialer and Smart Call Screening System with Material You Expressive Design</strong>
+  <strong>Advanced Android Telephony Platform and Hardware Audio Screening Engine</strong>
 </p>
 
 <p align="center">
@@ -21,71 +21,71 @@
 
 ## Overview
 
-Resonix is an open-source Android dialer and call screening platform built with Kotlin and Jetpack Compose. Inspired by Google Pixel Call Screen, Resonix provides a dual-engine architecture: a full-featured, standalone Material You dialer for non-rooted devices, and an optional root-privileged hardware audio injection engine for rooted devices.
+Resonix is an open-source Android dialer and telephony audio routing platform built with Kotlin and Jetpack Compose. It operates in two tiers: a standard Android Telecom dialer for unrooted devices, and a root-privileged hardware ALSA audio injection engine for Magisk, KernelSU, and APatch environments.
 
 ---
 
-## Interface & Screenshots
-
-Resonix features an expressive Material You interface with fluid animations, dynamic Monet color extraction, and dedicated call handling modes.
+## Visual Interface
 
 | 1. Incoming Call | 2. In-Call Telephony Suite | 3. Live AI Screening Studio |
 | :---: | :---: | :---: |
 | <img src="screenshots/1.PNG" width="240" alt="1. Incoming Call Screen" /> | <img src="screenshots/2.PNG" width="240" alt="2. In-Call Controls Suite" /> | <img src="screenshots/3.PNG" width="240" alt="3. Live AI Call Screening Studio" /> |
-| **Incoming Call Screen**<br>Ambient liquid backdrop, caller ID verification, spam protection badge, and one-tap AI screening invocation. | **In-Call Controls Suite**<br>Active call timer, direct audio path indicators, hold, mute, speaker, keypad, record, add call, and speech jammer. | **Live AI Screening Studio**<br>Real-time speech-to-text live transcripts, instant contextual quick replies, natural voice relay, and direct take-over. |
+| **Incoming Call Screen**<br>Caller ID verification, spam protection status, and one-tap screening trigger. | **In-Call Controls Suite**<br>Call timer, hold, mute, speakerphone, DTMF keypad, call recording, add call, and speech jammer. | **Live AI Screening Studio**<br>Real-time speech-to-text transcript feed, contextual quick replies, and direct line take-over. |
 
 | 4. Contact Details & Rules | 5. Smart T9 Keypad & Dialer | 6. Telephony Settings & Theme |
 | :---: | :---: | :---: |
 | <img src="screenshots/4.PNG" width="240" alt="4. Contact Details & Screening Rules" /> | <img src="screenshots/5.PNG" width="240" alt="5. Smart T9 Keypad & Dialer" /> | <img src="screenshots/6.PNG" width="240" alt="6. Telephony Settings & Theme" /> |
-| **Contact Info & Rules**<br>Profile management, direct actions, per-caller automated screening rules, VIP exemptions, and custom voice personas. | **Smart T9 Keypad & Dialer**<br>Rapid T9 contact search suggestions, tactile dialpad keys with haptic feedback, and fluid bottom navigation. | **Settings & Theme Engine**<br>Default Phone app handler, spam filters, statistics, call recording engine, and dynamic light/dark theme switch. |
+| **Contact Info & Rules**<br>Contact management, per-caller automated screening rules, VIP exemptions, and voice personas. | **Smart T9 Keypad & Dialer**<br>T9 contact search suggestions, call logs, speed dial favorites, and bottom navigation. | **Settings & Theme Engine**<br>Default dialer configuration, spam filters, call recording settings, and light/dark theme toggle. |
 
 ---
 
-## Operation Modes and Capabilities
+## Powerful Features
 
-Resonix operates in two distinct tiers based on available device privileges.
+### 1. Root-Privileged Hardware Audio Engine (Magisk / KernelSU / APatch)
 
-### 1. Standard Mode (Non-Root / Any Android 8.0+ Device)
+When superuser access is granted, Resonix installs an integrated system module that mounts the application into `/system/priv-app/Resonix/` with system-level privileged permissions:
 
-Standard Mode requires zero modifications or root access and functions as your primary system Phone app.
-
-* **Default Phone Dialer:** Complete Android Telecom integration managing all incoming and outgoing cellular calls.
-* **Material You Dynamic Theming:** Automatically derives light and dark color schemes from the active system wallpaper using Android Monet palette extraction.
-* **Ambient Liquid Backdrop:** Fluid procedural background color movement during incoming calls and active sessions.
-* **Alphabetical Contacts Quick-Scroller:** High-performance index scrubber with smooth scroll jumping and contact search.
-* **Call Log Management:** Filterable call history by All and Missed calls, contact linking, and speed dial favorites.
-* **In-Call Telephony Suite:**
-  * Hold and resume call functionality.
-  * Microphone mute and speakerphone routing.
-  * Interactive DTMF tone keypad with standard frequencies.
-  * Add call capability with conference merge and active call swapping.
-* **Dynamic Call Capsule:** System-wide floating overlay pill for call management and status display while using other applications.
-* **Spam and Security Protection:** Local database for blocking unwanted numbers and filtering incoming call sessions.
-* **Integrated GitHub OTA Updates:** In-app update checker that downloads and prompts to install new releases directly from GitHub.
-
----
-
-### 2. Root-Enhanced Mode (Magisk / KernelSU / APatch)
-
-When superuser access is granted, Resonix can install an integrated system module that mounts the application into `/system/priv-app/Resonix/` with system-level privileged permissions.
-
-* **Direct Cellular Audio Injection:**
-  * Uses the privileged `MODIFY_AUDIO_ROUTING` and `CAPTURE_AUDIO_OUTPUT` system permissions.
-  * Feeds 16-bit 16kHz linear PCM digital audio streams directly into the active cellular modem uplink mixer.
-* **Zero Room Noise (Loudspeaker Stays Off):**
-  * Synthesized voice and audio playback do not play through the device loudspeaker.
-  * Audio is injected directly into the voice line, making AI call screening completely silent to people around you.
-* **Interactive AI Call Screening:**
-  * Real-time conversational assistant UI displayed during active screening sessions.
-  * Live speech-to-text transcript feed with conversational message bubbles.
-  * Instant quick replies for immediate responses with a single tap.
-  * Custom text relay: Type any message to synthesize natural speech directly to the caller.
-* **Multi-Persona Voice Studio:**
-  * Multiple built-in neural female voice personas (Sarah, Emma, Lily) suited for professional, formal, or casual screening.
-* **Speech Jammer Tool:**
-  * Direct-to-line delayed auditory feedback engine designed to deter automated telemarketers and spam callers.
+* **Direct Baseband Uplink Injection:**
+  * Uses privileged `MODIFY_AUDIO_ROUTING` and `CAPTURE_AUDIO_OUTPUT` system permissions.
+  * Streams 16-bit 16kHz linear PCM digital audio directly into the cellular modem uplink ALSA mixer.
+* **System Audio and Media Injection into Active Calls:**
+  * Streams system audio, media files, and soundboards directly into the active voice call transmission line without loudspeaker bleed.
+* **Zero Room Noise / Silent Screening:**
+  * Synthesized voice and audio playback do not play through the physical loudspeaker.
+  * Audio is injected directly into the voice line, keeping screening sessions silent to nearby listeners.
+* **Hardware Noise Suppression and Echo Cancellation:**
+  * Fluence dual-mic tuning and hardware acoustic echo cancellation (AEC) and noise suppression (NS).
+  * Prevents downlink-to-uplink loopback, ensuring crystal-clear, noise-free calls without background hiss or static.
+* **Lossless Two-Way Call Recording:**
+  * Direct digital audio capture from cellular uplink and downlink streams without microphone speaker bleed or distortion.
+* **Dual-Engine Speech Jammer & Echo Chamber:**
+  * **Delayed Auditory Feedback (DAF):** Configurable millisecond speech collision (100ms - 350ms) to disrupt telemarketers and robocallers.
+  * **Infinite Echo Chamber:** Multi-tap recursive acoustic reflections with adjustable decay and warm low-pass damping.
+  * **Two-Way Echo:** Optional microphone loopback for acoustic reflection testing.
+* **Interactive AI Call Screening and Relay:**
+  * Real-time on-device speech-to-text transcript feed with conversational message bubbles.
+  * Instant contextual quick replies for immediate responses with a single tap.
+  * Custom text relay: Type any message to speak it directly to the caller via synthetic voice.
+  * Multiple built-in neural voice personas (Sarah, Emma, Lily).
 * **Silent One-Tap OTA Updates:**
-  * Performs silent background installation of newer releases without requiring system package installer dialogs.
+  * Background installation of newer releases directly from GitHub without system package installer prompts.
+
+---
+
+### 2. Standard Telephony Suite (Non-Root / All Android 8.0+ Devices)
+
+Standard Mode requires zero modifications or root access and functions as your primary system Phone app:
+
+* **Default Phone Dialer:** Complete Android Telecom `InCallService` integration managing all incoming and outgoing cellular calls.
+* **Multi-Party Call Management:**
+  * Add call capability.
+  * Carrier-verified conference merging.
+  * Call swapping between active and held lines.
+* **Call Log Management:** Filterable call history by All and Missed calls, multi-select deletion, and speed dial favorites with hold-to-delete.
+* **Contact Directory:** Fast T9 contact search and alphabetical index scroller.
+* **Dynamic Call Capsule:** System-wide floating overlay pill for call management and status display while using other applications.
+* **Local Spam Protection:** On-device database for blocking unwanted numbers and filtering incoming call sessions.
+* **Integrated GitHub OTA Updates:** In-app release checker with direct download and installation prompts.
 
 ---
 
@@ -94,33 +94,36 @@ When superuser access is granted, Resonix can install an integrated system modul
 | Capability | Standard Mode (Non-Root) | Root-Enhanced Mode |
 | :--- | :--- | :--- |
 | **Default Phone Dialer** | Supported | Supported |
-| **Material You Dynamic Theming** | Supported | Supported |
-| **Contacts & Quick-Scroller** | Supported | Supported |
-| **Call Logs & Speed Dial** | Supported | Supported |
-| **In-Call Controls (Hold, Mute, Speaker, DTMF)** | Supported | Supported |
 | **Conference Calls (Add, Merge, Swap)** | Supported | Supported |
-| **Dynamic Capsule Overlay** | Supported | Supported |
+| **Call Logs & Multi-Select Deletion** | Supported | Supported |
+| **Contacts & T9 Keypad Search** | Supported | Supported |
+| **Dynamic Capsule Floating Overlay** | Supported | Supported |
 | **Local Number Blocking** | Supported | Supported |
-| **Audio Path** | Standard Telephony Audio | Direct PCM Byte Stream into Cellular Uplink Mixer |
-| **Room Audio Leakage** | Speakerphone output | Completely Silent (Loudspeaker OFF) |
+| **Audio Path** | Standard Telephony Audio | Direct PCM Stream into Modem Uplink Mixer |
+| **Room Audio Leakage** | Loudspeaker output | Completely Silent (Loudspeaker OFF) |
+| **Direct System Audio Injection** | Not Available | Supported |
+| **Hardware Echo Cancellation & Dual-Mic NS** | System Default | Kernel & ALSA Tuned Fluence Dual-Mic |
+| **Two-Way Lossless Call Recording** | Standard AudioRecord | Direct Uplink/Downlink Digital Capture |
+| **Speech Jammer & Echo Chamber** | Not Available | Supported (DAF + Infinite Echo) |
 | **AI Call Screening & Relay** | Not Available | Supported |
-| **Speech Jammer Engine** | Not Available | Supported |
 | **OTA Updates** | System Package Installer | Silent 1-Tap Background Install |
 
 ---
 
-## Architecture and Technology Stack
+## Architecture and Technical Specifications
 
-* **Language:** Kotlin 100% with Coroutines and StateFlow for reactive state management.
-* **UI Toolkit:** Jetpack Compose with Material 3, custom Canvas animations, and Monet color extraction.
+* **Target SDK:** Android 17 (API 37)
+* **Minimum SDK:** Android 8.0 (API 26)
+* **Language:** Kotlin with Coroutines and StateFlow for reactive state management.
+* **UI Toolkit:** Jetpack Compose with Material 3.
 * **Telephony Services:**
   * Android Telecom `InCallService` for call session lifecycle.
   * Android `CallScreeningService` for spam filtering and verification.
 * **Audio Engineering:**
-  * `AudioTrack` configured with `STREAM_VOICE_CALL` / `USAGE_VOICE_COMMUNICATION`.
-  * Direct 16-bit 16kHz PCM digital uplink injection.
+  * Direct 16-bit 16kHz linear PCM digital audio injection.
+  * ALSA hardware mixer tuning for Qualcomm, MediaTek, and Tensor modems.
 * **Root Integration:**
-  * Automated Magisk / KernelSU magic-mount module generator (`RootPrivilegeManager`).
+  * Magisk / KernelSU / APatch module generator (`RootPrivilegeManager`).
   * Privileged permission whitelist configuration (`privapp-permissions-com.callscreener.app.xml`).
 
 ---
@@ -128,7 +131,8 @@ When superuser access is granted, Resonix can install an integrated system modul
 ## Installation
 
 ### Method 1: Download Pre-built Release
-Download the signed release APK from the official [GitHub Releases](https://github.com/hunterdp11/resonix-releases/releases/latest) page.
+Download the signed release APK from the official [GitHub Releases](https://github.com/hunterdp11/resonix-releases/releases/latest) page:
+* File: `Resonix-v1.0.0-release.apk`
 
 ### Method 2: Build from Source
 ```bash
@@ -152,20 +156,9 @@ If your device is rooted with Magisk, KernelSU, or APatch:
 2. On the main dashboard, locate the **Root Priv-App Mode** card.
 3. Tap **Activate Magisk / KernelSU Priv-App Module** and grant Superuser permissions when prompted.
 4. **Reboot your device.**
-5. After rebooting, Resonix will detect the active system module and unlock direct audio injection and AI screening capabilities.
+5. After rebooting, Resonix will detect the active system module and unlock direct hardware audio injection, call recording, and screening capabilities.
 
 To return to Standard Mode at any time, tap **Uninstall Module** in Settings and reboot.
-
----
-
-## Contributing
-
-Contributions, bug reports, and suggestions are welcome.
-1. Fork the repository.
-2. Create your feature branch (`git checkout -b feature/NewFeature`).
-3. Commit your changes (`git commit -m 'feat: add NewFeature'`).
-4. Push to your branch (`git push origin feature/NewFeature`).
-5. Open a Pull Request.
 
 ---
 
