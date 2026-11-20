@@ -61,6 +61,15 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "/META-INF/INDEX.LIST"
+            excludes += "DebugProbesKt.bin"
+            excludes += "/META-INF/*.version"
+            excludes += "kotlin-tooling-metadata.json"
+        }
+        dex {
+            useLegacyPackaging = true
+        }
+        jniLibs {
+            useLegacyPackaging = true
         }
     }
 }
