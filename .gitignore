@@ -1,0 +1,19 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.idea
+.DS_Store
+/build
+/app/build
+/captures
+.externalNativeBuild
+.cxx
+*.apk
+*.aab
+output.json
+.system_generated
+
+# Local environment & runner scripts
+run.ps1
+*.log
