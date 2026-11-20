@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://android.com"><img src="https://img.shields.io/badge/Platform-Android%208.0%2B%20(API%2026%2B)-3DDC84?logo=android&logoColor=white" alt="Platform" /></a>
+  <a href="https://android.com"><img src="https://img.shields.io/badge/Platform-Android%2012%2B%20(API%2031%2B)-3DDC84?logo=android&logoColor=white" alt="Platform" /></a>
   <a href="https://developer.android.com"><img src="https://img.shields.io/badge/Target%20SDK-Android%2017%20(API%2037)-34A853?logo=android&logoColor=white" alt="Target SDK" /></a>
   <a href="https://kotlinlang.org"><img src="https://img.shields.io/badge/Language-Kotlin-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin" /></a>
   <a href="https://developer.android.com/jetpack/compose"><img src="https://img.shields.io/badge/UI-Jetpack%20Compose%20%2F%20Material%203-4285F4?logo=jetpackcompose&logoColor=white" alt="Compose" /></a>
@@ -113,7 +113,7 @@ Standard Mode requires zero modifications or root access and functions as your p
 ## Architecture and Technical Specifications
 
 * **Target SDK:** Android 17 (API 37)
-* **Minimum SDK:** Android 8.0 (API 26)
+* **Minimum SDK:** Android 12 (API 31)
 * **Language:** Kotlin with Coroutines and StateFlow for reactive state management.
 * **UI Toolkit:** Jetpack Compose with Material 3.
 * **Telephony Services:**

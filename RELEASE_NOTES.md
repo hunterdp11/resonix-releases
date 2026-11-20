@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://android.com"><img src="https://img.shields.io/badge/Platform-Android%208.0%2B%20(API%2026%2B)-3DDC84?logo=android&logoColor=white" alt="Platform" /></a>
+  <a href="https://android.com"><img src="https://img.shields.io/badge/Platform-Android%2012%2B%20(API%2031%2B)-3DDC84?logo=android&logoColor=white" alt="Platform" /></a>
   <a href="https://developer.android.com"><img src="https://img.shields.io/badge/Target%20SDK-Android%2017-34A853?logo=android&logoColor=white" alt="Target SDK" /></a>
   <a href="https://kotlinlang.org"><img src="https://img.shields.io/badge/Language-Kotlin-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin" /></a>
   <a href="https://developer.android.com/jetpack/compose"><img src="https://img.shields.io/badge/UI-Jetpack%20Compose%20%2F%20Material%203-4285F4?logo=jetpackcompose&logoColor=white" alt="Compose" /></a>
@@ -82,7 +82,7 @@ Requires zero root permissions or system modifications and serves as your full p
 
 * **Language:** Kotlin with Coroutines and StateFlow for reactive state management.
 * **UI Toolkit:** Jetpack Compose with Material 3.
-* **Target SDK:** Android 17 (Backward compatible with Android 8.0+ / API 26+).
+* **Target SDK:** Android 17 (Minimum Android 12 / API 31+).
 * **Telephony:** Android Telecom `InCallService` and `CallScreeningService`.
 * **Audio Engineering:** Direct 16-bit 16kHz linear PCM digital audio injection, ALSA hardware mixers, and Fluence dual-mic hardware tuning.
 
@@ -91,7 +91,7 @@ Requires zero root permissions or system modifications and serves as your full p
 ## Download and Installation
 
 * **Release APK:** `Resonix-v1.0.0-release.apk`
-* **Requirements:** Android 8.0 (API 26) or higher. Target SDK: Android 17.
+* **Requirements:** Android 12 (API 31) or higher. Target SDK: Android 17.
 * **Setup:**
   1. Download and install `Resonix-v1.0.0-release.apk`.
   2. Open Resonix and grant the requested Phone and Call Screening permissions.
